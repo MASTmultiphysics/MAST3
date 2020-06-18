@@ -31,13 +31,15 @@ class ExceptionBase {
 
 public:
     ExceptionBase(const std::string& cond,
+                  const std::string& val_msg,
                   const std::string& msg,
                   const std::string& file,
                   const int line):
-    _cond  (cond),
-    _msg   (msg),
-    _file  (file),
-    _line  (line)
+    _cond    (cond),
+    _val_msg (val_msg),
+    _msg     (msg),
+    _file    (file),
+    _line    (line)
     { }
 
     virtual ~ExceptionBase() { }
@@ -47,17 +49,16 @@ public:
         std::cerr
         << "Condition Violated: "
         << _cond << std::endl
-        << _error_message() << std::endl
+        << _val_msg << std::endl
         << _file << " : " << _line << std::endl;
         
         throw;
     }
     
 protected:
-    
-    virtual const std::string& _error_message() = 0;
-        
+            
     const std::string _cond;
+    const std::string _val_msg;
     const std::string _msg;
     const std::string _file;
     const int         _line;
@@ -77,19 +78,19 @@ public:
                const std::string& msg,
                const std::string& file,
                const int          line):
-    MAST::Exceptions::ExceptionBase(cond, msg, file, line),
-    _val1    (v1),
-    _valstr  ("Val 1: " + std::to_string(v1))
+    MAST::Exceptions::ExceptionBase(cond,
+                                    "Val 1: " + std::to_string(v1),
+                                    msg,
+                                    file,
+                                    line),
+    _val1    (v1)
     {}
 
     virtual ~Exception1() { }
     
 protected:
-    
-    virtual const std::string& _error_message() override { return _valstr;}
-    
+        
     const Val1Type     _val1;
-    const std::string  _valstr;
 };
 
 
@@ -105,19 +106,19 @@ public:
                const std::string& msg,
                const std::string& file,
                const int          line):
-    MAST::Exceptions::ExceptionBase(cond,  msg, file, line),
+    MAST::Exceptions::ExceptionBase(cond,
+                                    "Val 1: " + std::to_string(v1) + " \nVal 2: " + std::to_string(v2),
+                                    msg,
+                                    file,
+                                    line),
     _val1    (v1),
-    _val2    (v2),
-    _valstr  ("Val 1: " + std::to_string(v1) + " \nVal 2: " + std::to_string(v2))
+    _val2    (v2)
     { }
     
 protected:
     
-    virtual const std::string& _error_message() override { return _valstr;}
-
     Val1Type  _val1;
     Val2Type  _val2;
-    const std::string  _valstr;
 };
 }
 }
@@ -150,5 +151,16 @@ protected:
                                  __LINE__).throw_error()       \
 
 #endif // DEBUG
+
+
+
+#define Error(cond, msg)                                       \
+    if (!(cond))                                               \
+    MAST::Exceptions::ExceptionBase(                           \
+                             #cond,                            \
+                             "  ",                             \
+                             msg,                              \
+                             __FILE__,                         \
+                             __LINE__).throw_error()           \
 
 #endif // __mast__exceptions__
