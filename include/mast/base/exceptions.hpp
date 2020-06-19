@@ -126,10 +126,20 @@ protected:
 
 #ifdef NDEBUG
 
+#define Assert0(cond, msg) { }
 #define Assert1(cond, v1, msg) { }
 #define Assert2(cond, v1, v2, msg)  { }
 
 #else
+
+#define Assert0(cond, msg)                                     \
+    if (!(cond))                                               \
+    MAST::Exceptions::ExceptionBase                            \
+                                (#cond,                        \
+                                 " ",                          \
+                                 msg,                          \
+                                 __FILE__,                     \
+                                 __LINE__).throw_error()       \
 
 #define Assert1(cond, v1, msg)                                 \
     if (!(cond))                                               \

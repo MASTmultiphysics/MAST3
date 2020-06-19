@@ -1,4 +1,5 @@
-#include <mast/base/exceptions.h>
+#include <mast/base/exceptions.hpp>
+#include <mast/util/perf_log.hpp>
 
 int main() {
  
