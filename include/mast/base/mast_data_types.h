@@ -21,11 +21,11 @@
 #define __mast__data_types__
 
 // Eigen includes
-//#include <Eigen/Dense>
+#include <Eigen/Dense>
 
-typedef double Real;
-typedef unsigned int uint_type;
-typedef int int_type;
+typedef double       real_t;
+typedef unsigned int uint_t;
+typedef int          int_t;
 #define ComplexStepDelta 1.e-12
 
 //typedef Matrix<Real, Dynamic, 1> RealVectorX;

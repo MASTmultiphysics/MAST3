@@ -4,7 +4,7 @@ add_executable(structural_example_1
 target_include_directories(structural_example_1 PRIVATE
                             ${PROJECT_SOURCE_DIR}/include)
 
-#target_link_libraries(structural_example_1 mast)
+target_link_libraries(structural_example_1 mast)
 
 #install(TARGETS structural_example_1
 #    RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/examples)

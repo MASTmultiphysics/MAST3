@@ -1,10 +1,13 @@
 #include <mast/base/exceptions.hpp>
 #include <mast/util/perf_log.hpp>
+#include <mast/quadrature/libmesh/quadrature.hpp>
+#include <mast/fe/libmesh/fe.h>
+#include <mast/fe/fe_basis_derivatives.hpp>
+#include <mast/fe/eval/fe_derivative_evaluation.hpp>
+
+struct Context {};
 
 int main() {
- 
-    int a = 1, b = 0;
-    //Assert1(1 == 0, 1, "Checking stuff");
-    //Assert2(a == b, a, b, "Checking stuff");
-    Error(false, "This should quit");
+
+    
 }

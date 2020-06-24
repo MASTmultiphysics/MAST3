@@ -36,9 +36,9 @@ std::vector<double> TEST::eigen_matrix_to_std_vector(RealMatrixX M)
     return vec;
 }
 
-Real TEST::get_shoelace_area(RealMatrixX X)
+real_tTEST::get_shoelace_area(RealMatrixX X)
 {
-    Real true_volume = 0.0;
+    real_ttrue_volume = 0.0;
     uint n_nodes = X.cols();
     for (uint i=0; i<n_nodes-1; i++)
     {
@@ -55,9 +55,9 @@ void TEST::approximate_internal_jacobian_with_finite_difference(
                                     const RealVectorX& initial_elem_solution, 
                                     RealMatrixX& jacobian)
 {
-    Real delta = 3.4526698e-04; // sqrt(eps('single')) in MATLAB
-    //Real delta = 1.1920929e-07; // eps('single') in MATLAB
-    //Real delta = 1.490116119384766e-08; // sqrt(eps('double')) in MATLAB
+    real_tdelta = 3.4526698e-04; // sqrt(eps('single')) in MATLAB
+    //real_tdelta = 1.1920929e-07; // eps('single') in MATLAB
+    //real_tdelta = 1.490116119384766e-08; // sqrt(eps('double')) in MATLAB
     
     int n = jacobian.cols();
     RealMatrixX dummy = RealMatrixX::Zero(n,n);
@@ -111,7 +111,7 @@ void TEST::approximate_side_external_jacobian_with_finite_difference(
                                     const RealVectorX& initial_elem_solution, 
                                     RealMatrixX& jacobian)
 {
-    Real delta = 3.4526698e-04; // sqrt(eps('single')) in MATLAB
+    real_tdelta = 3.4526698e-04; // sqrt(eps('single')) in MATLAB
     
     int n = jacobian.cols();
     RealMatrixX dummy = RealMatrixX::Zero(n,n);
@@ -153,7 +153,7 @@ void TEST::approximate_volume_external_jacobian_with_finite_difference(
                                     const RealVectorX& initial_elem_solution, 
                                     RealMatrixX& jacobian)
 {
-    Real delta = 3.4526698e-04; // sqrt(eps('single')) in MATLAB
+    real_tdelta = 3.4526698e-04; // sqrt(eps('single')) in MATLAB
     
     int n = jacobian.cols();
     RealMatrixX dummy = RealMatrixX::Zero(n,n);
@@ -194,9 +194,9 @@ void TEST::approximate_inertial_jacobian_with_finite_difference(
                                     const RealVectorX& initial_elem_accel, 
                                     RealMatrixX& jacobian)
 {
-    Real delta = 3.4526698e-04; // sqrt(eps('single')) in MATLAB
-    //Real delta = 1.1920929e-07; // eps('single') in MATLAB
-    //Real delta = 1.490116119384766e-08; // sqrt(eps('double')) in MATLAB
+    real_tdelta = 3.4526698e-04; // sqrt(eps('single')) in MATLAB
+    //real_tdelta = 1.1920929e-07; // eps('single') in MATLAB
+    //real_tdelta = 1.490116119384766e-08; // sqrt(eps('double')) in MATLAB
     
     int n = jacobian.cols();
     RealMatrixX dummy = RealMatrixX::Zero(n,n);
@@ -250,9 +250,9 @@ void TEST::approximate_thermal_jacobian_with_finite_difference(
                                     RealMatrixX& jacobian,
                                     MAST::BoundaryConditionBase& thermal_bc)
 {
-    Real delta = 3.4526698e-04; // sqrt(eps('single')) in MATLAB
-    //Real delta = 1.1920929e-07; // eps('single') in MATLAB
-    //Real delta = 1.490116119384766e-08; // sqrt(eps('double')) in MATLAB
+    real_tdelta = 3.4526698e-04; // sqrt(eps('single')) in MATLAB
+    //real_tdelta = 1.1920929e-07; // eps('single') in MATLAB
+    //real_tdelta = 1.490116119384766e-08; // sqrt(eps('double')) in MATLAB
     
     int n = jacobian.cols();
     RealMatrixX dummy = RealMatrixX::Zero(n,n);
@@ -301,10 +301,10 @@ void TEST::approximate_thermal_jacobian_with_finite_difference(
 
 
 void TEST::transform_element(libMesh::MeshBase& mesh, const RealMatrixX X0,
-                        Real shift_x, Real shift_y, Real shift_z,
-                        Real scale_x, Real scale_y,
-                        Real rotation_x, Real rotation_y, Real rotation_z,
-                        Real shear_x, Real shear_y)
+                        real_tshift_x, real_tshift_y, real_tshift_z,
+                        real_tscale_x, real_tscale_y,
+                        real_trotation_x, real_trotation_y, real_trotation_z,
+                        real_tshear_x, real_tshear_y)
 {    
     const uint n_nodes = X0.cols();
     
@@ -343,7 +343,7 @@ void TEST::transform_element(libMesh::MeshBase& mesh, const RealMatrixX X0,
     
     // Rotation Matrices
     RealMatrix3 Rz;
-    Real theta = rotation_z*pi/180.0;
+    real_ttheta = rotation_z*pi/180.0;
     Rz <<  cos(theta),    -sin(theta),         0.0,
            sin(theta),     cos(theta),         0.0,
              0.0,             0.0,             1.0;

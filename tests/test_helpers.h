@@ -38,7 +38,7 @@ namespace TEST {
     /**
      * Calcualtes the area of a 2D polygon using the shoelace formula.
      */
-    Real get_shoelace_area(RealMatrixX X);
+    real_tget_shoelace_area(RealMatrixX X);
 
     /**
      * Approximates the internal Jacobian of an element using a 6th order
@@ -97,9 +97,9 @@ namespace TEST {
      * and in different orientations.
      */
     void transform_element(libMesh::MeshBase& mesh, const RealMatrixX X0,
-                           Real shift_x, Real shift_y, Real shift_z,
-                           Real scale_x, Real scale_y,
-                           Real rotation_x, Real rotation_y, Real rotation_z,
-                           Real shear_x = 0, Real shear_y = 0);
+                           real_tshift_x, real_tshift_y, real_tshift_z,
+                           real_tscale_x, real_tscale_y,
+                           real_trotation_x, real_trotation_y, real_trotation_z,
+                           real_tshear_x = 0, real_tshear_y = 0);
 }
 #endif // __test__test_helpers__

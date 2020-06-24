@@ -22,9 +22,9 @@ public:
       
         EventData(): sys(0.), user(0.), ncalls(0) { }
         
-        Real       sys;
-        Real       user;
-        uint_type  ncalls;
+        real_t      sys;
+        real_t      user;
+        uint_t      ncalls;
     };
     
     
@@ -65,14 +65,14 @@ public:
             _user_time += r.ru_utime.tv_sec + 1.e-6 * r.ru_utime.tv_usec;
         }
         
-        inline Real get_sys_time  () const { return  _sys_time; }
-        inline Real get_user_time () const { return _user_time; }
+        inline real_t get_sys_time  () const { return  _sys_time; }
+        inline real_t get_user_time () const { return _user_time; }
 
     private:
         
         const std::string& _name_ref;
-        Real               _sys_time;
-        Real               _user_time;
+        real_t              _sys_time;
+        real_t              _user_time;
     };
     
     using map_type   = std::map<std::string, MAST::Utility::PerformanceLogging::EventData>;

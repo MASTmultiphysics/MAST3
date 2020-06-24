@@ -114,6 +114,7 @@ add_subdirectory(contrib)
 
 # MAIN TARGETS
 add_subdirectory(include)
+add_subdirectory(src)
 
 # DOCUMENTATION
 if(BUILD_DOC)
