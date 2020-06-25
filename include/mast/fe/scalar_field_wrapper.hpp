@@ -11,7 +11,12 @@ class ScalarFieldWrapper {
 
 public:
     
-    ScalarFieldWrapper() {}
+    ScalarFieldWrapper():
+    _fe              (nullptr),
+    _fe_derivative   (nullptr),
+    _comp            (0),
+    _comp_derivative (0)
+    {}
     
     virtual ~ScalarFieldWrapper() { }
     
