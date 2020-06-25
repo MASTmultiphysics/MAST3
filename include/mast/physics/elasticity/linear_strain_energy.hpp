@@ -26,7 +26,7 @@ public:
 
     using scalar_t         = typename FEVarType::scalar_t;
     using basis_scalar_t   = typename FEVarType::fe_basis_t::scalar_t;
-    using vector_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
+    using vector_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using matrix_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     using section_scalar_t = typename SectionPropertyType::scalar_t;
     using fe_basis_t       = typename FEVarType::fe_basis_t;
@@ -134,7 +134,7 @@ public:
 
         MAST::Numerics::FEMOperatorMatrix<scalar_t>
         Bxmat;
-        Bxmat.reinit(n_strain, 2, fe.n_basis());
+        Bxmat.reinit(n_strain, Dim, fe.n_basis());
 
         
         for (uint_t i=0; i<fe.n_q_points(); i++) {

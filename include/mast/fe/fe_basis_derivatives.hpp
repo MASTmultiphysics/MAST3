@@ -26,6 +26,7 @@ public:
     using dx_dxi_mat_t  = typename Eigen::Map<const typename Eigen::Matrix<NodalScalarType, SpatialDim, ElemDim>>;
     using dphi_dx_mat_t = typename Eigen::Map<const typename Eigen::Matrix<NodalScalarType, Eigen::Dynamic, SpatialDim>>;
     using dphi_dx_vec_t = typename Eigen::Map<const typename Eigen::Matrix<NodalScalarType, Eigen::Dynamic, 1>>;
+    using normal_vec_t  = typename Eigen::Map<const typename Eigen::Matrix<NodalScalarType, SpatialDim, 1>>;
     static_assert(std::is_same<BasisScalarType, typename FEBasisType::scalar_t>::value,
                   "BasisScalarType incompatible with FEBasisType::scalar_t.");
     static_assert(ElemDim == FEBasisType::ref_dim,
@@ -276,6 +277,23 @@ public:
         Assert0(_if_dphi_dx, "Jacobian inverse computation not requested");
 
         return _dphi_dx(qp, x_i*this->n_basis()+phi_i);
+    }
+
+    inline normal_vec_t normal(uint_t qp) const
+    {
+        Assert0(_if_normal, "Normal not requested");
+
+        return normal_vec_t(_side_normal.col(qp).data(), SpatialDim);
+    }
+
+    inline NodalScalarType     normal(uint_t qp, uint_t x_i) const
+    {
+        Assert0(_if_normal, "Normal not requested");
+        Assert2(x_i < SpatialDim,
+                x_i, SpatialDim,
+                "Invalid normal component index");
+
+        return _side_normal(x_i, qp);
     }
 
 protected:
