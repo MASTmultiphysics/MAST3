@@ -50,8 +50,8 @@ private:
     real_t                   _p;
     const DensityFieldType&  _d;
 };
-}
-}
-}
+} // namespace SIMP
+} // namespace Physics
+} // namespace MAST
 
 #endif  // __mast_simp_penalized_density_h__
