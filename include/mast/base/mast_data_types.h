@@ -29,68 +29,6 @@ typedef int                  int_t;
 typedef std::complex<real_t> complex_t;
 #define ComplexStepDelta     1.e-12
 
-//typedef Matrix<Real, Dynamic, 1> RealVectorX;
-//typedef Matrix<Real, 3, 1> RealVector3;
-//typedef Matrix<Complex, Dynamic, 1> ComplexVectorX;
-//typedef Matrix<Complex, 3, 1> ComplexVector3;
-//template <typename ValType> struct VectorType{typedef void return_type;};
-//template < > struct VectorType<Real> {typedef RealVectorX return_type;};
-//template < > struct VectorType<Complex> {typedef ComplexVectorX return_type;};
-//
-//
-//typedef Matrix<Real, Dynamic, Dynamic> RealMatrixX;
-//typedef Matrix<Real, 3, 3> RealMatrix3;
-//typedef Matrix<Complex, Dynamic, Dynamic> ComplexMatrixX;
-//typedef Matrix<Complex, 3, 3> ComplexMatrix3;
-//template <typename ValType> struct MatrixType{typedef void return_type;};
-//template < > struct MatrixType<Real>    {typedef RealMatrixX return_type;};
-//template < > struct MatrixType<Complex> {typedef ComplexMatrixX return_type;};
-//
-//
-//typedef libMesh::DenseMatrix<Real> DenseRealMatrix;
-//typedef libMesh::DenseMatrix<Complex> DenseComplexMatrix;
-//
-//typedef libMesh::DenseVector<Real> DenseRealVector;
-//typedef libMesh::DenseVector<Complex> DenseComplexVector;
-//
-//template <typename ScalarType>
-//struct EigenVector
-//{
-//    using type     =  Eigen::Matrix<ScalarType, Dynamic, 1>;
-//    using map_type =  Eigen::Map<type>;
-//};
-//
-//template <typename ScalarType>
-//struct EigenRowVector
-//{
-//    using type     =  Eigen::Matrix<ScalarType, 1, Dynamic>;
-//    using map_type =  Eigen::Map<type>;
-//};
-//
-//
-//// choosing the matrix type to be column-major, based on the discussion here
-//// https://eigen.tuxfamily.org/dox/group__TopicStorageOrders.html
-//template <typename ScalarType>
-//struct EigenMatrix
-//{
-//    using type     =  Eigen::Matrix<ScalarType, Dynamic, Dynamic, ColMajor>;
-//    using map_type =  Eigen::Map<type>;
-//};
-//
-//
-//struct EigenTraits {
-//
-//    template <typename ScalarType>
-//    using matrix_type     = typename EigenMatrix<ScalarType>::type;
-//    template <typename ScalarType>
-//    using matrix_map_type = typename EigenMatrix<ScalarType>::map_type;
-//    template <typename ScalarType>
-//    using vector_type     = typename EigenVector<ScalarType>::type;
-//    template <typename ScalarType>
-//    using vector_map_type = typename EigenVector<ScalarType>::map_type;
-//};
-//
-//
 namespace MAST {
 
 template <typename NodalScalarType, typename SolScalarType>
