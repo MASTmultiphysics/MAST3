@@ -16,10 +16,10 @@ namespace Elasticity {
 template <typename NodalScalarType, typename VarScalarType, typename FEVarType, uint_t Dim>
 inline
 typename std::enable_if<Dim == 2, void>::type
-void linear_continuum_strain(const FEVarType& fe_var,
-                             const uint_type qp,
-                             typename Eigen::Matrix<VarScalarType, 3, 1>::type& epsilon,
-                             MAST::FEMOperatorMatrixBase<NodalScalarType>& Bmat) {
+linear_continuum_strain(const FEVarType&                                    fe_var,
+                        const uint_t                                        qp,
+                        typename Eigen::Matrix<VarScalarType, 3, 1>::type&  epsilon,
+                        MAST::Numerics::FEMOperatorMatrix<NodalScalarType>& Bmat) {
     
     epsilon.setZero();
     

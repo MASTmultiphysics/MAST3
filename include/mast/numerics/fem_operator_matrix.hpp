@@ -25,8 +25,8 @@
 #include <iomanip>
 
 // MAST includes
-#include "base/mast_data_types.h"
-
+#include <mast/base/mast_data_types.h>
+#include <mast/base/exceptions.hpp>
 
 
 
@@ -34,13 +34,13 @@ namespace MAST {
 namespace Numerics {
 
 template <typename ScalarType>
-class FEMOperatorMatrixBase
+class FEMOperatorMatrix
 {
 public:
-    FEMOperatorMatrixBase();
+    FEMOperatorMatrix();
     
     
-    virtual ~FEMOperatorMatrixBase();
+    virtual ~FEMOperatorMatrix();
     
     
     /*!
@@ -120,7 +120,7 @@ public:
      */
     template <typename T>
     void right_multiply_transpose(T& r,
-                                  const MAST::Numerics::FEMOperatorMatrixBase<ScalarType>& m) const;
+                                  const MAST::Numerics::FEMOperatorMatrix<ScalarType>& m) const;
     
     
     /*!
@@ -167,7 +167,7 @@ protected:
 } // namespace MAST
 
 template <typename ScalarType>
-MAST::Numerics::FEMOperatorMatrixBase<ScalarType>::FEMOperatorMatrixBase():
+MAST::Numerics::FEMOperatorMatrix<ScalarType>::FEMOperatorMatrix():
 _n_interpolated_vars(0),
 _n_discrete_vars(0),
 _n_dofs_per_var(0)
@@ -177,7 +177,7 @@ _n_dofs_per_var(0)
 
 
 template <typename ScalarType>
-MAST::Numerics::FEMOperatorMatrixBase<ScalarType>::~FEMOperatorMatrixBase()
+MAST::Numerics::FEMOperatorMatrix<ScalarType>::~FEMOperatorMatrix()
 {
     this->clear();
 }
@@ -186,7 +186,7 @@ MAST::Numerics::FEMOperatorMatrixBase<ScalarType>::~FEMOperatorMatrixBase()
 template <typename ScalarType>
 inline
 void
-MAST::Numerics::FEMOperatorMatrixBase<ScalarType>::print(std::ostream& o) {
+MAST::Numerics::FEMOperatorMatrix<ScalarType>::print(std::ostream& o) {
     
     unsigned int index = 0;
     
@@ -208,7 +208,7 @@ MAST::Numerics::FEMOperatorMatrixBase<ScalarType>::print(std::ostream& o) {
 template <typename ScalarType>
 inline
 void
-MAST::Numerics::FEMOperatorMatrixBase<ScalarType>::clear() {
+MAST::Numerics::FEMOperatorMatrix<ScalarType>::clear() {
     
     _n_interpolated_vars = 0;
     _n_discrete_vars     = 0;
@@ -232,7 +232,7 @@ MAST::Numerics::FEMOperatorMatrixBase<ScalarType>::clear() {
 template <typename ScalarType>
 inline
 void
-MAST::Numerics::FEMOperatorMatrixBase<ScalarType>::
+MAST::Numerics::FEMOperatorMatrix<ScalarType>::
 reinit(unsigned int n_interpolated_vars,
        unsigned int n_discrete_vars,
        unsigned int n_discrete_dofs_per_var) {
@@ -250,18 +250,24 @@ template <typename ScalarType>
 template <typename VecType>
 inline
 void
-MAST::Numerics::FEMOperatorMatrixBase<ScalarType>::
+MAST::Numerics::FEMOperatorMatrix<ScalarType>::
 set_shape_function(unsigned int interpolated_var,
                    unsigned int discrete_var,
                    const VecType& shape_func) {
     
     // make sure that reinit has been called.
-    libmesh_assert(_var_shape_functions.size());
+    Assert0(_var_shape_functions.size(), "Object not initialized");
     
     // also make sure that the specified indices are within bounds
-    libmesh_assert(interpolated_var < _n_interpolated_vars);
-    libmesh_assert(discrete_var < _n_discrete_vars);
-    libmesh_assert_equal_to(shape_func.size(), _n_dofs_per_var);
+    Assert2(interpolated_var < _n_interpolated_vars,
+            interpolated_var, _n_interpolated_vars,
+            "Invalid interpolation variable index");
+    Assert2(discrete_var < _n_discrete_vars,
+            discrete_var, _n_discrete_vars,
+            "Invalid discrete variable index");
+    Assert2(shape_func.size() == _n_dofs_per_var,
+            shape_func.size(), _n_dofs_per_var,
+            "Invalid basis function vector size.");
     
     ScalarType* vec =
     _var_shape_functions[discrete_var*_n_interpolated_vars+interpolated_var];
@@ -272,7 +278,7 @@ set_shape_function(unsigned int interpolated_var,
         _var_shape_functions[discrete_var*_n_interpolated_vars+interpolated_var] = vec;
     }
     
-    for (uint_type i=0; i<_n_dofs_per_var; i++)
+    for (uint_t i=0; i<_n_dofs_per_var; i++)
         vec[i] = shape_func(i);
 }
 
@@ -282,7 +288,7 @@ template <typename ScalarType>
 template <typename VecType>
 inline
 void
-MAST::Numerics::FEMOperatorMatrixBase<ScalarType>::
+MAST::Numerics::FEMOperatorMatrix<ScalarType>::
 reinit(unsigned int n_vars,
        const VecType& shape_func) {
     
@@ -296,7 +302,7 @@ reinit(unsigned int n_vars,
     for (unsigned int i=0; i<n_vars; i++)
     {
         ScalarType *vec = new ScalarType[_n_dofs_per_var];
-        for (uint_type i=0; i<_n_dofs_per_var; i++)
+        for (uint_t i=0; i<_n_dofs_per_var; i++)
             vec[i] = shape_func(i);
         _var_shape_functions[i*n_vars+i] = vec;
     }
@@ -308,11 +314,15 @@ template <typename ScalarType>
 template <typename T>
 inline
 void
-MAST::Numerics::FEMOperatorMatrixBase<ScalarType>::
+MAST::Numerics::FEMOperatorMatrix<ScalarType>::
 vector_mult(T& res, const T& v) const {
     
-    libmesh_assert_equal_to(res.size(), _n_interpolated_vars);
-    libmesh_assert_equal_to(v.size(), n());
+    Assert2(res.size() == _n_interpolated_vars,
+            res.size(), _n_interpolated_vars,
+            "Incompatible vector size.");
+    Assert2(v.size() == n(),
+            v.size(), n(),
+            "Incompatible vector size");
     
     res.setZero();
     unsigned int index = 0;
@@ -331,11 +341,15 @@ template <typename ScalarType>
 template <typename T>
 inline
 void
-MAST::Numerics::FEMOperatorMatrixBase<ScalarType>::
+MAST::Numerics::FEMOperatorMatrix<ScalarType>::
 vector_mult_transpose(T& res, const T& v) const {
     
-    libmesh_assert_equal_to(res.size(), n());
-    libmesh_assert_equal_to(v.size(), _n_interpolated_vars);
+    Assert2(res.size() == n(),
+            res.size(), n(),
+            "Incompatible vector size");
+    Assert2(v.size() == _n_interpolated_vars,
+            v.size(), _n_interpolated_vars,
+            "Incompatible vector size");
     
     res.setZero(res.size());
     unsigned int index = 0;
@@ -356,13 +370,19 @@ template <typename ScalarType>
 template <typename T>
 inline
 void
-MAST::Numerics::FEMOperatorMatrixBase<ScalarType>::
+MAST::Numerics::FEMOperatorMatrix<ScalarType>::
 right_multiply(T& r, const T& m) const {
     
-    libmesh_assert_equal_to(r.rows(), _n_interpolated_vars);
-    libmesh_assert_equal_to(r.cols(), m.cols());
-    libmesh_assert_equal_to(m.rows(), n());
-    
+    Assert2(r.rows() == _n_interpolated_vars,
+            r.rows(), _n_interpolated_vars,
+            "Incompatible matrix row dimension");
+    Assert2(r.cols() == m.cols(),
+            r.cols(), m.cols(),
+            "Incompatible matrix column dimension");
+    Assert2(m.rows() == n(),
+            m.rows(), n(),
+            "Incompatible matrix row dimension");
+
     r.setZero();
     unsigned int index = 0;
     
@@ -385,12 +405,18 @@ template <typename ScalarType>
 template <typename T>
 inline
 void
-MAST::Numerics::FEMOperatorMatrixBase<ScalarType>::
+MAST::Numerics::FEMOperatorMatrix<ScalarType>::
 right_multiply_transpose(T& r, const T& m) const {
     
-    libmesh_assert_equal_to(r.rows(), n());
-    libmesh_assert_equal_to(r.cols(), m.cols());
-    libmesh_assert_equal_to(m.rows(), _n_interpolated_vars);
+    Assert2(r.rows() == n(),
+            r.rows(), n(),
+            "Incompatible matrix row dimension");
+    Assert2(r.cols() == m.cols(),
+            r.cols(), m.cols(),
+            "Incompatible matrix column dimension");
+    Assert2(m.rows() == _n_interpolated_vars,
+            m.rows(), _n_interpolated_vars,
+            "Incompatible matrix row dimension");
     
     r.setZero(r.rows(), r.cols());
     unsigned int index = 0;
@@ -413,12 +439,18 @@ template <typename ScalarType>
 template <typename T>
 inline
 void
-MAST::Numerics::FEMOperatorMatrixBase<ScalarType>::
-right_multiply_transpose(T& r, const MAST::Numerics::FEMOperatorMatrixBase<ScalarType>& m) const {
+MAST::Numerics::FEMOperatorMatrix<ScalarType>::
+right_multiply_transpose(T& r, const MAST::Numerics::FEMOperatorMatrix<ScalarType>& m) const {
     
-    libmesh_assert_equal_to(r.rows(), n());
-    libmesh_assert_equal_to(r.cols(), m.n());
-    libmesh_assert_equal_to(_n_interpolated_vars, m._n_interpolated_vars);
+    Assert2(r.rows() == n(),
+            r.rows(), n(),
+            "Incompatible matrix row dimension");
+    Assert2(r.cols() == m.n(),
+            r.cols(), m.n(),
+            "Incompatible matrix column dimension");
+    Assert2(_n_interpolated_vars == m._n_interpolated_vars,
+            _n_interpolated_vars, m._n_interpolated_vars,
+            "Incompatible number of variables");
     
     r.setZero();
     unsigned int index_i, index_j = 0;
@@ -448,12 +480,18 @@ template <typename ScalarType>
 template <typename T>
 inline
 void
-MAST::Numerics::FEMOperatorMatrixBase<ScalarType>::
+MAST::Numerics::FEMOperatorMatrix<ScalarType>::
 left_multiply(T& r, const T& m) const {
     
-    libmesh_assert_equal_to(r.rows(), m.rows());
-    libmesh_assert_equal_to(r.cols(), n());
-    libmesh_assert_equal_to(m.cols(), _n_interpolated_vars);
+    Assert2(r.rows() == m.rows(),
+            r.rows(), m.rows(),
+            "Incompatible matrix rows");
+    Assert2(r.cols() == n(),
+            r.cols(), n(),
+            "Incompatible matrix columns");
+    Assert2(m.cols() == _n_interpolated_vars,
+            m.cols(), _n_interpolated_vars,
+            "Incompatible matrix columns");
     
     r.setZero(r.rows(), r.cols());
     unsigned int index = 0;
@@ -476,12 +514,18 @@ template <typename ScalarType>
 template <typename T>
 inline
 void
-MAST::Numerics::FEMOperatorMatrixBase<ScalarType>::
+MAST::Numerics::FEMOperatorMatrix<ScalarType>::
 left_multiply_transpose(T& r, const T& m) const {
     
-    libmesh_assert_equal_to(r.rows(), m.rows());
-    libmesh_assert_equal_to(r.cols(), _n_interpolated_vars);
-    libmesh_assert_equal_to(m.cols(), n());
+    Assert2(r.rows() == m.rows(),
+            r.rows(), m.rows(),
+            "Incompatible matrix rows");
+    Assert2(r.cols() == _n_interpolated_vars,
+            r.cols(), _n_interpolated_vars,
+            "Incompatible matrix columns");
+    Assert2(m.cols() == n(),
+            m.cols(), n(),
+            "Incompatible matrix columns");
     
     r.setZero();
     unsigned int index = 0;

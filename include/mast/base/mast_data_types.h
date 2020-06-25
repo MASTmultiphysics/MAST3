@@ -23,10 +23,11 @@
 // Eigen includes
 #include <Eigen/Dense>
 
-typedef double       real_t;
-typedef unsigned int uint_t;
-typedef int          int_t;
-#define ComplexStepDelta 1.e-12
+typedef double               real_t;
+typedef unsigned int         uint_t;
+typedef int                  int_t;
+typedef std::complex<real_t> complex_t;
+#define ComplexStepDelta     1.e-12
 
 //typedef Matrix<Real, Dynamic, 1> RealVectorX;
 //typedef Matrix<Real, 3, 1> RealVector3;
@@ -90,23 +91,23 @@ typedef int          int_t;
 //};
 //
 //
-//namespace MAST {
-//
-//template <typename NodalScalarType, typename SolScalarType>
-//struct DeducedScalarType { };
-//
-//template <>
-//struct DeducedScalarType<Real, Real> { using type = Real;};
-//
-//template <>
-//struct DeducedScalarType<std::complex<Real>, Real> { using type = std::complex<Real>;};
-//
-//template <>
-//struct DeducedScalarType<Real, std::complex<Real>> { using type = std::complex<Real>;};
-//
-//template <>
-//struct DeducedScalarType<std::complex<Real>, std::complex<Real>> { using type = std::complex<Real>;};
-//
-//}
+namespace MAST {
+
+template <typename NodalScalarType, typename SolScalarType>
+struct DeducedScalarType { };
+
+template <>
+struct DeducedScalarType<real_t, real_t> { using type = real_t;};
+
+template <>
+struct DeducedScalarType<std::complex<real_t>, real_t> { using type = std::complex<real_t>;};
+
+template <>
+struct DeducedScalarType<real_t, std::complex<real_t>> { using type = std::complex<real_t>;};
+
+template <>
+struct DeducedScalarType<std::complex<real_t>, std::complex<real_t>> { using type = std::complex<real_t>;};
+
+}
 
 #endif // __mast__data_types__
