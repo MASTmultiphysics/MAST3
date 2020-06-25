@@ -16,18 +16,18 @@ namespace Elasticity {
 template <typename NodalScalarType, typename VarScalarType, typename FEVarType, uint_t Dim>
 inline
 typename std::enable_if<Dim == 2, void>::type
-void green_lagrange_strain_operator(const FEVarType& fe_var,
-                                    const uint_t qp,
-                                    typename Eigen::Matrix<VarScalarType, 3, 1>::type& epsilon,
-                                    typename Eigen::Matrix<VarScalarType, 3, 1>::type& epsilon,
-                                    EigenVector<ScalarType>& epsilon,
-                                    EigenMatrix<ScalarType>& mat_x,
-                                    EigenMatrix<ScalarType>& mat_y,
-                                    MAST::FEMOperatorMatrixBase<ScalarType>& Bmat_lin,
-                                    MAST::FEMOperatorMatrixBase<ScalarType>& Bmat_nl_x,
-                                    MAST::FEMOperatorMatrixBase<ScalarType>& Bmat_nl_y,
-                                    MAST::FEMOperatorMatrixBase<ScalarType>& Bmat_nl_u,
-                                    MAST::FEMOperatorMatrixBase<ScalarType>& Bmat_nl_v) {
+green_lagrange_strain_operator(const FEVarType&                                    fe_var,
+                               const uint_t                                        qp,
+                               typename Eigen::Matrix<VarScalarType, 2, 2>&        E,
+                               typename Eigen::Matrix<VarScalarType, 2, 2>&        F,
+                               typename Eigen::Matrix<VarScalarType, 3, 1>&        epsilon,
+                               typename Eigen::Matrix<VarScalarType, 3, 2>&        mat_x,
+                               typename Eigen::Matrix<VarScalarType, 3, 2>&        mat_y,
+                               MAST::Numerics::FEMOperatorMatrix<NodalScalarType>& Bmat_lin,
+                               MAST::Numerics::FEMOperatorMatrix<NodalScalarType>& Bmat_nl_x,
+                               MAST::Numerics::FEMOperatorMatrix<NodalScalarType>& Bmat_nl_y,
+                               MAST::Numerics::FEMOperatorMatrix<NodalScalarType>& Bmat_nl_u,
+                               MAST::Numerics::FEMOperatorMatrix<NodalScalarType>& Bmat_nl_v) {
     
     
     epsilon.setZero();

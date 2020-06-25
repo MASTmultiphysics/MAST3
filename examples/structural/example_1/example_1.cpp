@@ -6,6 +6,7 @@
 #include <mast/fe/eval/fe_derivative_evaluation.hpp>
 #include <mast/fe/fe_var_data.hpp>
 #include <mast/physics/elasticity/linear_elastic_strain_operator.hpp>
+#include <mast/physics/elasticity/green_lagrange_strain.hpp>
 
 struct Context {};
 
