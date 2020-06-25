@@ -21,8 +21,9 @@ class FEVarData {
   
 public:
     
-    using var_scalar_t     = typename MAST::DeducedScalarType<NodalScalarType, SolScalarType>::type;
-    using sol_vec_view_t   = Eigen::Map<const typename Eigen::Matrix<var_scalar_t, NComponents, 1>>;
+    using fe_basis_t       = FEBasisDerivativeType;
+    using scalar_t         = typename MAST::DeducedScalarType<NodalScalarType, SolScalarType>::type;
+    using sol_vec_view_t   = Eigen::Map<const typename Eigen::Matrix<scalar_t, NComponents, 1>>;
     
     FEVarData():
     _compute_du_dx   (nullptr),
@@ -86,7 +87,7 @@ public:
         return _fe->n_q_points();
     }
     
-    inline var_scalar_t u(uint_t qp, uint_t comp) const  {
+    inline scalar_t u(uint_t qp, uint_t comp) const  {
         
         Assert0(_coeff_vec.size(), "Object not initialized");
         Assert2(comp <= NComponents,
@@ -96,7 +97,7 @@ public:
         return _u(qp, comp);
     }
     
-    inline var_scalar_t du_dx(uint_t qp, uint_t comp, uint_t x_i) const
+    inline scalar_t du_dx(uint_t qp, uint_t comp, uint_t x_i) const
     {
         Assert0(_compute_du_dx, "Object not initialized with du/dx");
         Assert0(_coeff_vec.size(), "Object not initialized");
@@ -120,7 +121,7 @@ protected:
                 n_coeffs, _fe->n_basis() * NComponents,
                 "Incompatible dimensions of coefficient vector");
         
-        _coeff_vec = Eigen::Matrix<var_scalar_t, Eigen::Dynamic, 1>::Zero(n_coeffs);
+        _coeff_vec = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>::Zero(n_coeffs);
         
         for (uint_t i=0; i<n_coeffs; i++)
             _coeff_vec(i) = coeffs(i);
@@ -137,7 +138,7 @@ protected:
                 _coeff_vec.size(), n_basis*NComponents,
                 "Coefficients not initialized");
         
-        _u = Eigen::Matrix<var_scalar_t, NComponents, Eigen::Dynamic>::Zero(NComponents, n_qp);
+        _u = Eigen::Matrix<scalar_t, NComponents, Eigen::Dynamic>::Zero(NComponents, n_qp);
         
         // now, initialize the solution value and derivatives.
         for (uint_t i=0; i<n_qp; i++)
@@ -147,7 +148,7 @@ protected:
         
         if (_compute_du_dx) {
             
-            _du_dx = Eigen::Matrix<var_scalar_t, NComponents*Dim, Eigen::Dynamic>::Zero(NComponents*Dim, n_qp);
+            _du_dx = Eigen::Matrix<scalar_t, NComponents*Dim, Eigen::Dynamic>::Zero(NComponents*Dim, n_qp);
             
             for (uint_t i=0; i<n_qp; i++)
                 for (uint_t j=0; j<NComponents; j++)
@@ -162,7 +163,7 @@ protected:
     
     template <typename VecType>
     inline
-    typename std::enable_if<!std::is_same<var_scalar_t, real_t>::type, void>::type
+    typename std::enable_if<!std::is_same<scalar_t, real_t>::type, void>::type
     _add_complex_perturbation(VecType& v, uint_t i) {
         
         Assert2(i <= v.size(), i, v.size(), "Invalid vector index");
@@ -172,9 +173,9 @@ protected:
 
     bool                               _compute_du_dx;
     const FEBasisDerivativeType       *_fe;
-    Eigen::Matrix<var_scalar_t, NComponents, Eigen::Dynamic>     _u;
-    Eigen::Matrix<var_scalar_t, NComponents*Dim, Eigen::Dynamic> _du_dx;
-    Eigen::Matrix<var_scalar_t, Eigen::Dynamic, 1>               _coeff_vec;
+    Eigen::Matrix<scalar_t, NComponents, Eigen::Dynamic>     _u;
+    Eigen::Matrix<scalar_t, NComponents*Dim, Eigen::Dynamic> _du_dx;
+    Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>               _coeff_vec;
 };
 
 
