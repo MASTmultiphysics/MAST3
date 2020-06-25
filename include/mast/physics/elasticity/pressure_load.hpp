@@ -13,7 +13,6 @@ namespace Elasticity {
 template <typename FEVarType,
           typename PressureFieldType,
           typename SectionAreaType
-          typename
           uint_t Dim,
           typename ContextType>
 class SurfacePressureLoad {
@@ -26,6 +25,14 @@ public:
     using matrix_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
 
     SurfacePressureLoad() { }
+    
+    virtual ~SurfacePressureLoad() { }
+    
+    inline void set_section_area(const SectionAreaType& s) { _section = s;}
+    
+    inline void set_pressure(const PressureFieldType& s) { _pressure = &p;}
+    
+    inline void set_fe_var_data(const FEVarType& fe) { _fe_var_data = &fe;}
     
     inline void compute(ContextType& c,
                         vector_t& res,

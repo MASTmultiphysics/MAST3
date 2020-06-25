@@ -39,7 +39,7 @@ public:
     
     virtual ~LinearContinuumStrainEnergy() { }
 
-    virtual inline void
+    inline void
     set_section_property(const SectionPropertyType& p) {
         
         Assert0(!_property, "Property already initialized.");
@@ -47,13 +47,13 @@ public:
         _property = &p;
     }
 
-    virtual inline void set_fe_var_data(const FEVarType& fe_data)
+    inline void set_fe_var_data(const FEVarType& fe_data)
     {
         Assert0(!_fe_var_data, "FE data already initialized.");
         _fe_var_data = &fe_data;
     }
 
-    virtual inline uint_t n_dofs() const {
+    inline uint_t n_dofs() const {
 
         Assert0(_fe_var_data, "FE data not initialized.");
 
