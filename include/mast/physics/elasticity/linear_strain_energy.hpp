@@ -158,7 +158,7 @@ public:
     }
 
     
-protected:
+private:
     
     
     const SectionPropertyType       *_property;

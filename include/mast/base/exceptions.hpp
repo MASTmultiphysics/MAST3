@@ -24,7 +24,6 @@
 #include <string>
 
 namespace MAST {
-
 namespace Exceptions {
 
 class ExceptionBase {
@@ -63,8 +62,6 @@ protected:
     const std::string _file;
     const int         _line;
 };
-
-
 
 
 template <typename Val1Type>
@@ -120,8 +117,9 @@ protected:
     Val1Type  _val1;
     Val2Type  _val2;
 };
-}
-}
+
+} // namespace Exceptions
+} // namespace MAST
 
 
 #ifdef NDEBUG

@@ -12,7 +12,7 @@ namespace Elasticity {
 
 template <typename FEVarType,
           typename PressureFieldType,
-          typename SectionAreaType
+          typename SectionAreaType,
           uint_t Dim,
           typename ContextType>
 class SurfacePressureLoad {
@@ -30,7 +30,7 @@ public:
     
     inline void set_section_area(const SectionAreaType& s) { _section = s;}
     
-    inline void set_pressure(const PressureFieldType& s) { _pressure = &p;}
+    inline void set_pressure(const PressureFieldType& p) { _pressure = &p;}
     
     inline void set_fe_var_data(const FEVarType& fe) { _fe_var_data = &fe;}
     
@@ -50,7 +50,7 @@ public:
             c.qp       = i;
             scalar_t p = _pressure->value(c) * _section->value(c);
             
-            for (uint_i j=0; j<Dim; j++) {
+            for (uint_t j=0; j<Dim; j++) {
                 
                 // j-th component of normal vector at ith quadrature point
                 scalar_t nj = fe.normal(i, j);
@@ -83,7 +83,7 @@ public:
             scalar_t p = (_pressure->value(c) * _section->derivative(c, f) +
                           _pressure->derivative(c, f) * _section->value(c)) ;
             
-            for (uint_i j=0; j<Dim; j++) {
+            for (uint_t j=0; j<Dim; j++) {
                 
                 // j-th component of normal vector at ith quadrature point
                 scalar_t nj = fe.normal(i, j);

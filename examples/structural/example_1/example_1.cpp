@@ -5,8 +5,9 @@
 #include <mast/fe/fe_basis_derivatives.hpp>
 #include <mast/fe/eval/fe_derivative_evaluation.hpp>
 #include <mast/fe/fe_var_data.hpp>
-#include <mast/physics/elasticity/linear_elastic_strain_operator.hpp>
-#include <mast/physics/elasticity/green_lagrange_strain.hpp>
+#include <mast/physics/elasticity/linear_strain_energy.hpp>
+#include <mast/physics/elasticity/pressure_load.hpp>
+#include <mast/base/assembly/libmesh/residual_and_jacobian.hpp>
 
 struct Context {};
 
