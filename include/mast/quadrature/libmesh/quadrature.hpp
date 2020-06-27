@@ -7,8 +7,8 @@
 #include <mast/base/mast_data_types.h>
 
 // libMesh includes
-#include "libmesh/quadrature.h"
-#include "libmesh/enum_quadrature_type.h"
+#include <libmesh/quadrature.h>
+#include <libmesh/enum_quadrature_type.h>
 
 namespace MAST {
 

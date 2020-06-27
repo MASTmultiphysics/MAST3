@@ -20,16 +20,23 @@ template <typename BasisScalarType,
 class FEShapeDerivative {
     
 public:
+    
     static const uint_t ref_dim     = ElemDim;
     static const uint_t spatial_dim = SpatialDim;
-    using dxi_dx_mat_t  = typename Eigen::Map<const typename Eigen::Matrix<NodalScalarType, ElemDim, SpatialDim>>;
-    using dx_dxi_mat_t  = typename Eigen::Map<const typename Eigen::Matrix<NodalScalarType, SpatialDim, ElemDim>>;
-    using dphi_dx_mat_t = typename Eigen::Map<const typename Eigen::Matrix<NodalScalarType, Eigen::Dynamic, SpatialDim>>;
-    using dphi_dx_vec_t = typename Eigen::Map<const typename Eigen::Matrix<NodalScalarType, Eigen::Dynamic, 1>>;
-    using normal_vec_t  = typename Eigen::Map<const typename Eigen::Matrix<NodalScalarType, SpatialDim, 1>>;
+    using basis_scalar_t = BasisScalarType;
+    using nodal_scalar_t = NodalScalarType;
+    using scalar_t       = typename MAST::DeducedScalarType<BasisScalarType, NodalScalarType>::type;
+    using fe_basis_t     = FEBasisType;
+    using dxi_dx_mat_t   = typename Eigen::Map<const typename Eigen::Matrix<NodalScalarType, ElemDim, SpatialDim>>;
+    using dx_dxi_mat_t   = typename Eigen::Map<const typename Eigen::Matrix<NodalScalarType, SpatialDim, ElemDim>>;
+    using dphi_dx_mat_t  = typename Eigen::Map<const typename Eigen::Matrix<NodalScalarType, Eigen::Dynamic, SpatialDim>>;
+    using dphi_dx_vec_t  = typename Eigen::Map<const typename Eigen::Matrix<NodalScalarType, Eigen::Dynamic, 1>>;
+    using normal_vec_t   = typename Eigen::Map<const typename Eigen::Matrix<NodalScalarType, SpatialDim, 1>>;
+    static_assert(std::is_same<nodal_scalar_t, scalar_t>::value,
+                  "The nodal scalar type should be the derived scalar type.");
     static_assert(std::is_same<BasisScalarType, typename FEBasisType::scalar_t>::value,
                   "BasisScalarType incompatible with FEBasisType::scalar_t.");
-    static_assert(ElemDim == FEBasisType::ref_dim,
+    static_assert(ElemDim == FEBasisType::dim,
                   "FE Dimension should be same as element dimension.");
 
     FEShapeDerivative():

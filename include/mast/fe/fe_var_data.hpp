@@ -161,9 +161,9 @@ protected:
     }
     
     
-    template <typename VecType>
+    template <typename VecType, typename V=SolScalarType>
     inline
-    typename std::enable_if<!std::is_same<scalar_t, real_t>::value, void>::type
+    typename std::enable_if<std::is_same<V, complex_t>::value, void>::type
     _add_complex_perturbation(VecType& v, uint_t i) {
         
         Assert2(i <= v.size(), i, v.size(), "Invalid vector index");

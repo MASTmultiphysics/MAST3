@@ -7,7 +7,7 @@
 #include <mast/base/exceptions.hpp>
 
 // libMesh includes
-#include "libmesh/fe_base.h"
+#include <libmesh/fe_base.h>
 
 namespace MAST {
 
@@ -121,9 +121,9 @@ public:
         }
     }
 
-    inline void reinit_side(const libMesh::Elem&     e,
-                            const side_quadrature_t& q,
-                            const uint_t             s) {
+    inline void reinit_for_side(const libMesh::Elem&     e,
+                                const side_quadrature_t& q,
+                                const uint_t             s) {
         
         // reinitialize only if needed
         if (&e != _elem ||

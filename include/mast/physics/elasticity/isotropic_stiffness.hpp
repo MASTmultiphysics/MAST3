@@ -18,24 +18,29 @@ template <typename ScalarType, typename ModulusType, typename PoissonType, typen
 class IsotropicMaterialStiffness<ScalarType, 2, ModulusType, PoissonType, ContextType> {
 public:
     
-    using E_scalar_t  = typename ModulusType::scalar_t
-    using nu_scalar_t = typename PoissonsType::scalar_t
-    using scalar_t    = MAST::DeducedScalarType<MAST::DeducedScalarType<E_scalar_t, nu_scalar_t>::type, ScalarType>::type;
+    using E_scalar_t  = typename ModulusType::scalar_t;
+    using nu_scalar_t = typename PoissonType::scalar_t;
+    using scalar_t    = typename MAST::DeducedScalarType<typename MAST::DeducedScalarType<E_scalar_t, nu_scalar_t>::type, ScalarType>::type;
     using value_t     = typename Eigen::Matrix<scalar_t, 3, 3>;
     
-    IsotropicMaterialStiffness(const ModulusType& E,
-                               const PoissonType& nu):
-    _E     (E),
-    _nu    (nu) { }
+    IsotropicMaterialStiffness():
+    _E     (nullptr),
+    _nu    (nullptr) { }
     
-    virtual ~IsotropicMaterialProperty(){}
+    virtual ~IsotropicMaterialStiffness() {}
+    
+    inline void set_modulus_and_nu(const ModulusType& E, const PoissonType& nu) {
+        
+        _E  = &E;
+        _nu = &nu;
+    }
     
     inline void value(const ContextType& c, value_t& m) const {
                 
         const E_scalar_t
-        E  = _E.value(c);
+        E  = _E->value(c);
         const nu_scalar_t
-        nu = _nu.value(c);
+        nu = _nu->value(c);
         
         m.setZero();
         
@@ -51,12 +56,12 @@ public:
                            value_t&               m) const {
         
         const E_scalar_t
-        E      = _E.value(c),
-        dEdp   = _E.derivative(c, f);
+        E      = _E->value(c),
+        dEdp   = _E->derivative(c, f);
 
         const nu_scalar_t
-        nu     = _nu.value(c),
-        dnudp  = _nu.derivative(c, f);
+        nu     = _nu->value(c),
+        dnudp  = _nu->derivative(c, f);
 
         m.setZero();
 
@@ -70,10 +75,10 @@ public:
         1./2./(1.+nu)*dEdp - E/2./pow(1.+nu,2) * dnudp;
     }
 
-protected:
+private:
     
-    const ModulusType&  _E;
-    const PoissonType& _nu;
+    const ModulusType*  _E;
+    const PoissonType* _nu;
 };
 
 
@@ -82,24 +87,29 @@ template <typename ScalarType, typename ModulusType, typename PoissonType, typen
 class IsotropicMaterialStiffness<ScalarType, 3, ModulusType, PoissonType, ContextType> {
 public:
     
-    using E_scalar_t  = typename ModulusType::scalar_t
-    using nu_scalar_t = typename PoissonsType::scalar_t
-    using scalar_t    = MAST::DeducedScalarType<MAST::DeducedScalarType<E_scalar_t, nu_scalar_t>::type, ScalarType>::type;
+    using E_scalar_t  = typename ModulusType::scalar_t;
+    using nu_scalar_t = typename PoissonType::scalar_t;
+    using scalar_t    = typename MAST::DeducedScalarType<typename MAST::DeducedScalarType<E_scalar_t, nu_scalar_t>::type, ScalarType>::type;
     using value_t     = typename Eigen::Matrix<scalar_t, 6, 6>;
     
-    IsotropicMaterialStiffness(const ModulusType& E,
-                               const PoissonType& nu):
-    _E     (E),
-    _nu    (nu) { }
+    IsotropicMaterialStiffness():
+    _E     (nullptr),
+    _nu    (nullptr) { }
     
-    virtual ~IsotropicMaterialProperty(){}
+    virtual ~IsotropicMaterialStiffness() {}
     
+    inline void set_modulus_and_nu(const ModulusType& E, const PoissonType& nu) {
+        
+        _E  = &E;
+        _nu = &nu;
+    }
+
     inline void value(const ContextType& c, value_t& m) const {
                 
         const E_scalar_t
-        E  = _E.value(c);
+        E  = _E->value(c);
         const nu_scalar_t
-        nu = _nu.value(c);
+        nu = _nu->value(c);
         
         m.setZero();
         
@@ -115,12 +125,12 @@ public:
                            value_t&               m) const {
         
         const E_scalar_t
-        E      = _E.value(c),
-        dEdp   = _E.derivative(c, f);
+        E      = _E->value(c),
+        dEdp   = _E->derivative(c, f);
 
         const nu_scalar_t
-        nu     = _nu.value(c),
-        dnudp  = _nu.derivative(c, f);
+        nu     = _nu->value(c),
+        dnudp  = _nu->derivative(c, f);
 
         m.setZero();
 
@@ -136,10 +146,10 @@ public:
         1./2./(1.+nu)*dEdp - E/2./pow(1.+nu,2) * dnudp;
     }
 
-protected:
+private:
     
-    const ModulusType&  _E;
-    const PoissonType& _nu;
+    const ModulusType*  _E;
+    const PoissonType* _nu;
 };
 
 
