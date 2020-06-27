@@ -21,7 +21,7 @@ class Accessor {
 
 public:
 
-    Accessor(const libMesh::System& sys, VecType& vec):
+    Accessor(const libMesh::System& sys, const VecType& vec):
     _sys      (&sys),
     _vec      (&vec)
     { }
@@ -32,8 +32,9 @@ public:
     { }
 
     inline void set_system(libMesh::System& sys) { _sys = &sys;}
-    inline void set_vec(VecType& vec) { _vec = &vec;}
+    inline void set_vec(const VecType& vec) { _vec = &vec;}
     inline const std::vector<libMesh::dof_id_type>& dof_indices() const {return _dof_ids;}
+    inline std::vector<libMesh::dof_id_type>& dof_indices() {return _dof_ids;}
     inline uint_t n_dofs() const { return _dof_ids.size();}
     
     inline ScalarType operator() (uint_t i) const {
@@ -54,7 +55,7 @@ public:
 private:
     
     const libMesh::System              *_sys;
-    VecType                            *_vec;
+    const VecType                      *_vec;
     std::vector<libMesh::dof_id_type>   _dof_ids;
 };
 

@@ -126,10 +126,13 @@ public:
     }
     
     template <typename AccessorType>
-    inline void init(const libMesh::Elem& e,
+    inline void init(Context& c,
                      const AccessorType& v) {
         
-        _c->elem = &e;
+    }
+    
+    inline void clear() {
+        
     }
     
     inline void compute(Context& c,
@@ -181,7 +184,24 @@ int main(int argc, const char** argv) {
     c.mesh->print_info();
     c.mesh->boundary_info->print_info();
 
-    ElemOps<Traits<real_t, real_t, real_t, 2>> e_ops(c);
+    using basis_scalar_t = real_t;
+    using nodal_scalar_t = real_t;
+    using sol_scalar_t   = real_t;
+    using res_vec_t      = Eigen::Matrix<sol_scalar_t, Eigen::Dynamic, 1>;
+    using jac_mat_t      = Eigen::Matrix<sol_scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
+    using elem_ops_t = ElemOps<Traits<basis_scalar_t, nodal_scalar_t, sol_scalar_t, 2>>;
+    
+    elem_ops_t e_ops(c);
+
+    MAST::Base::Assembly::libMeshWrapper::ResidualAndJacobian<real_t, elem_ops_t>
+    assembly;
+    
+    assembly.set_elem_ops(e_ops);
+
+    res_vec_t sol, res;
+    jac_mat_t jac;
+
+    assembly.assemble(c, sol, &res, &jac);
     
     return 0;
 }

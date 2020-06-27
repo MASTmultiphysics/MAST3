@@ -21,8 +21,8 @@ namespace libMeshWrapper {
 template <typename ScalarType,
           typename VecType,
           typename MatType,
-          typename SubMatType,
-          typename SubVecType>
+          typename SubVecType,
+          typename SubMatType>
 inline
 typename std::enable_if<std::is_same<ScalarType, real_t>::value &&
                         std::is_same<SubVecType, libMesh::DenseVector<ScalarType>>::value &&
@@ -32,8 +32,8 @@ constrain_and_add(VecType& v,
                   MatType& m,
                   const libMesh::DofMap& dof_map,
                   std::vector<libMesh::dof_id_type>& dof_indices,
-                  libMesh::DenseVector<ScalarType>& v_sub,
-                  libMesh::DenseMatrix<ScalarType>& m_sub) {
+                  SubVecType& v_sub,
+                  SubMatType& m_sub) {
 
     dof_map.constrain_element_matrix_and_vector(m_sub, v_sub, dof_indices);
     
@@ -54,7 +54,7 @@ typename std::enable_if<std::is_same<ScalarType, real_t>::value &&
 constrain_and_add(VecType& v,
                   const libMesh::DofMap& dof_map,
                   std::vector<libMesh::dof_id_type>& dof_indices,
-                  libMesh::DenseVector<real_t>& v_sub) {
+                  SubVecType& v_sub) {
     
     dof_map.constrain_element_vector(v_sub, dof_indices);
 
@@ -72,7 +72,7 @@ typename std::enable_if<std::is_same<ScalarType, real_t>::value &&
 constrain_and_add(MatType& m,
                   const libMesh::DofMap& dof_map,
                   std::vector<libMesh::dof_id_type>& dof_indices,
-                  libMesh::DenseMatrix<ScalarType>& m_sub) {
+                  SubMatType& m_sub) {
     
     dof_map.constrain_element_matrix(m_sub, dof_indices);
 
@@ -85,8 +85,8 @@ constrain_and_add(MatType& m,
 template <typename ScalarType,
           typename VecType,
           typename MatType,
-          typename SubMatType,
-          typename SubVecType>
+          typename SubVecType,
+          typename SubMatType>
 inline
 typename std::enable_if<std::is_same<ScalarType, complex_t>::value &&
                        std::is_same<SubVecType, libMesh::DenseVector<ScalarType>>::value &&
@@ -96,8 +96,8 @@ constrain_and_add(VecType& v,
                   MatType& m,
                   const libMesh::DofMap& dof_map,
                   std::vector<libMesh::dof_id_type>& dof_indices,
-                  libMesh::DenseVector<ScalarType>& v_sub,
-                  libMesh::DenseMatrix<ScalarType>& m_sub) {
+                  SubVecType& v_sub,
+                  SubMatType& m_sub) {
 
     Assert2(v_sub.size() == dof_indices.size(),
             v_sub.size(), dof_indices.size(),
@@ -158,7 +158,7 @@ typename std::enable_if<std::is_same<ScalarType, complex_t>::value &&
 constrain_and_add(VecType& v,
                   const libMesh::DofMap& dof_map,
                   std::vector<libMesh::dof_id_type>& dof_indices,
-                  libMesh::DenseVector<complex_t>& v_sub) {
+                  SubVecType& v_sub) {
     
     Assert2(v_sub.size() == dof_indices.size(),
             v_sub.size(), dof_indices.size(),
@@ -199,7 +199,7 @@ typename std::enable_if<std::is_same<ScalarType, complex_t>::value &&
 constrain_and_add(MatType& m,
                   const libMesh::DofMap& dof_map,
                   std::vector<libMesh::dof_id_type>& dof_indices,
-                  libMesh::DenseMatrix<ScalarType>& m_sub) {
+                  SubMatType& m_sub) {
     
     Assert2(m_sub.m() == dof_indices.size(),
             m_sub.m(), dof_indices.size(),
@@ -240,8 +240,8 @@ constrain_and_add(MatType& m,
 template <typename ScalarType,
           typename VecType,
           typename MatType,
-          typename SubMatType,
-          typename SubVecType>
+          typename SubVecType,
+          typename SubMatType>
 inline
 typename std::enable_if<std::is_same<VecType, libMesh::NumericVector<ScalarType>>::value &&
                         std::is_same<SubVecType, libMesh::DenseVector<ScalarType>>::value &&
@@ -252,8 +252,8 @@ constrain_and_add(libMesh::NumericVector<ScalarType>& v,
                   libMesh::SparseMatrix<ScalarType>& m,
                   const libMesh::DofMap& dof_map,
                   std::vector<libMesh::dof_id_type>& dof_indices,
-                  libMesh::DenseVector<ScalarType>& v_sub,
-                  libMesh::DenseMatrix<ScalarType>& m_sub) {
+                  SubVecType& v_sub,
+                  SubMatType& m_sub) {
 
     dof_map.constrain_element_matrix_and_vector(m_sub, v_sub, dof_indices);
     m.add_matrix(m_sub, dof_indices);
@@ -269,7 +269,7 @@ typename std::enable_if<std::is_same<VecType, libMesh::NumericVector<ScalarType>
 constrain_and_add(libMesh::NumericVector<ScalarType>& v,
                   const libMesh::DofMap& dof_map,
                   std::vector<libMesh::dof_id_type>& dof_indices,
-                  libMesh::DenseVector<ScalarType>& v_sub) {
+                  SubVecType& v_sub) {
 
     dof_map.constrain_element_vector(v_sub, dof_indices);
     v.add_vector(v_sub, dof_indices);
@@ -284,7 +284,7 @@ typename std::enable_if<std::is_same<MatType, libMesh::SparseMatrix<ScalarType>>
 constrain_and_add(libMesh::SparseMatrix<ScalarType>& m,
                   const libMesh::DofMap& dof_map,
                   std::vector<libMesh::dof_id_type>& dof_indices,
-                  libMesh::DenseMatrix<ScalarType>& m_sub) {
+                  SubMatType& m_sub) {
     
     dof_map.constrain_element_matrix(m_sub, dof_indices);
     m.add_matrix(m_sub, dof_indices);

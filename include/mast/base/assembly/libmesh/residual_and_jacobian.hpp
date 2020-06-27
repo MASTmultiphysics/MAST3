@@ -19,10 +19,8 @@ namespace Assembly {
 namespace libMeshWrapper {
 
 template <typename ScalarType,
-          typename ElemOpsType,
-          typename ContextType>
-class ResidualAndJacobian:
-public libMesh::NonlinearImplicitSystem::ComputeResidualandJacobian {
+          typename ElemOpsType>
+class ResidualAndJacobian {
 
 public:
     
@@ -40,15 +38,13 @@ public:
     
     inline void set_elem_ops(ElemOpsType& e_ops) { _e_ops = &e_ops; }
 
-    template <typename VecType, typename MatrixType>
+    template <typename VecType, typename MatType, typename ContextType>
     inline void assemble(ContextType   &c,
                          const VecType &X,
                          VecType       *R,
-                         MatrixType    *J) {
+                         MatType    *J) {
         
         Assert0( R || J, "Atleast one assembled quantity should be specified.");
-        
-        libMesh::NonlinearImplicitSystem& sys = c.system();
         
         if (R) MAST::Numerics::Utility::setZero(*R);
         if (J) MAST::Numerics::Utility::setZero(*J);
@@ -56,18 +52,17 @@ public:
         // iterate over each element, initialize it and get the relevant
         // analysis quantities
         typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, VecType>
-        sol_accessor(sys, *X);
+        sol_accessor(*c.sys, X);
 
-        typename ElemOpsType::vec_t
+        typename ElemOpsType::vector_t
         res_e;
-        typename ElemOpsType::mat_t
+        typename ElemOpsType::matrix_t
         jac_e;
         
         
-        libMesh::MeshBase::const_element_iterator       el     =
-        sys.get_mesh().active_local_elements_begin();
-        const libMesh::MeshBase::const_element_iterator end_el =
-        sys.get_mesh().active_local_elements_end();
+        libMesh::MeshBase::const_element_iterator
+        el     = c.mesh->active_local_elements_begin(),
+        end_el = c.mesh->active_local_elements_end();
         
         for ( ; el != end_el; ++el) {
             
@@ -86,22 +81,27 @@ public:
             _e_ops->clear();
             
             // copy to the libMesh matrix for further processing
-            libMesh::DenseVector<ScalarType> v;
-            libMesh::DenseMatrix<ScalarType> m;
-            if (R) MAST::Numerics::Utility::copy(v, res_e);
-            if (J) MAST::Numerics::Utility::copy(m, jac_e);
+            using sub_vec_t = libMesh::DenseVector<ScalarType>;
+            using sub_mat_t = libMesh::DenseMatrix<ScalarType>;
+            sub_vec_t v;
+            sub_mat_t m;
+            if (R) MAST::Numerics::Utility::copy(res_e, v);
+            if (J) MAST::Numerics::Utility::copy(jac_e, m);
             
             // constrain the quantities to account for hanging dofs,
             // Dirichlet constraints, etc.
             if (R && J)
                 MAST::Base::Assembly::libMeshWrapper::constrain_and_add
-                (*R, *J, sys.get_dof_map(), sol_accessor.dof_indices(), v, m);
+                <ScalarType, VecType, MatType, sub_vec_t, sub_mat_t>
+                (*R, *J, c.sys->get_dof_map(), sol_accessor.dof_indices(), v, m);
             else if (R)
                 MAST::Base::Assembly::libMeshWrapper::constrain_and_add
-                (*R, sys.get_dof_map(), sol_accessor.dof_indices(), v);
+                <ScalarType, VecType, sub_vec_t>
+                (*R, c.sys->get_dof_map(), sol_accessor.dof_indices(), v);
             else
                 MAST::Base::Assembly::libMeshWrapper::constrain_and_add
-                (*J, sys.get_dof_map(), sol_accessor.dof_indices(), m);
+                <ScalarType, MatType, sub_mat_t>
+                (*J, c.sys->get_dof_map(), sol_accessor.dof_indices(), m);
         }
 
         // parallel matrix/vector require finalization of communication
