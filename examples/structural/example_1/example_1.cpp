@@ -18,6 +18,8 @@
 #include <libmesh/equation_systems.h>
 #include <libmesh/boundary_info.h>
 
+// BEGIN_TRANSLATE Extension of bar
+
 class Context {
     
 public:
@@ -203,5 +205,6 @@ int main(int argc, const char** argv) {
 
     assembly.assemble(c, sol, &res, &jac);
     
+    // END_TRANSLATE
     return 0;
 }
