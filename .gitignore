@@ -1,0 +1,12 @@
+# CMake build files.
+build/dbg/
+build/opt/
+build
+
+# CLion IDE files.
+.idea/
+cmake-build*/
+build2
+
+# Visual Studio Code settings.
+.vscode/

@@ -121,9 +121,9 @@ if(BUILD_DOC)
     add_subdirectory(doc)
 endif()
 
-# TESTS
-enable_testing()
-add_subdirectory(tests)
+# TESTS - testing temporarily disabled.
+#enable_testing()
+#add_subdirectory(tests)
 
 # EXAMPLES
 add_subdirectory(examples)
