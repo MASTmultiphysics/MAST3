@@ -8,21 +8,21 @@
 namespace MAST {
 namespace Physics {
 namespace Elasticity {
+namespace LinearContinuum {
 
+template <uint_t D> struct NStrainComponents { };
+template <> struct NStrainComponents<1> { static const uint_t value = 1; };
+template <> struct NStrainComponents<2> { static const uint_t value = 3; };
+template <> struct NStrainComponents<3> { static const uint_t value = 6; };
 
 
 template <typename FEVarType,
           typename SectionPropertyType,
           uint_t Dim,
           typename ContextType>
-class LinearContinuumStrainEnergy {
+class StrainEnergy {
     
 public:
-    
-    template <uint_t D> struct NStrainComponents { };
-    template <> struct NStrainComponents<1> { static const uint_t value = 1; };
-    template <> struct NStrainComponents<2> { static const uint_t value = 3; };
-    template <> struct NStrainComponents<3> { static const uint_t value = 6; };
 
     using scalar_t         = typename FEVarType::scalar_t;
     using basis_scalar_t   = typename FEVarType::fe_basis_t::scalar_t;
@@ -30,14 +30,15 @@ public:
     using matrix_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     using section_scalar_t = typename SectionPropertyType::scalar_t;
     using fe_basis_t       = typename FEVarType::fe_basis_t;
-    static const uint_t n_strain  = NStrainComponents<Dim>::value;
+    static const uint_t n_strain  =
+    MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<Dim>::value;
     
-    LinearContinuumStrainEnergy():
+    StrainEnergy():
     _property    (nullptr),
     _fe_var_data (nullptr)
     { }
     
-    virtual ~LinearContinuumStrainEnergy() { }
+    virtual ~StrainEnergy() { }
 
     inline void
     set_section_property(const SectionPropertyType& p) {
@@ -73,15 +74,15 @@ public:
         typename Eigen::Matrix<scalar_t, n_strain, 1>
         epsilon,
         stress;
-        typename Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>
-        vec     = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>::Zero(2*fe.n_basis());
+        vector_t
+        vec     = vector_t::Zero(2*fe.n_basis());
         
         typename SectionPropertyType::value_t
         mat;
         
-        typename Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>
-        mat1 = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>::Zero(n_strain, 2*fe.n_basis()),
-        mat2 = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>::Zero(2*fe.n_basis(), 2*fe.n_basis());
+        matrix_t
+        mat1 = matrix_t::Zero(n_strain, 2*fe.n_basis()),
+        mat2 = matrix_t::Zero(2*fe.n_basis(), 2*fe.n_basis());
 
         MAST::Numerics::FEMOperatorMatrix<scalar_t>
         Bxmat;
@@ -123,14 +124,14 @@ public:
         typename Eigen::Matrix<scalar_t, n_strain, 1>
         epsilon,
         stress;
-        typename Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>
-        vec     = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>::Zero(2*fe.n_basis());
+        vector_t
+        vec     = vector_t::Zero(2*fe.n_basis());
 
         typename SectionPropertyType::value_t
         mat;
-        typename Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>
-        mat1 = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>::Zero(n_strain, 2*fe.n_basis()),
-        mat2 = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>::Zero(2*fe.n_basis(), 2*fe.n_basis());
+        matrix_t
+        mat1 = matrix_t::Zero(n_strain, 2*fe.n_basis()),
+        mat2 = matrix_t::Zero(2*fe.n_basis(), 2*fe.n_basis());
 
         MAST::Numerics::FEMOperatorMatrix<scalar_t>
         Bxmat;
@@ -165,6 +166,7 @@ private:
     const FEVarType                 *_fe_var_data;
 };
 
+}  // namespace LinearContinuum
 }  // namespace Elasticity
 }  // namespace Physics
 }  // namespace MAST

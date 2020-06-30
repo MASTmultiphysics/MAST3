@@ -64,7 +64,7 @@ struct Traits {
     using nu_t              = typename MAST::Base::ScalarConstant<SolScalarType>;
     using press_t           = typename MAST::Base::ScalarConstant<SolScalarType>;
     using prop_t            = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<SolScalarType, Dim, modulus_t, nu_t, Context>;
-    using energy_t          = typename MAST::Physics::Elasticity::LinearContinuumStrainEnergy<fe_var_t, prop_t, Dim, Context>;
+    using energy_t          = typename MAST::Physics::Elasticity::LinearContinuum::StrainEnergy<fe_var_t, prop_t, Dim, Context>;
 };
 
 
