@@ -17,6 +17,7 @@ target_link_libraries(mast_catch_tests mast)
 # TODO: May be better to use Catch2's built in CMake support rather than manually adding through ctest
 
 add_subdirectory(fe)
+add_subdirectory(physics)
 
 message(NOTICE "It is recommended to run 'make check' instead of 'make test'. Alternatively, for 'ctest' or \
 'make test' to output Catch2 error messages when a failure occurs, you must set the environment variable \

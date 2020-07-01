@@ -75,18 +75,18 @@ public:
         epsilon,
         stress;
         vector_t
-        vec     = vector_t::Zero(2*fe.n_basis());
+        vec     = vector_t::Zero(Dim*fe.n_basis());
         
         typename SectionPropertyType::value_t
         mat;
         
         matrix_t
-        mat1 = matrix_t::Zero(n_strain, 2*fe.n_basis()),
-        mat2 = matrix_t::Zero(2*fe.n_basis(), 2*fe.n_basis());
+        mat1 = matrix_t::Zero(n_strain, Dim*fe.n_basis()),
+        mat2 = matrix_t::Zero(Dim*fe.n_basis(), Dim*fe.n_basis());
 
         MAST::Numerics::FEMOperatorMatrix<scalar_t>
         Bxmat;
-        Bxmat.reinit(n_strain, 2, fe.n_basis());
+        Bxmat.reinit(n_strain, Dim, fe.n_basis());
 
         
         for (uint_t i=0; i<fe.n_q_points(); i++) {
@@ -125,13 +125,13 @@ public:
         epsilon,
         stress;
         vector_t
-        vec     = vector_t::Zero(2*fe.n_basis());
+        vec     = vector_t::Zero(Dim*fe.n_basis());
 
         typename SectionPropertyType::value_t
         mat;
         matrix_t
-        mat1 = matrix_t::Zero(n_strain, 2*fe.n_basis()),
-        mat2 = matrix_t::Zero(2*fe.n_basis(), 2*fe.n_basis());
+        mat1 = matrix_t::Zero(n_strain, Dim*fe.n_basis()),
+        mat2 = matrix_t::Zero(Dim*fe.n_basis(), Dim*fe.n_basis());
 
         MAST::Numerics::FEMOperatorMatrix<scalar_t>
         Bxmat;

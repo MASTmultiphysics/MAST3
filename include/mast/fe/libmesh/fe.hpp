@@ -17,25 +17,25 @@ namespace libMeshWrapper {
 
 
 template <uint_t Dim>
-void
+inline void
 init_basis_derivative_map(const libMesh::FEMap& fe_m,
                           std::vector<const std::vector<std::vector<double>>*>& map)
 { Assert0(false, "Implementation for specific dimensions");}
 
 template <>
-void
+inline void
 init_basis_derivative_map<1>(const libMesh::FEMap& fe_m,
                              std::vector<const std::vector<std::vector<double>>*>& dphi_dxi)
 { dphi_dxi = {&fe_m.get_dphidxi_map()};}
 
 template <>
-void
+inline void
 init_basis_derivative_map<2>(const libMesh::FEMap& fe_m,
                              std::vector<const std::vector<std::vector<double>>*>& dphi_dxi)
 { dphi_dxi = {&fe_m.get_dphidxi_map(), &fe_m.get_dphideta_map()};}
 
 template <>
-void
+inline void
 init_basis_derivative_map<3>(const libMesh::FEMap& fe_m,
                              std::vector<const std::vector<std::vector<double>>*>& dphi_dxi)
 { dphi_dxi = {&fe_m.get_dphidxi_map(), &fe_m.get_dphideta_map(), &fe_m.get_dphidzeta_map()};}
