@@ -1,10 +1,10 @@
 target_sources(mast_catch_tests
-               PRIVATE
-               ${CMAKE_CURRENT_LIST_DIR}/fe_basis_quad4.cpp)
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/fe_basis_quad4.cpp)
 
 #Quad4 basis function evaluation
 add_test(NAME Quad4_ShapeFunctionDerivatives
-    COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "Quad4_ShapeFunctionDerivatives")
+    COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "quad4_basis_derivatives")
 set_tests_properties(Quad4_ShapeFunctionDerivatives
     PROPERTIES
         LABELS "SEQ"
