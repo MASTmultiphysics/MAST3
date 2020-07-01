@@ -21,7 +21,7 @@
 #define CATCH_CONFIG_RUNNER
 #include "catch.hpp"
 
-#include "libmesh/libmesh.h"
+#include <libmesh/libmesh.h>
 
 libMesh::LibMeshInit *p_global_init;
 

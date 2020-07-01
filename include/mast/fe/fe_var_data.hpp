@@ -26,7 +26,7 @@ public:
     using sol_vec_view_t   = Eigen::Map<const typename Eigen::Matrix<scalar_t, NComponents, 1>>;
     
     FEVarData():
-    _compute_du_dx   (nullptr),
+    _compute_du_dx   (false),
     _fe              (nullptr)
     {}
     virtual ~FEVarData() {}
@@ -94,7 +94,7 @@ public:
                 comp, NComponents,
                 "Invalid component index");
 
-        return _u(qp, comp);
+        return _u(comp, qp);
     }
     
     inline scalar_t du_dx(uint_t qp, uint_t comp, uint_t x_i) const
@@ -105,7 +105,7 @@ public:
                 comp, NComponents,
                 "Invalid component index");
 
-        return _du_dx(x_i*NComponents+comp + x_i, qp);
+        return _du_dx(x_i*NComponents+comp, qp);
     }
 
 protected:

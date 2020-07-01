@@ -63,13 +63,13 @@ compute_Jac(const ContextType& c,
     // quadrature point spatial coordinate derivatives dx/dxi
     for (uint_t i=0; i<nq; i++) {
         
-        Eigen::Map<typename Eigen::Matrix<NodalScalarType, SpatialDim*ElemDim, Eigen::Dynamic>>
+        Eigen::Map<typename Eigen::Matrix<NodalScalarType, SpatialDim, ElemDim>>
         dxdxi(dx_dxi.col(i).data(), SpatialDim, ElemDim);
 
         for (uint_t l=0; l<n_nodes; l++)
             for (uint_t j=0; j<SpatialDim; j++)
                 for (uint_t k=0; k<ElemDim; k++)
-                    dxdxi(j, k) += fe_basis->dphi_dxi(i, l, k) * node_coord(j, l);
+                    dxdxi(j, k) += fe_basis.dphi_dxi(i, l, k) * node_coord(j, l);
     }
 
 }
@@ -89,7 +89,7 @@ compute_detJ(const Eigen::Matrix<NodalScalarType, SpatialDim*ElemDim, Eigen::Dyn
     
     for (uint_t i=0; i<nq; i++) {
         
-        Eigen::Map<const typename Eigen::Matrix<NodalScalarType, SpatialDim*ElemDim, Eigen::Dynamic>>
+        Eigen::Map<const typename Eigen::Matrix<NodalScalarType, SpatialDim, ElemDim>>
         dxdxi(dx_dxi.col(i).data(), SpatialDim, ElemDim);
 
         // determinant of dx_dxi
@@ -175,7 +175,7 @@ compute_detJ_side_quad
     for (uint_t i=0; i<nq; i++) {
         
         Eigen::Map<const typename Eigen::Matrix<NodalScalarType, 2, 2>>
-        dxdxi(dx_dxi.row(i).data(), SpatialDim, ElemDim);
+        dxdxi(dx_dxi.col(i).data(), SpatialDim, ElemDim);
         
         // determinant of dx_dxi
         detJ(i) = dxdxi.row(row).norm();
@@ -276,7 +276,7 @@ compute_quad_side_tangent_and_normal
     for (uint_t i=0; i<nq; i++) {
         
         Eigen::Map<typename Eigen::Matrix<NodalScalarType, 2, 2>::type>
-        dxdxi(dx_dxi.row(i).data(), 2, 2);
+        dxdxi(dx_dxi.col(i).data(), 2, 2);
         
         // tangent
         dx(0)     = v * dxdxi(row, 0);
@@ -323,8 +323,8 @@ template <typename NodalScalarType,
           typename ContextType>
 inline void
 compute_detJxW(const FEBasisType& fe_basis,
-               const Eigen::Matrix<NodalScalarType, 1, Eigen::Dynamic>& detJ,
-               Eigen::Matrix<NodalScalarType, 1, Eigen::Dynamic>&       detJxW) {
+               const Eigen::Matrix<NodalScalarType, Eigen::Dynamic, 1>& detJ,
+               Eigen::Matrix<NodalScalarType, Eigen::Dynamic, 1>&       detJxW) {
     
     Assert2(fe_basis.n_q_points() == detJ.cols(),
             fe_basis.n_q_points(), detJ.cols(),
@@ -333,7 +333,7 @@ compute_detJxW(const FEBasisType& fe_basis,
     uint_t
     nq      = detJ.cols();
 
-    detJxW      = Eigen::Matrix<NodalScalarType, Eigen::Dynamic, 1>::type::Zero(nq);
+    detJxW      = Eigen::Matrix<NodalScalarType, Eigen::Dynamic, 1>::Zero(nq);
     
     for (uint_t i=0; i<nq; i++) {
 
@@ -341,16 +341,6 @@ compute_detJxW(const FEBasisType& fe_basis,
         detJxW(i) = detJ(i) * fe_basis.qp_weight(i);
     }
 }
-
-
-
-template <typename NodalScalarType,
-          uint_t ElemDim,
-          uint_t SpatialDim>
-inline void
-compute_Jac_inv
- (const Eigen::Matrix<NodalScalarType, ElemDim*SpatialDim, Eigen::Dynamic>& dx_dxi,
-  Eigen::Matrix<NodalScalarType, ElemDim*SpatialDim, Eigen::Dynamic>& dxi_dx);
 
 
 
@@ -373,9 +363,9 @@ compute_Jac_inv
 
         // quadrature point spatial coordinate derivatives dx/dxi
         Eigen::Map<const typename Eigen::Matrix<NodalScalarType, ElemDim, ElemDim>>
-        dxdxi(dx_dxi.row(i).data(), ElemDim, ElemDim);
-        Eigen::Map<const typename Eigen::Matrix<NodalScalarType, ElemDim, ElemDim>>
-        dxidx(dxi_dx.row(i).data(), ElemDim, ElemDim);
+        dxdxi(dx_dxi.col(i).data(), ElemDim, ElemDim);
+        Eigen::Map<typename Eigen::Matrix<NodalScalarType, ElemDim, ElemDim>>
+        dxidx(dxi_dx.col(i).data(), ElemDim, ElemDim);
         
         // compute dx/dxi
         dxidx = dxdxi.inverse();
@@ -402,8 +392,8 @@ compute_dphi_dx
     Assert2(dxi_dx.cols() == nq,
             dxi_dx.cols(), nq,
             "Incompatible quadrature points in FEBasis and dxi_dx.");
-    Assert2(dxi_dx.rows() == n_basis*SpatialDim,
-            dxi_dx.rows(), n_basis*SpatialDim,
+    Assert2(dxi_dx.rows() == ElemDim*SpatialDim,
+            dxi_dx.rows(), ElemDim*SpatialDim,
             "Incompatible rows in dxi_dx.");
 
     dphi_dx     = Eigen::Matrix<NodalScalarType, Eigen::Dynamic, Eigen::Dynamic>::Zero(SpatialDim*n_basis, nq);
@@ -412,13 +402,14 @@ compute_dphi_dx
         
         // quadrature point spatial coordinate derivatives dx/dxi
         Eigen::Map<const typename Eigen::Matrix<NodalScalarType, ElemDim, SpatialDim>>
-        dxidx (dxi_dx.col(i).data(), ElemDim, SpatialDim),
+        dxidx (dxi_dx.col(i).data(), ElemDim, SpatialDim);
+        Eigen::Map<typename Eigen::Matrix<NodalScalarType, Eigen::Dynamic, SpatialDim>>
         dphidx(dphi_dx.col(i).data(), n_basis, SpatialDim);
         
         for (uint_t l=0; l<n_basis; l++)
             for (uint_t j=0; j<SpatialDim; j++)
                 for (uint_t k=0; k<ElemDim; k++)
-                    dphidx(l, j) += fe_basis->dphi_dxi(i, l, k) * dxidx(k, j);
+                    dphidx(l, j) += fe_basis.dphi_dxi(i, l, k) * dxidx(k, j);
     }
 }
 
