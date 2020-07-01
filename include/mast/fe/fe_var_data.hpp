@@ -26,7 +26,7 @@ public:
     using sol_vec_view_t   = Eigen::Map<const typename Eigen::Matrix<scalar_t, NComponents, 1>>;
     
     FEVarData():
-    _compute_du_dx   (nullptr),
+    _compute_du_dx   (false),
     _fe              (nullptr)
     {}
     virtual ~FEVarData() {}

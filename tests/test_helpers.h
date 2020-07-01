@@ -37,22 +37,10 @@ namespace Test {
      * Converts an Eigen Matrix object to a std::vector. Useful for performing
      * elementwise comparisons in Catch2 tests.
      */
-template<typename Derived>
-std::vector<real_t> eigen_matrix_to_std_vector(const Eigen::MatrixBase<Derived>& M) {
+template<typename ValType>
+std::vector<real_t> eigen_matrix_to_std_vector(const ValType& M) {
 
-    static_assert(std::is_same<real_t, typename Eigen::MatrixBase<Derived>::Scalar>::value,
-                  "Scalar type of matrix shoudl be real_t");
-    
-    const real_t *v = static_cast<const Derived>(M).data();
-    std::vector<real_t> vec(v, v+M.rows()*M.cols());
-    return vec;
-}
-
-
-template<typename Derived>
-std::vector<real_t> eigen_matrix_to_std_vector(const Eigen::Map<Derived>& M) {
-
-    static_assert(std::is_same<real_t, typename Eigen::Map<Derived>::Scalar>::value,
+    static_assert(std::is_same<real_t, typename ValType::Scalar>::value,
                   "Scalar type of matrix shoudl be real_t");
     
     const real_t *v = M.data();

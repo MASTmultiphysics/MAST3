@@ -131,28 +131,28 @@ TEST_CASE("quad4_basis_derivatives",
                                                                 J_det,
                                                                 nvec);
         
-        SECTION("Finite Element: Shape Function: Nvec") {
-            
+        /*SECTION("Finite Element: Shape Function: Nvec")*/ {
+
             // compare shape functions
             for (uint_t j=0; j<4; j++) vec[j] = fe->phi(i, j);
             REQUIRE_THAT(MAST::Test::eigen_matrix_to_std_vector(Nvec), Catch::Approx(vec));
         }
 
-        SECTION("Finite Element: Shape Function Derivative: dNvec/dxi") {
+        /*SECTION("Finite Element: Shape Function Derivative: dNvec/dxi")*/ {
             
             // compare shape functions derivatives wrt xi
             for (uint_t j=0; j<4; j++) vec[j] = fe->dphi_dxi(i, j, 0);
             REQUIRE_THAT(MAST::Test::eigen_matrix_to_std_vector(dNvec_dxi), Catch::Approx(vec));
         }
 
-        SECTION("Finite Element: Shape Function Derivative: dNvec/deta") {
+        /*SECTION("Finite Element: Shape Function Derivative: dNvec/deta")*/ {
             
             // compare shape functions derivatives wrt eta
             for (uint_t j=0; j<4; j++) vec[j] = fe->dphi_dxi(i, j, 1);
             REQUIRE_THAT(MAST::Test::eigen_matrix_to_std_vector(dNvec_deta), Catch::Approx(vec));
         }
 
-        SECTION("Finite Element: Jacobian determinants") {
+        /*SECTION("Finite Element: Jacobian determinants")*/ {
             
             // Jacobian
             REQUIRE(fe_deriv->detJ(i) == Catch::Detail::Approx(J_det));
