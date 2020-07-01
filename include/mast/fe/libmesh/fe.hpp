@@ -149,6 +149,12 @@ public:
 
     inline uint_t n_basis() const { return _fe->n_shape_functions();}
     
+    inline scalar_t qp_weight(uint_t qp) const {
+
+        Assert0(_q || _q_side, "Quadrature rule must be specified before quadrature weight can be obtained");
+        return _q?_q->weight(qp):_q_side->weight(qp);
+    }
+
     inline scalar_t phi(uint_t qp, uint_t phi_i) const { return _fe->get_phi()[phi_i][qp];}
     
     inline scalar_t

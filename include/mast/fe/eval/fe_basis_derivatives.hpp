@@ -126,7 +126,7 @@ public:
         if (_if_JxW)
             MAST::FEBasis::Evaluation::compute_detJxW
             <NodalScalarType, ElemDim, SpatialDim, FEBasisType, ContextType>
-            (*_fe_basis, *_detJ, *_detJxW);
+            (*_fe_basis,  _detJ,  _detJxW);
         
         if (_if_Jac_inv)
             MAST::FEBasis::Evaluation::compute_Jac_inv<NodalScalarType, ElemDim, SpatialDim>
@@ -135,7 +135,7 @@ public:
         if (_if_dphi_dx)
             MAST::FEBasis::Evaluation::compute_dphi_dx
             <NodalScalarType, ElemDim, SpatialDim, FEBasisType>
-            (*_fe_basis, *_dxi_dx, *_dphi_dx);
+            (*_fe_basis, _dxi_dx, _dphi_dx);
     }
     
 
@@ -283,7 +283,7 @@ public:
     {
         Assert0(_if_dphi_dx, "Jacobian inverse computation not requested");
 
-        return _dphi_dx(qp, x_i*this->n_basis()+phi_i);
+        return _dphi_dx(x_i*this->n_basis()+phi_i, qp);
     }
 
     inline normal_vec_t normal(uint_t qp) const

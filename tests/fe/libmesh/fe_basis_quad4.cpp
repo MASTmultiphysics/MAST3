@@ -4,6 +4,8 @@
 
 // MAST includes
 #include <mast/fe/libmesh/fe.hpp>
+#include <mast/fe/eval/fe_basis_derivatives.hpp>
+#include <mast/fe/fe_var_data.hpp>
 
 // Test includes
 #include <fe/quad_derivatives.hpp>
@@ -14,6 +16,15 @@
 
 extern libMesh::LibMeshInit* p_global_init;
 
+struct Context {
+    Context(): elem(nullptr), qp(-1), s(-1) {}
+    uint_t elem_dim() const {return elem->dim();}
+    uint_t  n_nodes() const {return elem->n_nodes();}
+    real_t  nodal_coord(uint_t nd, uint_t c) const {return elem->point(nd)(c);}
+    libMesh::Elem* elem;
+    uint_t qp;
+    uint_t s;
+};
 
 TEST_CASE("quad4_basis_derivatives",
           "[2D],[QUAD4],[FEBasis]") {
@@ -58,16 +69,44 @@ TEST_CASE("quad4_basis_derivatives",
         nodes[i] = libMesh::Node::build(libMesh::Point(x_vec(i), y_vec(i)), i).release();
         e->set_node(i) = nodes[i];
     }
-
-    std::unique_ptr<MAST::Quadrature::libMeshWrapper::Quadrature<real_t, 2>>
-    q(new MAST::Quadrature::libMeshWrapper::Quadrature<real_t, 2>(libMesh::QGAUSS, libMesh::FOURTH));
     
-    std::unique_ptr<MAST::FEBasis::libMeshWrapper::FEBasis<real_t, 2>>
-    fe(new MAST::FEBasis::libMeshWrapper::FEBasis<real_t, 2>(libMesh::FEType(libMesh::FIRST, libMesh::LAGRANGE)));
+    using quadrature_t = MAST::Quadrature::libMeshWrapper::Quadrature<real_t, 2>;
+    using fe_t         = MAST::FEBasis::libMeshWrapper::FEBasis<real_t, 2>;
+    using fe_deriv_t   = MAST::FEBasis::Evaluation::FEShapeDerivative<real_t, real_t, 2, 2, fe_t>;
+    using fe_var_t     = MAST::FEBasis::FEVarData<real_t, real_t, real_t, 1, 2, Context, fe_deriv_t>;
+    
+    std::unique_ptr<quadrature_t>
+    q(new quadrature_t(libMesh::QGAUSS, libMesh::FOURTH));
+    
+    std::unique_ptr<fe_t>
+    fe(new fe_t(libMesh::FEType(libMesh::FIRST, libMesh::LAGRANGE)));
 
+    std::unique_ptr<fe_deriv_t>
+    fe_deriv(new fe_deriv_t);
+
+    std::unique_ptr<fe_var_t>
+    fe_var(new fe_var_t);
+
+    Context c;
+    c.elem = e.get();
+    
+    // initialize the shape function derivatives wrt reference coordinates
     fe->set_compute_dphi_dxi(true);
     fe->reinit(*e, *q);
     
+    // initialize the shape function derivatives wrt spatial coordinates
+    fe_deriv->set_compute_dphi_dx(true);
+    fe_deriv->set_compute_detJ(true);
+    fe_deriv->set_compute_Jac_inverse(true);
+    fe_deriv->set_fe_basis(*fe);
+    fe_deriv->reinit(c);
+    
+    // initialize the variable data
+    fe_var->set_compute_du_dx(true);
+    fe_var->set_fe_shape_data(*fe_deriv);
+    fe_var->init(c, u_vec);
+    
+    // iterate over points and check the data for accuracy
     for (uint_t i=0; i<fe->n_q_points(); i++) {
         
         xi  = q->quadrature_object().get_points()[i](0);
@@ -101,14 +140,14 @@ TEST_CASE("quad4_basis_derivatives",
 
         SECTION("Finite Element: Shape Function Derivative: dNvec/dxi") {
             
-            // compare shape functions
+            // compare shape functions derivatives wrt xi
             for (uint_t j=0; j<4; j++) vec[j] = fe->dphi_dxi(i, j, 0);
             REQUIRE_THAT(MAST::Test::eigen_matrix_to_std_vector(dNvec_dxi), Catch::Approx(vec));
         }
 
         SECTION("Finite Element: Shape Function Derivative: dNvec/deta") {
             
-            // compare shape functions
+            // compare shape functions derivatives wrt eta
             for (uint_t j=0; j<4; j++) vec[j] = fe->dphi_dxi(i, j, 1);
             REQUIRE_THAT(MAST::Test::eigen_matrix_to_std_vector(dNvec_deta), Catch::Approx(vec));
         }
