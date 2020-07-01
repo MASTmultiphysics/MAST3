@@ -103,21 +103,15 @@ inline void compute_fe_quad_derivatives(const ScalarType xi,
 
     // Jacobian
     Jac(0, 0) = dx_dxi;
-    Jac(0, 1) = dy_dxi;
-    Jac(1, 0) = dx_deta;
+    Jac(0, 1) = dx_deta;
+    Jac(1, 0) = dy_dxi;
     Jac(1, 1) = dy_deta;
     
     // inverse of Jacobian
     Jac_inv   = Jac.inverse();
 
-    // dxi_dx                  = Jacinv(1,1);            // dxi/dx
-    // deta_dx                 = Jacinv(1,2);            // dxi/dy
-    // dxi_dy                  = Jacinv(2,1);            // deta/dx
-    // deta_dy                 = Jacinv(2,2);            // deta/dy
-    
-    
-    dNvec_dx   =  Jac_inv(0, 0) * dNvec_dxi + Jac_inv(0, 1) * dNvec_deta;     // dN/dx
-    dNvec_dy   =  Jac_inv(1, 0) * dNvec_dxi + Jac_inv(1, 1) * dNvec_deta;     // dN/dy
+    dNvec_dx   =  Jac_inv(0, 0) * dNvec_dxi + Jac_inv(1, 0) * dNvec_deta;     // dN/dx
+    dNvec_dy   =  Jac_inv(0, 1) * dNvec_dxi + Jac_inv(1, 1) * dNvec_deta;     // dN/dy
 
     u          =  Nvec.dot(u_vec);            // value of u
     du_dx      =  dNvec_dx.dot(u_vec);        // du/dx

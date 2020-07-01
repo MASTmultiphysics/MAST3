@@ -28,7 +28,7 @@ struct Context {
 
 TEST_CASE("quad4_basis_derivatives",
           "[2D],[QUAD4],[FEBasis]") {
-
+    
     const uint_t
     n_basis = 4;
     
@@ -41,10 +41,10 @@ TEST_CASE("quad4_basis_derivatives",
     dNvec_deta,
     dNvec_dx,
     dNvec_dy;
-
+    
     std::vector<real_t>
     vec(4, 0.);
-
+    
     real_t
     xi,
     eta,
@@ -52,17 +52,22 @@ TEST_CASE("quad4_basis_derivatives",
     du_dx,
     du_dy,
     J_det;
-
+    
     Eigen::Matrix<real_t, 2, 2>
     Jac,
     Jac_inv;
     
     Eigen::Matrix<real_t, 3, 1>
     nvec;
-
+    
     x_vec << -1., 1., 1., -1.;
     y_vec << -1., -1., 1., 1.;
     u_vec << 1., 2., 3., 4.;
+    
+    // randomly perturb the coordinates
+    x_vec += 0.1 * Eigen::Matrix<real_t, 4, 1>::Random();
+    y_vec += 0.1 * Eigen::Matrix<real_t, 4, 1>::Random();
+    u_vec += 0.1 * Eigen::Matrix<real_t, 4, 1>::Random();
     
     std::unique_ptr<libMesh::Elem>
     e(libMesh::Elem::build(libMesh::QUAD4).release());
@@ -83,13 +88,13 @@ TEST_CASE("quad4_basis_derivatives",
     
     std::unique_ptr<fe_t>
     fe(new fe_t(libMesh::FEType(libMesh::FIRST, libMesh::LAGRANGE)));
-
+    
     std::unique_ptr<fe_deriv_t>
     fe_deriv(new fe_deriv_t);
-
+    
     std::unique_ptr<fe_var_t>
     fe_var(new fe_var_t);
-
+    
     Context c;
     c.elem = e.get();
     
@@ -114,7 +119,7 @@ TEST_CASE("quad4_basis_derivatives",
         
         xi  = q->quadrature_object().get_points()[i](0);
         eta = q->quadrature_object().get_points()[i](1);
-        REQUIRE(   fe->n_basis() == n_basis);
+        CHECK(   fe->n_basis() == n_basis);
         
         MAST::Test::FEBasis::Quad4::compute_fe_quad_derivatives(xi, eta,
                                                                 x_vec,
@@ -135,68 +140,68 @@ TEST_CASE("quad4_basis_derivatives",
                                                                 nvec);
         
         /*SECTION("Finite Element: Shape Function: Nvec")*/ {
-
+            
             // compare shape functions
             for (uint_t j=0; j<n_basis; j++) vec[j] = fe->phi(i, j);
-            REQUIRE_THAT(MAST::Test::eigen_matrix_to_std_vector(Nvec), Catch::Approx(vec));
+            CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(Nvec), Catch::Approx(vec));
         }
-
+        
         /*SECTION("Finite Element: Shape Function Derivative: dNvec/dxi")*/ {
             
             // compare shape functions derivatives wrt xi
             for (uint_t j=0; j<n_basis; j++) vec[j] = fe->dphi_dxi(i, j, 0);
-            REQUIRE_THAT(MAST::Test::eigen_matrix_to_std_vector(dNvec_dxi), Catch::Approx(vec));
+            CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(dNvec_dxi), Catch::Approx(vec));
         }
-
+        
         /*SECTION("Finite Element: Shape Function Derivative: dNvec/deta")*/ {
             
             // compare shape functions derivatives wrt eta
             for (uint_t j=0; j<n_basis; j++) vec[j] = fe->dphi_dxi(i, j, 1);
-            REQUIRE_THAT(MAST::Test::eigen_matrix_to_std_vector(dNvec_deta), Catch::Approx(vec));
+            CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(dNvec_deta), Catch::Approx(vec));
         }
-
+        
         /*SECTION("Finite Element: Jacobian determinants")*/ {
             
             // Jacobian
-            REQUIRE(fe_deriv->detJ(i) == Catch::Detail::Approx(J_det));
-            REQUIRE_THAT(MAST::Test::eigen_matrix_to_std_vector(Jac),
-                         Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(fe_deriv->dx_dxi(i))));
-            REQUIRE_THAT(MAST::Test::eigen_matrix_to_std_vector(Jac_inv),
-                         Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(fe_deriv->dxi_dx(i))));
+            CHECK(fe_deriv->detJ(i) == Catch::Detail::Approx(J_det));
+            CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(Jac),
+                       Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(fe_deriv->dx_dxi(i))));
+            CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(Jac_inv),
+                       Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(fe_deriv->dxi_dx(i))));
         }
-
+        
         /*SECTION("Finite Element: Shape Function Derivative: dNvec/dx")*/ {
             
             // compare shape functions derivatives wrt x
             for (uint_t j=0; j<n_basis; j++)
-                REQUIRE(dNvec_dx(j) == Catch::Detail::Approx(fe_deriv->dphi_dx(i, j, 0)));
-            REQUIRE_THAT(MAST::Test::eigen_matrix_to_std_vector(dNvec_dx),
-                         Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(fe_deriv->dphi_dx(i, 0))));
-            REQUIRE_THAT(MAST::Test::eigen_matrix_to_std_vector(dNvec_dx),
-                         Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(fe_deriv->dphi_dx(i).col(0))));
+                CHECK(dNvec_dx(j) == Catch::Detail::Approx(fe_deriv->dphi_dx(i, j, 0)));
+            CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(dNvec_dx),
+                       Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(fe_deriv->dphi_dx(i, 0))));
+            CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(dNvec_dx),
+                       Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(fe_deriv->dphi_dx(i).col(0))));
         }
-
+        
         /*SECTION("Finite Element: Shape Function Derivative: dNvec/dy")*/ {
             
             // compare shape functions derivatives wrt y
             for (uint_t j=0; j<n_basis; j++)
-                REQUIRE(dNvec_dy(j) == Catch::Detail::Approx(fe_deriv->dphi_dx(i, j, 1)));
-            REQUIRE_THAT(MAST::Test::eigen_matrix_to_std_vector(dNvec_dy),
-                         Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(fe_deriv->dphi_dx(i, 1))));
-            REQUIRE_THAT(MAST::Test::eigen_matrix_to_std_vector(dNvec_dy),
-                         Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(fe_deriv->dphi_dx(i).col(1))));
+                CHECK(dNvec_dy(j) == Catch::Detail::Approx(fe_deriv->dphi_dx(i, j, 1)));
+            CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(dNvec_dy),
+                       Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(fe_deriv->dphi_dx(i, 1))));
+            CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(dNvec_dy),
+                       Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(fe_deriv->dphi_dx(i).col(1))));
         }
-
+        
         /*SECTION("Finite Element: Solution and Derivatives: u, du/dx, du/dy")*/ {
             
             // compare solution at quadrature points
-            REQUIRE(    u == Catch::Detail::Approx(fe_var->u(i, 0)));
-            REQUIRE(du_dx == Catch::Detail::Approx(fe_var->du_dx(i, 0, 0)));
-            REQUIRE(du_dy == Catch::Detail::Approx(fe_var->du_dx(i, 0, 1)));
+            CHECK(    u == Catch::Detail::Approx(fe_var->u(i, 0)));
+            CHECK(du_dx == Catch::Detail::Approx(fe_var->du_dx(i, 0, 0)));
+            CHECK(du_dy == Catch::Detail::Approx(fe_var->du_dx(i, 0, 1)));
         }
-
+        
     }
-
+    
     for (uint_t i=0; i<nodes.size(); i++)
         delete nodes[i];
 }
