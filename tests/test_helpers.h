@@ -20,86 +20,101 @@
 #ifndef __test__test_helpers__
 #define __test__test_helpers__
 
-#include "base/mast_data_types.h"
-#include "elasticity/structural_element_base.h"
-#include "base/physics_discipline_base.h"
-#include "libmesh/point.h"
-#include "libmesh/face_quad4.h"
+// C++ includes
+#include <vector>
 
-namespace TEST {
+// MAST includes
+#include <mast/base/mast_data_types.h>
+//#include "elasticity/structural_element_base.h"
+//#include "base/physics_discipline_base.h"
+//#include "libmesh/point.h"
+//#include "libmesh/face_quad4.h"
+
+namespace MAST {
+namespace Test {
 
     /**
      * Converts an Eigen Matrix object to a std::vector. Useful for performing
      * elementwise comparisons in Catch2 tests.
      */
-    std::vector<double> eigen_matrix_to_std_vector(RealMatrixX M);
+template<typename Derived>
+std::vector<real_t> eigen_matrix_to_std_vector(const Eigen::MatrixBase<Derived>& M) {
 
-
-    /**
-     * Calcualtes the area of a 2D polygon using the shoelace formula.
-     */
-    real_tget_shoelace_area(RealMatrixX X);
-
-    /**
-     * Approximates the internal Jacobian of an element using a 6th order
-     * accurate central finite difference scheme.
-     */
-    void approximate_internal_jacobian_with_finite_difference(
-            MAST::StructuralElementBase& elem,
-            const RealVectorX& initial_elem_solution,
-            RealMatrixX& jacobian);
-
-
-    /**
-     * Approximates the side external jacobian using a 4th order accurate central
-     * finite difference scheme.
-     */
-    void approximate_side_external_jacobian_with_finite_difference(
-            MAST::StructuralElementBase& elem,
-            MAST::PhysicsDisciplineBase& discipline,
-            const RealVectorX& initial_elem_solution,
-            RealMatrixX& jacobian);
-
-    /**
-     * Approximates the volume external jacobian using a 4th order accurate central
-     * finite difference scheme.
-     */
-    void approximate_volume_external_jacobian_with_finite_difference(
-            MAST::StructuralElementBase& elem,
-            MAST::PhysicsDisciplineBase& discipline,
-            const RealVectorX& initial_elem_solution,
-            RealMatrixX& jacobian);
-
-    /**
-     * Approximates the inertial jacobian using a 6th order accurate central
-     * finite difference scheme.
-     */
-    void approximate_inertial_jacobian_with_finite_difference(
-            MAST::StructuralElementBase& elem,
-            const RealVectorX& initial_elem_solution,
-            RealMatrixX& jacobian);
-
-
-    /**
-     * Approximates the thermal jacobian using a 6th order accurate central
-     * finite difference scheme.
-     */
-    void approximate_thermal_jacobian_with_finite_difference(
-                                        MAST::StructuralElementBase& elem,
-                                        const RealVectorX& initial_elem_solution,
-                                        RealMatrixX& jacobian,
-                                        MAST::BoundaryConditionBase& thermal_bc);
-
-
-    /**
-     * Transform an element by applying any combination of: shifts, scales,
-     * rotations, and shears. Useful for testing elements of different geometries
-     * and in different orientations.
-     */
-    void transform_element(libMesh::MeshBase& mesh, const RealMatrixX X0,
-                           real_tshift_x, real_tshift_y, real_tshift_z,
-                           real_tscale_x, real_tscale_y,
-                           real_trotation_x, real_trotation_y, real_trotation_z,
-                           real_tshear_x = 0, real_tshear_y = 0);
+    static_assert(std::is_same<real_t, typename Eigen::MatrixBase<Derived>::Scalar>::value,
+                  "Scalar type of matrix shoudl be real_t");
+    
+    const real_t *v = static_cast<const Derived>(M).data();
+    std::vector<real_t> vec(v, v+M.rows()*M.cols());
+    return vec;
 }
+
+
+//    /**
+//     * Calcualtes the area of a 2D polygon using the shoelace formula.
+//     */
+//    real_tget_shoelace_area(RealMatrixX X);
+//
+//    /**
+//     * Approximates the internal Jacobian of an element using a 6th order
+//     * accurate central finite difference scheme.
+//     */
+//    void approximate_internal_jacobian_with_finite_difference(
+//            MAST::StructuralElementBase& elem,
+//            const RealVectorX& initial_elem_solution,
+//            RealMatrixX& jacobian);
+//
+//
+//    /**
+//     * Approximates the side external jacobian using a 4th order accurate central
+//     * finite difference scheme.
+//     */
+//    void approximate_side_external_jacobian_with_finite_difference(
+//            MAST::StructuralElementBase& elem,
+//            MAST::PhysicsDisciplineBase& discipline,
+//            const RealVectorX& initial_elem_solution,
+//            RealMatrixX& jacobian);
+//
+//    /**
+//     * Approximates the volume external jacobian using a 4th order accurate central
+//     * finite difference scheme.
+//     */
+//    void approximate_volume_external_jacobian_with_finite_difference(
+//            MAST::StructuralElementBase& elem,
+//            MAST::PhysicsDisciplineBase& discipline,
+//            const RealVectorX& initial_elem_solution,
+//            RealMatrixX& jacobian);
+//
+//    /**
+//     * Approximates the inertial jacobian using a 6th order accurate central
+//     * finite difference scheme.
+//     */
+//    void approximate_inertial_jacobian_with_finite_difference(
+//            MAST::StructuralElementBase& elem,
+//            const RealVectorX& initial_elem_solution,
+//            RealMatrixX& jacobian);
+//
+//
+//    /**
+//     * Approximates the thermal jacobian using a 6th order accurate central
+//     * finite difference scheme.
+//     */
+//    void approximate_thermal_jacobian_with_finite_difference(
+//                                        MAST::StructuralElementBase& elem,
+//                                        const RealVectorX& initial_elem_solution,
+//                                        RealMatrixX& jacobian,
+//                                        MAST::BoundaryConditionBase& thermal_bc);
+//
+//
+//    /**
+//     * Transform an element by applying any combination of: shifts, scales,
+//     * rotations, and shears. Useful for testing elements of different geometries
+//     * and in different orientations.
+//     */
+//    void transform_element(libMesh::MeshBase& mesh, const RealMatrixX X0,
+//                           real_tshift_x, real_tshift_y, real_tshift_z,
+//                           real_tscale_x, real_tscale_y,
+//                           real_trotation_x, real_trotation_y, real_trotation_z,
+//                           real_tshear_x = 0, real_tshear_y = 0);
+} // namespace Test
+} // namespace MAST
 #endif // __test__test_helpers__

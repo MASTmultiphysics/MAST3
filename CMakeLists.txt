@@ -122,8 +122,8 @@ if(BUILD_DOC)
 endif()
 
 # TESTS - testing temporarily disabled.
-#enable_testing()
-#add_subdirectory(tests)
+enable_testing()
+add_subdirectory(tests)
 
 # EXAMPLES
 add_subdirectory(examples)

@@ -1,25 +1,22 @@
 # Create the executable unit test target that uses the Catch2 testing framework.
 add_executable(mast_catch_tests
-    test_helpers.cpp
-    init_catch2.cpp)
+               test_helpers.h
+#               test_helpers.cpp
+               init_catch2.cpp)
 
 # Add include directories to the unit test executable target.
 target_include_directories(mast_catch_tests
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/contrib/catch
-        ${CMAKE_CURRENT_LIST_DIR})
+                           PRIVATE
+                           ${PROJECT_SOURCE_DIR}/include
+                           ${CMAKE_SOURCE_DIR}/contrib/catch
+                           ${CMAKE_CURRENT_LIST_DIR})
 
 # Link the unit test executable against the MAST library.
 target_link_libraries(mast_catch_tests mast)
 
 # TODO: May be better to use Catch2's built in CMake support rather than manually adding through ctest
 
-#add_subdirectory(base)
-#add_subdirectory(boundary_condition)
-#add_subdirectory(fe)
-#add_subdirectory(material)
-#add_subdirectory(property)
-#add_subdirectory(element)
+add_subdirectory(fe)
 
 message(NOTICE "It is recommended to run 'make check' instead of 'make test'. Alternatively, for 'ctest' or \
 'make test' to output Catch2 error messages when a failure occurs, you must set the environment variable \
@@ -29,7 +26,7 @@ CTEST_OUTPUT_ON_FAILURE=1.")
 # "check" instead. This "check" command will generate a graph to visualize test
 # dependencies, run ctest with output-on-failure enabled so that Catch2 output
 # is available, and then generate a graph to visualize which tests passed, 
-# failed, or were not ran.
+# failed, or were not run.
 #
 # References 
 # ----------

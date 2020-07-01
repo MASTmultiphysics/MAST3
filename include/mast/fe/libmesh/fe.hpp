@@ -5,6 +5,7 @@
 // MAST includes
 #include <mast/base/mast_data_types.h>
 #include <mast/base/exceptions.hpp>
+#include <mast/quadrature/libmesh/quadrature.hpp>
 
 // libMesh includes
 #include <libmesh/fe_base.h>
@@ -101,7 +102,7 @@ public:
     }
 
     inline void reinit(const libMesh::Elem& e,
-                       const quadrature_t&  q) {
+                       quadrature_t&  q) {
      
         // reinitialize only if needed
         if (&e != _elem || &q != _q) {
@@ -114,15 +115,15 @@ public:
             _q_side = nullptr;
             
             if (_compute_dphi_dxi)
-                MAST::FEBasis::libMeshWrapper::init_basis_derivative_map<Dim>(_dphi_dxi,
-                                                                              _fe->get_fe_map());
+                MAST::FEBasis::libMeshWrapper::init_basis_derivative_map<Dim>(_fe->get_fe_map(),
+                                                                              _dphi_dxi);
             else
                 _dphi_dxi.clear();
         }
     }
 
     inline void reinit_for_side(const libMesh::Elem&     e,
-                                const side_quadrature_t& q,
+                                side_quadrature_t& q,
                                 const uint_t             s) {
         
         // reinitialize only if needed
@@ -151,7 +152,11 @@ public:
     inline scalar_t phi(uint_t qp, uint_t phi_i) const { return _fe->get_phi()[phi_i][qp];}
     
     inline scalar_t
-    dphi_dxi(uint_t qp, uint_t phi_i, uint_t xi_i) const { return (*_dphi_dxi[xi_i])[phi_i][qp];}
+    dphi_dxi(uint_t qp, uint_t phi_i, uint_t xi_i) const {
+        
+        Assert0(_compute_dphi_dxi, "FE not initialized with basis derivatives.");
+        return (*_dphi_dxi[xi_i])[phi_i][qp];
+    }
 
 private:
     

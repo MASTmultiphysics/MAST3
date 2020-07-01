@@ -124,7 +124,6 @@ public:
         delete _fe_var_side;
         delete _fe_side_data;
         delete _fe_data;
-        delete _c;
     }
     
     template <typename AccessorType>
