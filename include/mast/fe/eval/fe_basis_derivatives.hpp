@@ -241,7 +241,7 @@ public:
     inline dx_dxi_mat_t      dx_dxi(uint_t qp) const
     {
         Assert0(_if_Jac, "Jacobian computation not requested");
-        return _dx_dxi_mat_t(_dx_dxi.col(qp).data(), spatial_dim, ref_dim);
+        return dx_dxi_mat_t(_dx_dxi.col(qp).data(), spatial_dim, ref_dim);
     }
 
     inline NodalScalarType      dx_dxi(uint_t qp, uint_t x_i, uint_t xi_i) const
@@ -253,7 +253,7 @@ public:
     inline dxi_dx_mat_t      dxi_dx(uint_t qp) const
     {
         Assert0(_if_Jac_inv, "Jacobian inverse computation not requested");
-        return _dxi_dx_mat_t(_dxi_dx.col(qp).data(), ref_dim, spatial_dim);
+        return dxi_dx_mat_t(_dxi_dx.col(qp).data(), ref_dim, spatial_dim);
     }
 
     inline NodalScalarType      dxi_dx(uint_t qp, uint_t x_i, uint_t xi_i) const

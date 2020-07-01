@@ -49,6 +49,18 @@ std::vector<real_t> eigen_matrix_to_std_vector(const Eigen::MatrixBase<Derived>&
 }
 
 
+template<typename Derived>
+std::vector<real_t> eigen_matrix_to_std_vector(const Eigen::Map<Derived>& M) {
+
+    static_assert(std::is_same<real_t, typename Eigen::Map<Derived>::Scalar>::value,
+                  "Scalar type of matrix shoudl be real_t");
+    
+    const real_t *v = M.data();
+    std::vector<real_t> vec(v, v+M.rows()*M.cols());
+    return vec;
+}
+
+
 //    /**
 //     * Calcualtes the area of a 2D polygon using the shoelace formula.
 //     */

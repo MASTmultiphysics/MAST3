@@ -151,6 +151,17 @@ TEST_CASE("quad4_basis_derivatives",
             for (uint_t j=0; j<4; j++) vec[j] = fe->dphi_dxi(i, j, 1);
             REQUIRE_THAT(MAST::Test::eigen_matrix_to_std_vector(dNvec_deta), Catch::Approx(vec));
         }
+
+        SECTION("Finite Element: Jacobian determinants") {
+            
+            // Jacobian
+            REQUIRE(fe_deriv->detJ(i) == Catch::Detail::Approx(J_det));
+            REQUIRE_THAT(MAST::Test::eigen_matrix_to_std_vector(Jac),
+                         Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(fe_deriv->dx_dxi(i))));
+            REQUIRE_THAT(MAST::Test::eigen_matrix_to_std_vector(Jac_inv),
+                         Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(fe_deriv->dxi_dx(i))));
+        }
+        
     }
 
     for (uint_t i=0; i<nodes.size(); i++)
