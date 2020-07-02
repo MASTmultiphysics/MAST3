@@ -23,6 +23,10 @@ public:
         return _v;
     }
 
+    inline ScalarType& operator() () {
+        return _v;
+    }
+
     inline ScalarType operator() () const {
         return _v;
     }
@@ -34,7 +38,7 @@ public:
 
     template <typename ContextType, typename ScalarFieldType>
     inline ScalarType derivative(ContextType& c,
-                                 const ScalarFieldType& f) {
+                                 const ScalarFieldType& f) const {
         return &f==this?1.:0.;
     }
 

@@ -101,6 +101,14 @@ struct ElemOps {
         fe_var->init(c, sol);
         strain_e->compute(c, res, jac);
     }
+
+    template <typename ScalarFieldType>
+    inline void derivative(const ScalarFieldType& f,
+                           typename Traits::vector_t& res,
+                           typename Traits::matrix_t* jac = nullptr) {
+        
+        strain_e->derivative(c, f, res, jac);
+    }
     
     std::unique_ptr<typename Traits::quadrature_t>   q;
     std::unique_ptr<typename Traits::fe_basis_t>     fe;
@@ -112,6 +120,42 @@ struct ElemOps {
     std::unique_ptr<typename Traits::energy_t>       strain_e;
     Context                                          c;
 };
+
+
+template <typename ScalarConstantType,
+          typename Traits,
+          typename TraitsComplex>
+inline void complex_step_derivative(ElemOps<TraitsComplex>          &e_ops_c,
+                                    const libMesh::Elem             *e,
+                                    ScalarConstantType              &f,
+                                    const typename Traits::vector_t &sol,
+                                    typename Traits::vector_t       &res,
+                                    typename Traits::matrix_t       &jac)  {
+    
+
+    typename TraitsComplex::vector_t
+    sol_c,
+    res_c;
+
+    typename TraitsComplex::matrix_t
+    jac_c;
+
+    e_ops_c.init(e);
+    
+    sol_c = sol.template cast<complex_t>();
+    res_c = TraitsComplex::vector_t::Zero(e_ops_c.n_dofs());
+    jac_c = TraitsComplex::matrix_t::Zero(e_ops_c.n_dofs(), e_ops_c.n_dofs());
+
+    // add perturbation to parameter
+    f() += complex_t(0., ComplexStepDelta);
+    
+    e_ops_c.compute(sol_c, res_c, &jac_c);
+    
+    res = res_c.imag()/ComplexStepDelta;
+    jac = jac_c.imag()/ComplexStepDelta;
+    
+}
+
 
 
 TEST_CASE("linear_strain_energy",
@@ -163,50 +207,86 @@ TEST_CASE("linear_strain_energy",
         e->set_node(i) = nodes[i];
     }
     
-    using traits_t        = Traits<real_t, real_t, real_t, 2>;
+    using traits_t         = Traits<real_t, real_t, real_t, 2>;
+    
     typename traits_t::vector_t
     sol,
-    res;
+    res,
+    res_cs;
 
     typename traits_t::matrix_t
     jac,
-    jac_c;
+    jac_cs;
 
     ElemOps<traits_t> e_ops;
     e_ops.init(e.get());
     
-    sol   = 0.1 * traits_t::vector_t::Random(e_ops.n_dofs());
-    res   = traits_t::vector_t::Zero(e_ops.n_dofs());
-    jac   = traits_t::matrix_t::Zero(e_ops.n_dofs(), e_ops.n_dofs());
-    jac_c = traits_t::matrix_t::Zero(e_ops.n_dofs(), e_ops.n_dofs());
+    sol    = 0.1 * traits_t::vector_t::Random(e_ops.n_dofs());
+    res    = traits_t::vector_t::Zero(e_ops.n_dofs());
+    jac    = traits_t::matrix_t::Zero(e_ops.n_dofs(), e_ops.n_dofs());
+    jac_cs = traits_t::matrix_t::Zero(e_ops.n_dofs(), e_ops.n_dofs());
 
     e_ops.compute(sol, res, &jac);
 
+    using traits_complex_t = Traits<real_t, real_t, complex_t, 2>;
+
     // compute the complex-step Jacobian
-    for (uint_t i=0; i<sol.size(); i++) {
+    {
+        for (uint_t i=0; i<sol.size(); i++) {
+                        
+            typename traits_complex_t::vector_t
+            sol_c,
+            res_c;
+            
+            ElemOps<traits_complex_t> e_ops_c;
+            e_ops_c.init(e.get());
+            
+            sol_c = sol.cast<complex_t>();
+            res_c = traits_complex_t::vector_t::Zero(e_ops.n_dofs());
+            
+            // complex perturbation to dof
+            sol_c(i) += complex_t(0., ComplexStepDelta);
+            
+            e_ops_c.compute(sol_c, res_c);
+            
+            jac_cs.col(i) = res_c.imag()/ComplexStepDelta;
+        }
         
-        using traits_complex_t = Traits<real_t, real_t, complex_t, 2>;
-
-        typename traits_complex_t::vector_t
-        sol_c,
-        res_c;
-
-        ElemOps<traits_complex_t> e_ops_c;
-        e_ops_c.init(e.get());
-        
-        sol_c = sol.cast<complex_t>();
-        res_c = traits_complex_t::vector_t::Zero(e_ops.n_dofs());
-
-        // complex perturbation to dof
-        sol_c(i) += complex_t(0., ComplexStepDelta);
-        
-        e_ops_c.compute(sol_c, res_c);
-        
-        jac_c.col(i) = res_c.imag()/ComplexStepDelta;
+        CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(jac),
+                   Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(jac_cs)));
     }
     
-    CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(jac),
-               Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(jac_c)));
+    // residual sensitivity wrt E
+    {
+        res.setZero();
+        jac.setZero();
+        e_ops.derivative(*e_ops.E, res, &jac);
+        
+        ElemOps<traits_complex_t> e_ops_c;
+        
+        complex_step_derivative
+        <typename traits_complex_t::modulus_t, traits_t, traits_complex_t>
+        (e_ops_c, e.get(), *e_ops_c.E, sol, res_cs, jac_cs);
+        
+        CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(res),
+                   Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(res_cs)));
+    }
+
+    // residual sensitivity wrt nu
+    {
+        res.setZero();
+        jac.setZero();
+        e_ops.derivative(*e_ops.nu, res, &jac);
+        
+        ElemOps<traits_complex_t> e_ops_c;
+        
+        complex_step_derivative
+        <typename traits_complex_t::modulus_t, traits_t, traits_complex_t>
+        (e_ops_c, e.get(), *e_ops_c.nu, sol, res_cs, jac_cs);
+        
+        CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(res),
+                   Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(res_cs)));
+    }
 
     for (uint_t i=0; i<nodes.size(); i++)
         delete nodes[i];

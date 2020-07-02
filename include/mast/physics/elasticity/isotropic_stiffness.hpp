@@ -66,10 +66,10 @@ public:
         m.setZero();
 
         m(0, 0) = m(1, 1) =
-        1./(1.-nu*nu) * dEdp + E/pow(1.-nu*nu,2) * nu * dnudp;
+        1./(1.-nu*nu) * dEdp + 2. * E/pow(1.-nu*nu,2) * nu * dnudp;
         
         m(0, 1) = m(1, 0) =
-        nu/(1.-nu*nu) * dEdp + (E/(1.-nu*nu) + E*nu/pow(1.-nu*nu,2)*nu) * dnudp;
+        nu/(1.-nu*nu) * dEdp + (E/(1.-nu*nu) + 2. * E*nu/pow(1.-nu*nu,2) * nu) * dnudp;
         
         m(2, 2) =
         1./2./(1.+nu)*dEdp - E/2./pow(1.+nu,2) * dnudp;

@@ -118,7 +118,7 @@ public:
         Assert0(_fe_var_data, "FE data not initialized.");
         Assert0(_property, "Section property not initialized");
         
-        const typename FEVarType::fe_basis_t
+        const typename FEVarType::fe_shape_deriv_t
         &fe = _fe_var_data->get_fe_shape_data();
 
         typename Eigen::Matrix<scalar_t, n_strain, 1>
