@@ -326,12 +326,12 @@ compute_detJxW(const FEBasisType& fe_basis,
                const Eigen::Matrix<NodalScalarType, Eigen::Dynamic, 1>& detJ,
                Eigen::Matrix<NodalScalarType, Eigen::Dynamic, 1>&       detJxW) {
     
-    Assert2(fe_basis.n_q_points() == detJ.cols(),
-            fe_basis.n_q_points(), detJ.cols(),
+    Assert2(fe_basis.n_q_points() == detJ.rows(),
+            fe_basis.n_q_points(), detJ.rows(),
             "Incompatible number of quadrature points of detJ and FEBasis.");
     
     uint_t
-    nq      = detJ.cols();
+    nq      = detJ.rows();
 
     detJxW      = Eigen::Matrix<NodalScalarType, Eigen::Dynamic, 1>::Zero(nq);
     

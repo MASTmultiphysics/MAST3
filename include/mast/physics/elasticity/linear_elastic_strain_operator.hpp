@@ -18,12 +18,12 @@ inline
 typename std::enable_if<Dim == 2, void>::type
 linear_continuum_strain(const FEVarType&                                    fe_var,
                         const uint_t                                        qp,
-                        typename Eigen::Matrix<VarScalarType, 3, 1>::type&  epsilon,
+                        typename Eigen::Matrix<VarScalarType, 3, 1>&        epsilon,
                         MAST::Numerics::FEMOperatorMatrix<NodalScalarType>& Bmat) {
     
     epsilon.setZero();
     
-    const typename FEVarType::fe_shape_data_type
+    const typename FEVarType::fe_shape_deriv_t
     &fe = fe_var.get_fe_shape_data();
     
     // make sure all matrices are the right size

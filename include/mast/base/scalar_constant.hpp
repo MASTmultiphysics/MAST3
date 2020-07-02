@@ -28,7 +28,7 @@ public:
     }
 
     template <typename ContextType>
-    inline ScalarType value(ContextType& c) {
+    inline ScalarType value(ContextType& c) const {
         return _v;
     }
 

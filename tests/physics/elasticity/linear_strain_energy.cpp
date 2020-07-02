@@ -69,6 +69,7 @@ struct ElemOps {
         // initialize the shape function derivatives wrt spatial coordinates
         fe_deriv->set_compute_dphi_dx(true);
         fe_deriv->set_compute_detJ(true);
+        fe_deriv->set_compute_detJxW(true);
         fe_deriv->set_compute_Jac_inverse(true);
         fe_deriv->set_fe_basis(*fe);
 
@@ -97,7 +98,7 @@ struct ElemOps {
                         typename Traits::vector_t& res) {
 
         fe_var->init(c, sol);
-
+        strain_e->compute(c, res);
     }
     
     std::unique_ptr<typename Traits::quadrature_t>   q;
@@ -121,7 +122,6 @@ TEST_CASE("linear_strain_energy",
     Eigen::Matrix<real_t, 4, 1>
     x_vec,
     y_vec,
-    u_vec,
     Nvec,
     dNvec_dxi,
     dNvec_deta,
@@ -148,12 +148,10 @@ TEST_CASE("linear_strain_energy",
     
     x_vec << -1., 1., 1., -1.;
     y_vec << -1., -1., 1., 1.;
-    u_vec << 1., 2., 3., 4.;
     
     // randomly perturb the coordinates
     x_vec += 0.1 * Eigen::Matrix<real_t, 4, 1>::Random();
     y_vec += 0.1 * Eigen::Matrix<real_t, 4, 1>::Random();
-    u_vec += 0.1 * Eigen::Matrix<real_t, 4, 1>::Random();
     
     std::unique_ptr<libMesh::Elem>
     e(libMesh::Elem::build(libMesh::QUAD4).release());
@@ -175,12 +173,14 @@ TEST_CASE("linear_strain_energy",
     ElemOps<traits_t> e_ops;
     e_ops.init(e.get());
     
-    sol = traits_t::vector_t::Zero(e_ops.n_dofs());
+    sol = 0.1 * traits_t::vector_t::Random(e_ops.n_dofs());
     res = traits_t::vector_t::Zero(e_ops.n_dofs());
     jac = traits_t::matrix_t::Zero(e_ops.n_dofs(), e_ops.n_dofs());
 
     e_ops.compute(sol, res);
 
+    std::cout << res << std::endl;
+    
     for (uint_t i=0; i<nodes.size(); i++)
         delete nodes[i];
 }

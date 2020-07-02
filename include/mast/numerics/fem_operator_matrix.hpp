@@ -97,8 +97,8 @@ public:
     /*!
      *   res = v^T * [this]
      */
-    template <typename T>
-    void vector_mult_transpose(T& res, const T& v) const;
+    template <typename T1, typename T2>
+    void vector_mult_transpose(T1& res, const T2& v) const;
     
     
     /*!
@@ -126,8 +126,8 @@ public:
     /*!
      *   [R] = [M] * [this]
      */
-    template <typename T>
-    void left_multiply(T& r, const T& m) const;
+    template <typename T1, typename T2>
+    void left_multiply(T1& r, const T2& m) const;
     
     
     /*!
@@ -338,11 +338,11 @@ vector_mult(T& res, const T& v) const {
 }
 
 template <typename ScalarType>
-template <typename T>
+template <typename T1, typename T2>
 inline
 void
 MAST::Numerics::FEMOperatorMatrix<ScalarType>::
-vector_mult_transpose(T& res, const T& v) const {
+vector_mult_transpose(T1& res, const T2& v) const {
     
     Assert2(res.size() == n(),
             res.size(), n(),
@@ -477,11 +477,11 @@ right_multiply_transpose(T& r, const MAST::Numerics::FEMOperatorMatrix<ScalarTyp
 
 
 template <typename ScalarType>
-template <typename T>
+template <typename T1, typename T2>
 inline
 void
 MAST::Numerics::FEMOperatorMatrix<ScalarType>::
-left_multiply(T& r, const T& m) const {
+left_multiply(T1& r, const T2& m) const {
     
     Assert2(r.rows() == m.rows(),
             r.rows(), m.rows(),

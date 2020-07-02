@@ -35,7 +35,7 @@ public:
         _nu = &nu;
     }
     
-    inline void value(const ContextType& c, value_t& m) const {
+    inline void value(ContextType& c, value_t& m) const {
                 
         const E_scalar_t
         E  = _E->value(c);
@@ -51,7 +51,7 @@ public:
     
     
     template <typename ScalarFieldType>
-    inline void derivative(const ContextType&     c,
+    inline void derivative(ContextType&           c,
                            const ScalarFieldType& f,
                            value_t&               m) const {
         

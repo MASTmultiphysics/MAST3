@@ -21,7 +21,7 @@ class FEVarData {
   
 public:
     
-    using fe_basis_t       = FEBasisDerivativeType;
+    using fe_shape_deriv_t = FEBasisDerivativeType;
     using scalar_t         = typename MAST::DeducedScalarType<NodalScalarType, SolScalarType>::type;
     using sol_vec_view_t   = Eigen::Map<const typename Eigen::Matrix<scalar_t, NComponents, 1>>;
     
