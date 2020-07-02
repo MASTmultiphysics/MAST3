@@ -95,10 +95,11 @@ struct ElemOps {
     }
     
     inline void compute(const typename Traits::vector_t& sol,
-                        typename Traits::vector_t& res) {
+                        typename Traits::vector_t& res,
+                        typename Traits::matrix_t* jac=nullptr) {
 
         fe_var->init(c, sol);
-        strain_e->compute(c, res);
+        strain_e->compute(c, res, jac);
     }
     
     std::unique_ptr<typename Traits::quadrature_t>   q;
@@ -162,25 +163,51 @@ TEST_CASE("linear_strain_energy",
         e->set_node(i) = nodes[i];
     }
     
-    using traits_t = Traits<real_t, real_t, real_t, 2>;
+    using traits_t        = Traits<real_t, real_t, real_t, 2>;
     typename traits_t::vector_t
     sol,
     res;
 
     typename traits_t::matrix_t
-    jac;
+    jac,
+    jac_c;
 
     ElemOps<traits_t> e_ops;
     e_ops.init(e.get());
     
-    sol = 0.1 * traits_t::vector_t::Random(e_ops.n_dofs());
-    res = traits_t::vector_t::Zero(e_ops.n_dofs());
-    jac = traits_t::matrix_t::Zero(e_ops.n_dofs(), e_ops.n_dofs());
+    sol   = 0.1 * traits_t::vector_t::Random(e_ops.n_dofs());
+    res   = traits_t::vector_t::Zero(e_ops.n_dofs());
+    jac   = traits_t::matrix_t::Zero(e_ops.n_dofs(), e_ops.n_dofs());
+    jac_c = traits_t::matrix_t::Zero(e_ops.n_dofs(), e_ops.n_dofs());
 
-    e_ops.compute(sol, res);
+    e_ops.compute(sol, res, &jac);
 
-    std::cout << res << std::endl;
+    // compute the complex-step Jacobian
+    for (uint_t i=0; i<sol.size(); i++) {
+        
+        using traits_complex_t = Traits<real_t, real_t, complex_t, 2>;
+
+        typename traits_complex_t::vector_t
+        sol_c,
+        res_c;
+
+        ElemOps<traits_complex_t> e_ops_c;
+        e_ops_c.init(e.get());
+        
+        sol_c = sol.cast<complex_t>();
+        res_c = traits_complex_t::vector_t::Zero(e_ops.n_dofs());
+
+        // complex perturbation to dof
+        sol_c(i) += complex_t(0., ComplexStepDelta);
+        
+        e_ops_c.compute(sol_c, res_c);
+        
+        jac_c.col(i) = res_c.imag()/ComplexStepDelta;
+    }
     
+    CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(jac),
+               Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(jac_c)));
+
     for (uint_t i=0; i<nodes.size(); i++)
         delete nodes[i];
 }
