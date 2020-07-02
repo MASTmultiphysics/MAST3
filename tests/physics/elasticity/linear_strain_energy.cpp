@@ -11,7 +11,6 @@
 #include <mast/physics/elasticity/linear_strain_energy.hpp>
 
 // Test includes
-#include <fe/quad_derivatives.hpp>
 #include <test_helpers.h>
 
 // libMesh includes
