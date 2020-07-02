@@ -164,12 +164,12 @@ public:
         if (this->_if_detJ)
             MAST::FEBasis::Evaluation::compute_detJ_side
             <NodalScalarType, ElemDim, SpatialDim, ContextType>
-            (c, s, *_dx_dxi, *_detJ);
+            (c, s, _dx_dxi, _detJ);
 
         if (_if_JxW)
             MAST::FEBasis::Evaluation::compute_detJxW
             <NodalScalarType, ElemDim, SpatialDim, FEBasisType, ContextType>
-            (*_fe_basis, *_detJ, *_detJxW);
+            (*_fe_basis, _detJ, _detJxW);
         
         if (_if_Jac_inv)
             MAST::FEBasis::Evaluation::compute_Jac_inv<NodalScalarType, ElemDim, SpatialDim>
@@ -178,12 +178,12 @@ public:
         if (_if_dphi_dx)
             MAST::FEBasis::Evaluation::compute_dphi_dx
             <NodalScalarType, ElemDim, SpatialDim, FEBasisType>
-            (*_fe_basis, *_dxi_dx, *_dphi_dx);
+            (*_fe_basis, _dxi_dx, _dphi_dx);
 
         if (this->_if_normal)
             MAST::FEBasis::Evaluation::compute_side_tangent_and_normal
             <NodalScalarType, ElemDim, SpatialDim, ContextType>
-            (c, s, *_dx_dxi, *_side_tangent, *_side_normal);
+            (c, s, _dx_dxi, _side_tangent, _side_normal);
     }
 
     inline uint_t               order() const {
@@ -301,6 +301,24 @@ public:
                 "Invalid normal component index");
 
         return _side_normal(x_i, qp);
+    }
+
+    
+    inline normal_vec_t tangent(uint_t qp) const
+    {
+        Assert0(_if_normal, "Normal & Tangent not requested");
+
+        return normal_vec_t(_side_tangent.col(qp).data(), SpatialDim);
+    }
+
+    inline NodalScalarType     tangent(uint_t qp, uint_t x_i) const
+    {
+        Assert0(_if_normal, "Normal & Tangent not requested");
+        Assert2(x_i < SpatialDim,
+                x_i, SpatialDim,
+                "Invalid normal component index");
+
+        return _side_tangent(x_i, qp);
     }
 
 protected:

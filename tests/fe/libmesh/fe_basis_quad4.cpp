@@ -18,16 +18,19 @@ extern libMesh::LibMeshInit* p_global_init;
 
 struct Context {
     Context(): elem(nullptr), qp(-1), s(-1) {}
-    uint_t elem_dim() const {return elem->dim();}
-    uint_t  n_nodes() const {return elem->n_nodes();}
-    real_t  nodal_coord(uint_t nd, uint_t c) const {return elem->point(nd)(c);}
+    inline uint_t elem_dim() const {return elem->dim();}
+    inline uint_t  n_nodes() const {return elem->n_nodes();}
+    inline real_t  nodal_coord(uint_t nd, uint_t c) const {return elem->point(nd)(c);}
+    inline bool elem_is_quad() const {return (elem->type() == libMesh::QUAD4 ||
+                                              elem->type() == libMesh::QUAD8 ||
+                                              elem->type() == libMesh::QUAD9);}
     libMesh::Elem* elem;
     uint_t qp;
     uint_t s;
 };
 
-TEST_CASE("quad4_basis_derivatives",
-          "[2D],[QUAD4],[FEBasis]") {
+
+void test_quad4_fe_data(const uint_t mode) {
     
     const uint_t
     n_basis = 4;
@@ -58,7 +61,8 @@ TEST_CASE("quad4_basis_derivatives",
     Jac_inv;
     
     Eigen::Matrix<real_t, 3, 1>
-    nvec;
+    nvec,
+    tvec;
     
     x_vec << -1., 1., 1., -1.;
     y_vec << -1., -1., 1., 1.;
@@ -107,7 +111,12 @@ TEST_CASE("quad4_basis_derivatives",
     fe_deriv->set_compute_detJ(true);
     fe_deriv->set_compute_Jac_inverse(true);
     fe_deriv->set_fe_basis(*fe);
-    fe_deriv->reinit(c);
+    if (mode == 0)
+        fe_deriv->reinit(c);
+    else {
+        fe_deriv->set_compute_normal(true);
+        fe_deriv->reinit_for_side(c, mode-1);
+    }
     
     // initialize the variable data
     fe_var->set_compute_du_dx(true);
@@ -125,7 +134,7 @@ TEST_CASE("quad4_basis_derivatives",
                                                                 x_vec,
                                                                 y_vec,
                                                                 u_vec,
-                                                                0, // mode
+                                                                mode, // mode
                                                                 u,
                                                                 du_dx,
                                                                 du_dy,
@@ -137,7 +146,8 @@ TEST_CASE("quad4_basis_derivatives",
                                                                 Jac,
                                                                 Jac_inv,
                                                                 J_det,
-                                                                nvec);
+                                                                nvec,
+                                                                tvec);
         
         /*SECTION("Finite Element: Shape Function: Nvec")*/ {
             
@@ -200,9 +210,36 @@ TEST_CASE("quad4_basis_derivatives",
             CHECK(du_dy == Catch::Detail::Approx(fe_var->du_dx(i, 0, 1)));
         }
         
+        // check the surface normal
+        if (mode > 0) {
+            
+            for (uint_t j=0; j<2; j++)
+                CHECK(fe_deriv->normal(i, j) == Catch::Detail::Approx(nvec(j)));
+            CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(fe_deriv->normal(i)),
+                       Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(nvec.topRows(2))));
+        }
+
+        // check the tangent normal
+        if (mode > 0) {
+            
+            for (uint_t j=0; j<2; j++)
+                CHECK(fe_deriv->tangent(i, j) == Catch::Detail::Approx(tvec(j)));
+            CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(fe_deriv->tangent(i)),
+                       Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(tvec.topRows(2))));
+        }
     }
     
     for (uint_t i=0; i<nodes.size(); i++)
         delete nodes[i];
+}
+
+
+TEST_CASE("quad4_basis_derivatives",
+          "[2D],[QUAD4],[FEBasis]") {
+    
+    // mode = 0  domain
+    // mode = 1, 2, 3, 4 correspond to sides 0, 1, 2, 3, respectively
+    for (uint_t i=0; i<=4; i++)
+        test_quad4_fe_data(i);
 }
 
