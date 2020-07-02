@@ -25,11 +25,11 @@ class StrainEnergy {
 public:
 
     using scalar_t         = typename FEVarType::scalar_t;
-    using basis_scalar_t   = typename FEVarType::fe_basis_t::scalar_t;
+    using basis_scalar_t   = typename FEVarType::fe_shape_deriv_t::scalar_t;
     using vector_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using matrix_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     using section_scalar_t = typename SectionPropertyType::scalar_t;
-    using fe_basis_t       = typename FEVarType::fe_basis_t;
+    using fe_shape_deriv_t = typename FEVarType::fe_shape_deriv_t;
     static const uint_t n_strain  =
     MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<Dim>::value;
     
@@ -68,25 +68,25 @@ public:
         Assert0(_fe_var_data, "FE data not initialized.");
         Assert0(_property, "Section property not initialized");
         
-        const typename FEVarType::fe_basis_t
+        const typename FEVarType::fe_shape_deriv_t
         &fe = _fe_var_data->get_fe_shape_data();
         
         typename Eigen::Matrix<scalar_t, n_strain, 1>
         epsilon,
         stress;
         vector_t
-        vec     = vector_t::Zero(2*fe.n_basis());
+        vec     = vector_t::Zero(Dim*fe.n_basis());
         
         typename SectionPropertyType::value_t
         mat;
         
         matrix_t
-        mat1 = matrix_t::Zero(n_strain, 2*fe.n_basis()),
-        mat2 = matrix_t::Zero(2*fe.n_basis(), 2*fe.n_basis());
+        mat1 = matrix_t::Zero(n_strain, Dim*fe.n_basis()),
+        mat2 = matrix_t::Zero(Dim*fe.n_basis(), Dim*fe.n_basis());
 
         MAST::Numerics::FEMOperatorMatrix<scalar_t>
         Bxmat;
-        Bxmat.reinit(n_strain, 2, fe.n_basis());
+        Bxmat.reinit(n_strain, Dim, fe.n_basis());
 
         
         for (uint_t i=0; i<fe.n_q_points(); i++) {
@@ -118,20 +118,20 @@ public:
         Assert0(_fe_var_data, "FE data not initialized.");
         Assert0(_property, "Section property not initialized");
         
-        const typename FEVarType::fe_basis_t
+        const typename FEVarType::fe_shape_deriv_t
         &fe = _fe_var_data->get_fe_shape_data();
 
         typename Eigen::Matrix<scalar_t, n_strain, 1>
         epsilon,
         stress;
         vector_t
-        vec     = vector_t::Zero(2*fe.n_basis());
+        vec     = vector_t::Zero(Dim*fe.n_basis());
 
         typename SectionPropertyType::value_t
         mat;
         matrix_t
-        mat1 = matrix_t::Zero(n_strain, 2*fe.n_basis()),
-        mat2 = matrix_t::Zero(2*fe.n_basis(), 2*fe.n_basis());
+        mat1 = matrix_t::Zero(n_strain, Dim*fe.n_basis()),
+        mat2 = matrix_t::Zero(Dim*fe.n_basis(), Dim*fe.n_basis());
 
         MAST::Numerics::FEMOperatorMatrix<scalar_t>
         Bxmat;
