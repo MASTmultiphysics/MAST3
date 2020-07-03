@@ -252,7 +252,6 @@ int main(int argc, const char** argv) {
     using nodal_scalar_t = real_t;
     using sol_scalar_t   = real_t;
     using res_vec_t      = Eigen::Matrix<sol_scalar_t, Eigen::Dynamic, 1>;
-    //using jac_mat_t      = Eigen::Matrix<sol_scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     using jac_mat_t      = Eigen::SparseMatrix<sol_scalar_t>;
     using elem_ops_t     = ElemOps<Traits<basis_scalar_t, nodal_scalar_t, sol_scalar_t, 2>>;
     
