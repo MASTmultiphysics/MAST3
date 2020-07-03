@@ -75,8 +75,10 @@ struct Traits {
     using modulus_t         = typename MAST::Base::ScalarConstant<SolScalarType>;
     using nu_t              = typename MAST::Base::ScalarConstant<SolScalarType>;
     using press_t           = typename MAST::Base::ScalarConstant<SolScalarType>;
+    using area_t            = typename MAST::Base::ScalarConstant<SolScalarType>;
     using prop_t            = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<SolScalarType, Dim, modulus_t, nu_t, Context>;
     using energy_t          = typename MAST::Physics::Elasticity::LinearContinuum::StrainEnergy<fe_var_t, prop_t, Dim, Context>;
+    using press_load_t      = typename MAST::Physics::Elasticity::SurfacePressureLoad<fe_var_t, press_t, area_t, Dim, Context>;
 };
 
 
@@ -95,13 +97,14 @@ public:
     _fe_data      (nullptr),
     _fe_side_data (nullptr),
     _fe_var       (nullptr),
-    _fe_var_side  (nullptr),
+    _fe_side_var  (nullptr),
     _E            (nullptr),
     _nu           (nullptr),
     _prop         (nullptr),
     _energy       (nullptr),
     _press        (nullptr),
-    _c            (&c) {
+    _area         (nullptr),
+    _p_load       (nullptr) {
         
         _fe_data       = new typename Traits::fe_data_t;
         _fe_data->init(libMesh::SECOND,
@@ -114,49 +117,78 @@ public:
                             libMesh::FIRST,
                             libMesh::LAGRANGE);
         _fe_var        = new typename Traits::fe_var_t;
-        _fe_var_side   = new typename Traits::fe_var_t;
+        _fe_side_var   = new typename Traits::fe_var_t;
 
+        // associate variables with the shape functions
+        _fe_var->set_fe_shape_data(_fe_data->fe_derivative());
+        _fe_side_var->set_fe_shape_data(_fe_side_data->fe_derivative());
+
+        // tell the FE computations which quantities are needed for computation
+        _fe_data->fe_basis().set_compute_dphi_dxi(true);
+        
+        _fe_data->fe_derivative().set_compute_dphi_dx(true);
+        _fe_data->fe_derivative().set_compute_detJxW(true);
+        
+        _fe_side_data->fe_basis().set_compute_dphi_dxi(true);
+        _fe_side_data->fe_derivative().set_compute_normal(true);
+        _fe_side_data->fe_derivative().set_compute_detJxW(true);
+
+        _fe_var->set_compute_du_dx(true);
+        
         // variables for physics
         _E        = new typename Traits::modulus_t(72.e9);
         _nu       = new typename Traits::nu_t(0.33);
-        _press    = new typename Traits::nu_t(1.e2);
+        _press    = new typename Traits::press_t(1.e2);
+        _area     = new typename Traits::area_t(1.0);
         _prop     = new typename Traits::prop_t;
         _prop->set_modulus_and_nu(*_E, *_nu);
         _energy   = new typename Traits::energy_t;
+        _energy->set_section_property(*_prop);
+        _p_load   = new typename Traits::press_load_t;
+        _p_load->set_section_area(*_area);
+        _p_load->set_pressure(*_press);
+        
+        // tell physics kernels about the FE discretization information
+        _energy->set_fe_var_data(*_fe_var);
+        _p_load->set_fe_var_data(*_fe_side_var);
     }
     
     virtual ~ElemOps() {
         
+        delete _p_load;
+        delete _area;
         delete _press;
         delete _energy;
         delete _prop;
         delete _nu;
         delete _E;
         delete _fe_var;
-        delete _fe_var_side;
+        delete _fe_side_var;
         delete _fe_side_data;
         delete _fe_data;
     }
     
-    template <typename AccessorType>
-    inline void init(Context& c,
-                     const AccessorType& v) {
 
-        _fe_data->reinit(c);
-        _fe_var->init(c, v);
-    }
-
-    inline void clear() {
-        
-    }
-    
-    inline void compute(Context& c,
+    template <typename ContextType, typename AccessorType>
+    inline void compute(ContextType& c,
+                        const AccessorType& v,
                         vector_t& res,
                         matrix_t* jac) {
         
+        _fe_data->reinit(c);
+        _fe_var->init(c, v);
         _energy->compute(c, res, jac);
+        
+        for (uint_t s=0; s<c.elem->n_sides(); s++)
+            if (c.if_compute_pressure_load_on_side(s)) {
+                                
+                _fe_side_data->reinit_for_side(c, s);
+                _fe_side_var->init(c, v);
+                _p_load->compute(c, res, jac);
+            }
     }
 
+    
     template <typename ScalarFieldType>
     inline void derivative(Context& c,
                            const ScalarFieldType& f,
@@ -172,16 +204,16 @@ private:
     typename Traits::fe_data_t         *_fe_data;
     typename Traits::fe_side_data_t    *_fe_side_data;
     typename Traits::fe_var_t          *_fe_var;
-    typename Traits::fe_var_t          *_fe_var_side;
+    typename Traits::fe_var_t          *_fe_side_var;
 
     // variables for physics
-    typename Traits::modulus_t   *_E;
-    typename Traits::nu_t        *_nu;
-    typename Traits::prop_t      *_prop;
-    typename Traits::energy_t    *_energy;
-    typename Traits::press_t     *_press;
-    
-    Context                      *_c;
+    typename Traits::modulus_t    *_E;
+    typename Traits::nu_t         *_nu;
+    typename Traits::prop_t       *_prop;
+    typename Traits::energy_t     *_energy;
+    typename Traits::press_t      *_press;
+    typename Traits::area_t       *_area;
+    typename Traits::press_load_t *_p_load;
 };
 
 
@@ -196,19 +228,24 @@ int main(int argc, const char** argv) {
 
     Context c(init.comm());
 
-    c.sys->add_variable("u_x", libMesh::FEType(fe_order, fe_family));
-    c.sys->add_variable("u_y", libMesh::FEType(fe_order, fe_family));
-
-    libMesh::MeshTools::Generation::build_line(*c.mesh, 5, 0.0, 10.0);
+    libMesh::MeshTools::Generation::build_square(*c.mesh,
+                                                 2, 2,
+                                                 0.0, 10.0,
+                                                 0.0, 10.0);
     c.mesh->print_info();
     c.mesh->boundary_info->print_info();
 
+    c.sys->add_variable("u_x", libMesh::FEType(fe_order, fe_family));
+    c.sys->add_variable("u_y", libMesh::FEType(fe_order, fe_family));
+
+    c.eq_sys->init();
+    
     using basis_scalar_t = real_t;
     using nodal_scalar_t = real_t;
     using sol_scalar_t   = real_t;
     using res_vec_t      = Eigen::Matrix<sol_scalar_t, Eigen::Dynamic, 1>;
     using jac_mat_t      = Eigen::Matrix<sol_scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
-    using elem_ops_t = ElemOps<Traits<basis_scalar_t, nodal_scalar_t, sol_scalar_t, 2>>;
+    using elem_ops_t     = ElemOps<Traits<basis_scalar_t, nodal_scalar_t, sol_scalar_t, 2>>;
     
     elem_ops_t e_ops(c);
 
@@ -219,8 +256,16 @@ int main(int argc, const char** argv) {
 
     res_vec_t sol, res;
     jac_mat_t jac;
+    
+    sol = res_vec_t::Zero(c.sys->n_dofs());
+    res = res_vec_t::Zero(c.sys->n_dofs());
+    jac = jac_mat_t::Zero(c.sys->n_dofs(), c.sys->n_dofs());
 
     assembly.assemble(c, sol, &res, &jac);
+    
+    std::cout << res << std::endl;
+    std::cout << jac << std::endl;
+    
     
     // END_TRANSLATE
     return 0;
