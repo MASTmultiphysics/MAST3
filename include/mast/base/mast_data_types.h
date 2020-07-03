@@ -22,6 +22,8 @@
 
 // Eigen includes
 #include <Eigen/Dense>
+#include <Eigen/SparseCore>
+
 
 typedef double               real_t;
 typedef unsigned int         uint_t;
