@@ -23,6 +23,7 @@
 #include <libmesh/zero_function.h>
 #include <libmesh/exodusII_io.h>
 
+// Eigen includes
 #include <Eigen/SparseLU>
 
 // BEGIN_TRANSLATE Extension of bar
