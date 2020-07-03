@@ -115,8 +115,8 @@ public:
             _q_side = nullptr;
             
             if (_compute_dphi_dxi)
-                MAST::FEBasis::libMeshWrapper::init_basis_derivative_map<Dim>(_fe->get_fe_map(),
-                                                                              _dphi_dxi);
+                MAST::FEBasis::libMeshWrapper::init_basis_derivative_map<Dim>
+                (_fe->get_fe_map(), _dphi_dxi);
             else
                 _dphi_dxi.clear();
         }
@@ -132,7 +132,7 @@ public:
             s  != _side) {
             
             _fe->attach_quadrature_rule(&q.quadrature_object());
-            _fe->reinit(&e, &q.quadrature_object(), s);
+            _fe->reinit(&e, s);
             
             _q      = nullptr;
             _elem   = &e;
@@ -140,8 +140,8 @@ public:
             _q_side = &q;
             
             if (_compute_dphi_dxi)
-                MAST::FEBasis::libMeshWrapper::init_basis_derivative_map<Dim>(_dphi_dxi,
-                                                                              _fe->get_fe_map());
+                MAST::FEBasis::libMeshWrapper::init_basis_derivative_map<Dim>
+                (_fe->get_fe_map(), _dphi_dxi);
             else
                 _dphi_dxi.clear();
         }

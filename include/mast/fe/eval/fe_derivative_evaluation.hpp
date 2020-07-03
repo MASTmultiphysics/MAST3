@@ -103,19 +103,6 @@ template <typename NodalScalarType,
           uint_t ElemDim,
           uint_t SpatialDim,
           typename ContextType>
-inline void
-compute_detJ_side(const ContextType& c,
-                  const uint_t s,
-                  const Eigen::Matrix<NodalScalarType, SpatialDim*ElemDim, Eigen::Dynamic>& dx_dxi,
-                  Eigen::Matrix<NodalScalarType, Eigen::Dynamic, 1>& detJ);
-    
-
-
-
-template <typename NodalScalarType,
-          uint_t ElemDim,
-          uint_t SpatialDim,
-          typename ContextType>
 inline
 typename std::enable_if<ElemDim == SpatialDim && ElemDim == 1, void>::type
 compute_detJ_side
@@ -130,7 +117,7 @@ compute_detJ_side
 
 
 
-inline uint_t quad_side_Jac_row(uint_t s) {
+inline uint_t quad_side_Jac_col(uint_t s) {
     
     // identify row of the Jacobian matrix that will be used to compute
     // the size
@@ -168,7 +155,7 @@ compute_detJ_side_quad
     
     uint_t
     nq      = dx_dxi.cols(),
-    row     = quad_side_Jac_row(s);
+    row     = MAST::FEBasis::Evaluation::quad_side_Jac_col(s);
     
     detJ        = Eigen::Matrix<NodalScalarType, Eigen::Dynamic, 1>::Zero(nq);
 
@@ -197,24 +184,11 @@ compute_detJ_side
   Eigen::Matrix<NodalScalarType, Eigen::Dynamic, 1>& detJ) {
      
      if (c.elem_is_quad())
-         compute_detJ_side_quad<NodalScalarType, ElemDim, SpatialDim, ContextType>(c, s);
+         compute_detJ_side_quad<NodalScalarType, ElemDim, SpatialDim, ContextType>(c, s, dx_dxi, detJ);
      else
          Error(false, "Not implemented for element type.");
  }
 
-
-
-template <typename NodalScalarType,
-          uint_t ElemDim,
-          uint_t SpatialDim,
-          typename ContextType>
-inline void
-compute_side_tangent_and_normal
-(const ContextType& c,
- const uint_t s,
- const Eigen::Matrix<NodalScalarType, SpatialDim*ElemDim, Eigen::Dynamic>& dx_dxi,
- Eigen::Matrix<NodalScalarType, SpatialDim, Eigen::Dynamic>&               tangent,
- Eigen::Matrix<NodalScalarType, SpatialDim, Eigen::Dynamic>&               normal);
 
 
 
@@ -260,7 +234,7 @@ compute_quad_side_tangent_and_normal
 
     uint_t
     nq      = dx_dxi.cols(),
-    row     = quad_side_Jac_row(s);
+    col     = MAST::FEBasis::Evaluation::quad_side_Jac_col(s);
     
     tangent = Eigen::Matrix<NodalScalarType, SpatialDim, Eigen::Dynamic>::Zero(SpatialDim, nq);
     normal  = Eigen::Matrix<NodalScalarType, SpatialDim, Eigen::Dynamic>::Zero(SpatialDim, nq);
@@ -275,22 +249,20 @@ compute_quad_side_tangent_and_normal
     
     for (uint_t i=0; i<nq; i++) {
         
-        Eigen::Map<typename Eigen::Matrix<NodalScalarType, 2, 2>::type>
+        Eigen::Map<const typename Eigen::Matrix<NodalScalarType, 2, 2>>
         dxdxi(dx_dxi.col(i).data(), 2, 2);
         
         // tangent
-        dx(0)     = v * dxdxi(row, 0);
-        dx(1)     = v * dxdxi(row, 1);
+        dx        = v * dxdxi.col(col);
         dx       /= dx.norm();
-        tangent(i, 0) =  dx(0);
-        tangent(i, 1) = -dx(1);
+        tangent.col(i) = dx;
         
         // normal is tangent cross k_hat
         // dn = |  i   j   k   | = i ty - j tx
         //      | tx  ty   0   |
         //      | 0    0   1   |
-        normal(i, 0) =  dx(1);
-        normal(i, 1) = -dx(0);
+        normal(0, i) =  dx(1);
+        normal(1, i) = -dx(0);
     }
 }
 
@@ -310,7 +282,9 @@ compute_side_tangent_and_normal
   Eigen::Matrix<NodalScalarType, SpatialDim, Eigen::Dynamic>&               normal) {
     
      if (c.elem_is_quad())
-         compute_quad_side_tangent_and_normal(c, s, tangent, normal);
+         MAST::FEBasis::Evaluation::compute_quad_side_tangent_and_normal
+         <NodalScalarType, ElemDim, SpatialDim, ContextType>
+         (c, s, dx_dxi, tangent, normal);
      else
          Error(false, "Not implemented for element type.");
 }

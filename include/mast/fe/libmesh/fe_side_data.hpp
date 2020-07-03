@@ -19,9 +19,10 @@ class FESideData {
 public:
         
     // libMesh quadrature and fe types are implemented for real variables only
-    using quadrature_t = typename MAST::Quadrature::libMeshWrapper::Quadrature<real_t, Dim-1>;
-    using fe_basis_t   = FEBasisType;
-    using scalar_t     = typename FEDerivativeType::scalar_t;
+    using quadrature_t       = typename MAST::Quadrature::libMeshWrapper::Quadrature<real_t, Dim-1>;
+    using fe_basis_t         = FEBasisType;
+    using fe_shape_deriv_t   = FEDerivativeType;
+    using scalar_t           = typename FEDerivativeType::scalar_t;
     static_assert(std::is_same<FEBasisType, MAST::FEBasis::libMeshWrapper::FEBasis<real_t, Dim>>::value,
                   "FEBasisType should be libMeshWrapper::FEBasis.");
     static_assert(std::is_same<FEBasisType, typename FEDerivativeType::fe_basis_t>::value,
@@ -60,12 +61,20 @@ public:
         _initialized = true;
     }
 
+    inline quadrature_t& quadrature() { return *_q;}
+    inline const quadrature_t& quadrature() const { return *_q;}
     
+    inline fe_basis_t& fe_basis() { return *_fe_basis;}
+    inline const fe_basis_t& fe_basis() const { return *_fe_basis;}
+
+    inline FEDerivativeType& fe_derivative() { return *_fe_deriv;}
+    inline const FEDerivativeType& fe_derivative() const { return *_fe_deriv;}
+
     template <typename ContextType>
     inline void reinit_for_side(const ContextType& c, uint_t s) {
         
         _fe_basis->reinit_for_side(*c.elem, *_q, s);
-        _fe_deriv->reinit_for_side(c);
+        _fe_deriv->reinit_for_side(c, s);
     }
     
 private:

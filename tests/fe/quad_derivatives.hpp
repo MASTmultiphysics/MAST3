@@ -83,7 +83,8 @@ inline void compute_fe_quad_derivatives(const ScalarType xi,
                                         Eigen::Matrix<ScalarType, 2, 2>& Jac,
                                         Eigen::Matrix<ScalarType, 2, 2>& Jac_inv,
                                         ScalarType& J_det,
-                                        Eigen::Matrix<ScalarType, 3, 1>& nvec) {
+                                        Eigen::Matrix<ScalarType, 3, 1>& nvec,
+                                        Eigen::Matrix<ScalarType, 3, 1>& tvec) {
 
     //
     //  mode = 0:    J_det is defined for the 2D domain
@@ -165,6 +166,7 @@ inline void compute_fe_quad_derivatives(const ScalarType xi,
             Error(false, "Invalid mode number");
             
     }
+    tvec    = ds/ds.norm();
     nvec    = ds.cross(khat);
     nvec    /= nvec.norm();
 }
