@@ -49,6 +49,50 @@ inline void mark_quantities_to_compute(FEDataType& fe,
 }
 
 
+inline void qp_location_for_mode(const uint_t mode,
+                                 const real_t xi,
+                                 const real_t eta,
+                                 real_t& xi_mode,
+                                 real_t& eta_mode) {
+    
+    switch (mode) {
+
+        case 0: {
+            xi_mode  = xi;
+            eta_mode = eta;
+        }
+            break;
+
+        case 1: {
+            xi_mode  = xi;
+            eta_mode = -1.;
+        }
+            break;
+
+        case 2: {
+            xi_mode  = 1.;
+            eta_mode = xi;
+        }
+            break;
+
+        case 3: {
+            xi_mode  = -xi;
+            eta_mode = 1.;
+        }
+            break;
+
+        case 4: {
+            xi_mode  = -1.;
+            eta_mode = -xi;
+        }
+            break;
+
+        default:
+            break;
+    }
+}
+
+
 template <typename FEDataType, typename FEVarType>
 inline void test_quantities(const uint_t                       n_basis,
                             const uint_t                       mode,
@@ -91,12 +135,16 @@ inline void test_quantities(const uint_t                       n_basis,
     nvec,
     tvec;
     
+    CHECK(   fe->n_basis() == n_basis);
+
     // iterate over points and check the data for accuracy
     for (uint_t i=0; i<fe->n_q_points(); i++) {
         
-        xi  = q->quadrature_object().get_points()[i](0);
-        eta = q->quadrature_object().get_points()[i](1);
-        CHECK(   fe->n_basis() == n_basis);
+        qp_location_for_mode(mode,
+                             q->quadrature_object().get_points()[i](0),
+                             q->quadrature_object().get_points()[i](1),
+                             xi,
+                             eta);
         
         MAST::Test::FEBasis::Quad4::compute_fe_quad_derivatives(xi, eta,
                                                                 x_vec,
