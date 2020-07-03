@@ -117,6 +117,7 @@ protected:
         uint_t
         n_coeffs = coeffs.size();
 
+        Assert0(_fe, "FE pointer not initialized");
         Assert2(n_coeffs == _fe->n_basis() * NComponents,
                 n_coeffs, _fe->n_basis() * NComponents,
                 "Incompatible dimensions of coefficient vector");
@@ -130,6 +131,8 @@ protected:
     
     inline void _init_variables(const ContextType& c) {
         
+        Assert0(_fe, "FE pointer not initialized");
+
         uint_t
         n_qp     = _fe->n_q_points(),
         n_basis  = _fe->n_basis();

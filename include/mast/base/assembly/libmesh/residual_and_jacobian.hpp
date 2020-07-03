@@ -70,15 +70,12 @@ public:
             c.elem = *el;
             
             sol_accessor.init(*c.elem);
-            _e_ops->init(c, sol_accessor);
             
             res_e.setZero(sol_accessor.n_dofs());
             if (J) jac_e.setZero(sol_accessor.n_dofs(), sol_accessor.n_dofs());
             
             // perform the element level calculations
-            _e_ops->compute(c, res_e, J?&jac_e:nullptr);
-            
-            _e_ops->clear();
+            _e_ops->compute(c, sol_accessor, res_e, J?&jac_e:nullptr);
             
             // copy to the libMesh matrix for further processing
             using sub_vec_t = libMesh::DenseVector<ScalarType>;

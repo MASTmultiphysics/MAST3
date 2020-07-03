@@ -51,7 +51,7 @@ public:
         << _val_msg << std::endl
         << _file << " : " << _line << std::endl;
         
-        throw;
+        throw 1;
     }
     
 protected:
