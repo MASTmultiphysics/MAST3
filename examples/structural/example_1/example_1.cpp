@@ -14,6 +14,7 @@
 
 // libMesh includes
 #include <libmesh/replicated_mesh.h>
+#include <libmesh/elem.h>
 #include <libmesh/mesh_generation.h>
 #include <libmesh/equation_systems.h>
 #include <libmesh/boundary_info.h>
@@ -25,11 +26,12 @@ class Context {
 public:
     
     Context(libMesh::Parallel::Communicator& comm):
-    mesh    (new libMesh::ReplicatedMesh(comm)),
-    eq_sys  (new libMesh::EquationSystems(*mesh)),
-    sys     (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("structural")),
-    elem    (nullptr),
-    qp      (-1) {
+    mesh      (new libMesh::ReplicatedMesh(comm)),
+    eq_sys    (new libMesh::EquationSystems(*mesh)),
+    sys       (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("structural")),
+    elem      (nullptr),
+    qp        (-1),
+    p_side_id (1) {
 
     }
 
@@ -39,11 +41,21 @@ public:
         delete mesh;
     }
     
+    uint_t elem_dim() const {return elem->dim();}
+    uint_t  n_nodes() const {return elem->n_nodes();}
+    real_t  nodal_coord(uint_t nd, uint_t c) const {return elem->point(nd)(c);}
+    inline bool elem_is_quad() const {return (elem->type() == libMesh::QUAD4 ||
+                                              elem->type() == libMesh::QUAD8 ||
+                                              elem->type() == libMesh::QUAD9);}
+    inline bool if_compute_pressure_load_on_side(const uint_t s)
+    { return mesh->boundary_info->has_boundary_id(elem, s, p_side_id);}
+
     libMesh::ReplicatedMesh          *mesh;
     libMesh::EquationSystems         *eq_sys;
     libMesh::NonlinearImplicitSystem *sys;
     const libMesh::Elem              *elem;
     uint_t                            qp;
+    uint_t                            p_side_id;
 };
 
 
@@ -129,9 +141,11 @@ public:
     template <typename AccessorType>
     inline void init(Context& c,
                      const AccessorType& v) {
-        
+
+        _fe_data->reinit(c);
+        _fe_var->init(c, v);
     }
-    
+
     inline void clear() {
         
     }
@@ -140,12 +154,16 @@ public:
                         vector_t& res,
                         matrix_t* jac) {
         
+        _energy->compute(c, res, jac);
     }
 
+    template <typename ScalarFieldType>
     inline void derivative(Context& c,
+                           const ScalarFieldType& f,
                            vector_t& res,
                            matrix_t* jac) {
         
+        _energy->derivative(c, f, res, jac);
     }
 
 private:

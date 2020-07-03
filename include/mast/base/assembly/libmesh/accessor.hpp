@@ -36,7 +36,8 @@ public:
     inline const std::vector<libMesh::dof_id_type>& dof_indices() const {return _dof_ids;}
     inline std::vector<libMesh::dof_id_type>& dof_indices() {return _dof_ids;}
     inline uint_t n_dofs() const { return _dof_ids.size();}
-    
+    inline uint_t size() const { return _dof_ids.size();}
+
     inline ScalarType operator() (uint_t i) const {
         
         Assert2(i < _dof_ids.size(),
