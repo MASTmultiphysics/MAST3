@@ -9,6 +9,13 @@
 // Test includes
 #include <test_helpers.h>
 
+namespace MAST {
+namespace Test {
+namespace Physics {
+namespace Elasticity {
+namespace Material {
+namespace IsotropicStiffness {
+
 struct Context {};
 
 template <typename ScalarType,
@@ -100,4 +107,12 @@ TEST_CASE("isotropic_linear_stiffness",
     // test for 3D
     test_sensitivity<3>();
 }
+
+} // namespace IsotropicStiffness
+} // namespace Material
+} // namespace Elasticity
+} // namespace Physics
+} // namespace Test
+} // namespace MAST
+
 

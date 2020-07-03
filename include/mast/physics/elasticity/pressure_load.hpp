@@ -20,7 +20,7 @@ class SurfacePressureLoad {
 public:
 
     using scalar_t         = typename FEVarType::scalar_t;
-    using basis_scalar_t   = typename FEVarType::fe_basis_t::scalar_t;
+    using basis_scalar_t   = typename FEVarType::fe_shape_deriv_t::scalar_t;
     using vector_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using matrix_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
 
@@ -28,12 +28,19 @@ public:
     
     virtual ~SurfacePressureLoad() { }
     
-    inline void set_section_area(const SectionAreaType& s) { _section = s;}
+    inline void set_section_area(const SectionAreaType& s) { _section = &s;}
     
     inline void set_pressure(const PressureFieldType& p) { _pressure = &p;}
     
     inline void set_fe_var_data(const FEVarType& fe) { _fe_var_data = &fe;}
-    
+
+    inline uint_t n_dofs() const {
+
+        Assert0(_fe_var_data, "FE data not initialized.");
+
+        return Dim*_fe_var_data->get_fe_shape_data().n_basis();
+    }
+
     inline void compute(ContextType& c,
                         vector_t& res,
                         matrix_t* jac = nullptr) const {
@@ -42,7 +49,7 @@ public:
         Assert0(_section, "Section property not initialized");
         Assert0(_pressure, "Pressure not initialized");
         
-        const typename FEVarType::fe_basis_t
+        const typename FEVarType::fe_shape_deriv_t
         &fe = _fe_var_data->get_fe_shape_data();
         
         for (uint_t i=0; i<fe.n_q_points(); i++) {
@@ -74,7 +81,7 @@ public:
         Assert0(_section, "Section property not initialized");
         Assert0(_pressure, "Pressure not initialized");
         
-        const typename FEVarType::fe_basis_t
+        const typename FEVarType::fe_shape_deriv_t
         &fe = _fe_var_data->get_fe_shape_data();
         
         for (uint_t i=0; i<fe.n_q_points(); i++) {
