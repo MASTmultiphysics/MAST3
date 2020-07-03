@@ -18,6 +18,12 @@
 
 extern libMesh::LibMeshInit* p_global_init;
 
+namespace MAST {
+namespace Test {
+namespace Physics {
+namespace Elasticity {
+namespace LinearStrainEnergy {
+
 struct Context {
     Context(): elem(nullptr), qp(-1), s(-1) {}
     uint_t elem_dim() const {return elem->dim();}
@@ -165,30 +171,7 @@ TEST_CASE("linear_strain_energy",
     
     Eigen::Matrix<real_t, 4, 1>
     x_vec,
-    y_vec,
-    Nvec,
-    dNvec_dxi,
-    dNvec_deta,
-    dNvec_dx,
-    dNvec_dy;
-    
-    std::vector<real_t>
-    vec(4, 0.);
-    
-    real_t
-    xi,
-    eta,
-    u,
-    du_dx,
-    du_dy,
-    J_det;
-    
-    Eigen::Matrix<real_t, 2, 2>
-    Jac,
-    Jac_inv;
-    
-    Eigen::Matrix<real_t, 3, 1>
-    nvec;
+    y_vec;
     
     x_vec << -1., 1., 1., -1.;
     y_vec << -1., -1., 1., 1.;
@@ -290,4 +273,11 @@ TEST_CASE("linear_strain_energy",
     for (uint_t i=0; i<nodes.size(); i++)
         delete nodes[i];
 }
+
+} // namespace LinearStrainEnergy
+} // namespace Elasticity
+} // namespace Physics
+} // namespace Test
+} // namespace MAST
+
 

@@ -122,8 +122,8 @@ public:
         }
     }
 
-    inline void reinit_for_side(const libMesh::Elem&     e,
-                                side_quadrature_t& q,
+    inline void reinit_for_side(const libMesh::Elem     &e,
+                                side_quadrature_t       &q,
                                 const uint_t             s) {
         
         // reinitialize only if needed
