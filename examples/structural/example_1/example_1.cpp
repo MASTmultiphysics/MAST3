@@ -18,6 +18,9 @@
 #include <libmesh/mesh_generation.h>
 #include <libmesh/equation_systems.h>
 #include <libmesh/boundary_info.h>
+#include <libmesh/dirichlet_boundaries.h>
+#include <libmesh/zero_function.h>
+#include <libmesh/exodusII_io.h>
 
 // BEGIN_TRANSLATE Extension of bar
 
@@ -93,7 +96,10 @@ public:
     using matrix_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     
 
-    ElemOps(Context& c):
+    ElemOps(libMesh::Order          q_order,
+            libMesh::QuadratureType q_type,
+            libMesh::Order          fe_order,
+            libMesh::FEFamily       fe_family):
     _fe_data      (nullptr),
     _fe_side_data (nullptr),
     _fe_var       (nullptr),
@@ -107,15 +113,9 @@ public:
     _p_load       (nullptr) {
         
         _fe_data       = new typename Traits::fe_data_t;
-        _fe_data->init(libMesh::SECOND,
-                       libMesh::QGAUSS,
-                       libMesh::FIRST,
-                       libMesh::LAGRANGE);
+        _fe_data->init(q_order, q_type, fe_order, fe_family);
         _fe_side_data  = new typename Traits::fe_side_data_t;
-        _fe_side_data->init(libMesh::SECOND,
-                            libMesh::QGAUSS,
-                            libMesh::FIRST,
-                            libMesh::LAGRANGE);
+        _fe_side_data->init(q_order, q_type, fe_order, fe_family);
         _fe_var        = new typename Traits::fe_var_t;
         _fe_side_var   = new typename Traits::fe_var_t;
 
@@ -222,23 +222,28 @@ int main(int argc, const char** argv) {
     libMesh::LibMeshInit init(argc, argv);
     
     libMesh::QuadratureType q_type    = libMesh::QGAUSS;
-    libMesh::Order          q_order   = libMesh::SECOND;
-    libMesh::Order          fe_order  = libMesh::FIRST;
+    libMesh::Order          q_order   = libMesh::FOURTH;
+    libMesh::Order          fe_order  = libMesh::SECOND;
     libMesh::FEFamily       fe_family = libMesh::LAGRANGE;
 
     Context c(init.comm());
 
     libMesh::MeshTools::Generation::build_square(*c.mesh,
-                                                 2, 2,
+                                                 5, 5,
                                                  0.0, 10.0,
-                                                 0.0, 10.0);
-    c.mesh->print_info();
-    c.mesh->boundary_info->print_info();
+                                                 0.0, 10.0,
+                                                 libMesh::QUAD9);
 
     c.sys->add_variable("u_x", libMesh::FEType(fe_order, fe_family));
     c.sys->add_variable("u_y", libMesh::FEType(fe_order, fe_family));
 
+    c.sys->get_dof_map().add_dirichlet_boundary
+    (libMesh::DirichletBoundary({3}, {0, 1}, libMesh::ZeroFunction<real_t>()));
+    
     c.eq_sys->init();
+
+    c.mesh->print_info(std::cout);
+    c.eq_sys->print_info(std::cout);
     
     using basis_scalar_t = real_t;
     using nodal_scalar_t = real_t;
@@ -247,7 +252,7 @@ int main(int argc, const char** argv) {
     using jac_mat_t      = Eigen::Matrix<sol_scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     using elem_ops_t     = ElemOps<Traits<basis_scalar_t, nodal_scalar_t, sol_scalar_t, 2>>;
     
-    elem_ops_t e_ops(c);
+    elem_ops_t e_ops(q_order, q_type, fe_order, fe_family);
 
     MAST::Base::Assembly::libMeshWrapper::ResidualAndJacobian<real_t, elem_ops_t>
     assembly;
@@ -263,9 +268,12 @@ int main(int argc, const char** argv) {
 
     assembly.assemble(c, sol, &res, &jac);
     
-    std::cout << res << std::endl;
-    std::cout << jac << std::endl;
+    sol = Eigen::FullPivLU<jac_mat_t>(jac).solve(-res);
     
+    for (uint_t i=0; i<sol.size(); i++)
+        c.sys->solution->set(i, sol(i));
+
+    libMesh::ExodusII_IO(*c.mesh).write_equation_systems("solution.exo", *c.eq_sys);
     
     // END_TRANSLATE
     return 0;
