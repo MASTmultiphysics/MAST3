@@ -4,6 +4,10 @@
 
 // C++ includes
 #include <vector>
+#include <type_traits>
+
+// MAST includes
+#include <mast/base/mast_data_types.h>
 
 // libMesh includes
 #include <libmesh/numeric_vector.h>
@@ -17,25 +21,29 @@ template <typename ValType>
 void
 setZero(ValType& m) { m.setZero();}
 
-template <typename ValType>
-typename std::enable_if<std::is_same<libMesh::NumericVector<real_t>, ValType>::value, void>::type
+void
 setZero(libMesh::NumericVector<real_t>& v) { v.zero();}
 
-template <typename ValType>
-typename std::enable_if<std::is_same<libMesh::SparseMatrix<real_t>, ValType>::value, void>::type
+void
 setZero(libMesh::SparseMatrix<real_t>& m) { m.zero();}
 
 template <typename ValType>
 void
 finalize(ValType& m) { }
 
-template <typename ValType>
-typename std::enable_if<std::is_same<libMesh::NumericVector<real_t>, ValType>::value, void>::type
+
+void
 finalize(libMesh::NumericVector<real_t>& v) { v.close();}
 
-template <typename ValType>
-typename std::enable_if<std::is_same<libMesh::SparseMatrix<real_t>, ValType>::value, void>::type
+
+void
 finalize(libMesh::SparseMatrix<real_t>& m) { m.close();}
+
+
+template <typename P1, int P2, typename P3>
+void
+finalize(Eigen::SparseMatrix<P1, P2, P3>& m) { m.makeCompressed();}
+
 
 template <typename ScalarType, typename VecType>
 void copy(const VecType& v_from,

@@ -89,15 +89,15 @@ public:
             // Dirichlet constraints, etc.
             if (R && J)
                 MAST::Base::Assembly::libMeshWrapper::constrain_and_add
-                <ScalarType, VecType, MatType, sub_vec_t, sub_mat_t>
+                <ScalarType, VecType, MatType>
                 (*R, *J, c.sys->get_dof_map(), sol_accessor.dof_indices(), v, m);
             else if (R)
                 MAST::Base::Assembly::libMeshWrapper::constrain_and_add
-                <ScalarType, VecType, sub_vec_t>
+                <ScalarType, VecType>
                 (*R, c.sys->get_dof_map(), sol_accessor.dof_indices(), v);
             else
                 MAST::Base::Assembly::libMeshWrapper::constrain_and_add
-                <ScalarType, MatType, sub_mat_t>
+                <ScalarType, MatType>
                 (*J, c.sys->get_dof_map(), sol_accessor.dof_indices(), m);
         }
 

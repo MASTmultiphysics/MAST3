@@ -11,6 +11,7 @@
 #include <mast/physics/elasticity/linear_strain_energy.hpp>
 #include <mast/physics/elasticity/pressure_load.hpp>
 #include <mast/base/assembly/libmesh/residual_and_jacobian.hpp>
+#include <mast/numerics/libmesh/sparse_matrix_initialization.hpp>
 
 // libMesh includes
 #include <libmesh/replicated_mesh.h>
@@ -21,6 +22,9 @@
 #include <libmesh/dirichlet_boundaries.h>
 #include <libmesh/zero_function.h>
 #include <libmesh/exodusII_io.h>
+
+// Eigen includes
+#include <Eigen/SparseLU>
 
 // BEGIN_TRANSLATE Extension of bar
 
@@ -249,7 +253,7 @@ int main(int argc, const char** argv) {
     using nodal_scalar_t = real_t;
     using sol_scalar_t   = real_t;
     using res_vec_t      = Eigen::Matrix<sol_scalar_t, Eigen::Dynamic, 1>;
-    using jac_mat_t      = Eigen::Matrix<sol_scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
+    using jac_mat_t      = Eigen::SparseMatrix<sol_scalar_t>;
     using elem_ops_t     = ElemOps<Traits<basis_scalar_t, nodal_scalar_t, sol_scalar_t, 2>>;
     
     elem_ops_t e_ops(q_order, q_type, fe_order, fe_family);
@@ -264,11 +268,12 @@ int main(int argc, const char** argv) {
     
     sol = res_vec_t::Zero(c.sys->n_dofs());
     res = res_vec_t::Zero(c.sys->n_dofs());
-    jac = jac_mat_t::Zero(c.sys->n_dofs(), c.sys->n_dofs());
-
+    MAST::Numerics::libMeshWrapper::init_sparse_matrix(c.sys->get_dof_map(), jac);
+    
     assembly.assemble(c, sol, &res, &jac);
     
-    sol = Eigen::FullPivLU<jac_mat_t>(jac).solve(-res);
+    sol = Eigen::SparseLU<jac_mat_t>(jac).solve(-res);
+    
     
     for (uint_t i=0; i<sol.size(); i++)
         c.sys->solution->set(i, sol(i));
