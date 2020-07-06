@@ -1,14 +1,15 @@
 target_sources(mast_catch_tests
                PRIVATE
-               ${CMAKE_CURRENT_LIST_DIR}/linear_strain_energy.cpp
                ${CMAKE_CURRENT_LIST_DIR}/isotropic_stiffness.cpp
-               ${CMAKE_CURRENT_LIST_DIR}/pressure_load.cpp)
+               ${CMAKE_CURRENT_LIST_DIR}/linear_strain_energy.cpp
+               ${CMAKE_CURRENT_LIST_DIR}/pressure_load.cpp
+               ${CMAKE_CURRENT_LIST_DIR}/von_mises_stress.cpp)
 
 #Linear elasticity kernel
 add_test(NAME LinearElasticStrainEnergy
          COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "linear_strain_energy")
 set_tests_properties(LinearElasticStrainEnergy
-                     PROPERTIES
+        PROPERTIES
         LABELS "SEQ"
         #FIXTURES_REQUIRED  "Element_Property_Card_1D_Structural;libMesh_Mesh_Generation_1d"
         FIXTURES_SETUP     LinearElasticStrainEnergy)
@@ -18,7 +19,7 @@ set_tests_properties(LinearElasticStrainEnergy
 add_test(NAME LinearPressureLoad
          COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "linear_pressure_load")
 set_tests_properties(LinearPressureLoad
-                     PROPERTIES
+        PROPERTIES
         LABELS "SEQ"
         #FIXTURES_REQUIRED  "Element_Property_Card_1D_Structural;libMesh_Mesh_Generation_1d"
         FIXTURES_SETUP     LinearPressureLoad)
@@ -28,9 +29,18 @@ set_tests_properties(LinearPressureLoad
 add_test(NAME IsotropicLinearMaterial
          COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "isotropic_linear_stiffness")
 set_tests_properties(IsotropicLinearMaterial
-                     PROPERTIES
+        PROPERTIES
         LABELS "SEQ"
         #FIXTURES_REQUIRED  "Element_Property_Card_1D_Structural;libMesh_Mesh_Generation_1d"
         FIXTURES_SETUP     IsotropicLinearMaterial)
+
+
+#von Mises stress
+add_test(NAME vonMisesStress
+         COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "von_mises_stress")
+set_tests_properties(vonMisesStress
+        PROPERTIES
+        LABELS "SEQ"
+        FIXTURES_SETUP     vonMisesStress)
 
 
