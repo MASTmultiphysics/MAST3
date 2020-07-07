@@ -11,15 +11,21 @@
 namespace MAST {
 namespace Physics {
 namespace Elasticity {
+namespace LinearContinuum {
+
+template <uint_t D> struct NStrainComponents { };
+template <> struct NStrainComponents<1> { static const uint_t value = 1; };
+template <> struct NStrainComponents<2> { static const uint_t value = 3; };
+template <> struct NStrainComponents<3> { static const uint_t value = 6; };
 
 
 template <typename NodalScalarType, typename VarScalarType, typename FEVarType, uint_t Dim>
 inline
 typename std::enable_if<Dim == 2, void>::type
-linear_continuum_strain(const FEVarType&                                    fe_var,
-                        const uint_t                                        qp,
-                        typename Eigen::Matrix<VarScalarType, 3, 1>&        epsilon,
-                        MAST::Numerics::FEMOperatorMatrix<NodalScalarType>& Bmat) {
+strain(const FEVarType&                                    fe_var,
+       const uint_t                                        qp,
+       typename Eigen::Matrix<VarScalarType, 3, 1>&        epsilon,
+       MAST::Numerics::FEMOperatorMatrix<NodalScalarType>& Bmat) {
     
     epsilon.setZero();
     
@@ -51,6 +57,7 @@ linear_continuum_strain(const FEVarType&                                    fe_v
     epsilon(2) = fe_var.du_dx(qp, 0, 1) + fe_var.du_dx(qp, 1, 0);  // du/dy + dv/dx
 }
 
+}  // namespace LinearContinuum
 }  // namespace Elasticity
 }  // namespace Physics
 }  // namespace MAST

@@ -10,11 +10,6 @@ namespace Physics {
 namespace Elasticity {
 namespace LinearContinuum {
 
-template <uint_t D> struct NStrainComponents { };
-template <> struct NStrainComponents<1> { static const uint_t value = 1; };
-template <> struct NStrainComponents<2> { static const uint_t value = 3; };
-template <> struct NStrainComponents<3> { static const uint_t value = 6; };
-
 
 template <typename FEVarType,
           typename SectionPropertyType,
@@ -30,9 +25,9 @@ public:
     using matrix_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     using section_scalar_t = typename SectionPropertyType::scalar_t;
     using fe_shape_deriv_t = typename FEVarType::fe_shape_deriv_t;
-    static const uint_t n_strain  =
-    MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<Dim>::value;
-    
+    static const uint_t
+    n_strain               = MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<Dim>::value;
+
     StrainEnergy():
     _property    (nullptr),
     _fe_var_data (nullptr)
@@ -94,7 +89,7 @@ public:
             c.qp = i;
             
             _property->value(c, mat);
-            MAST::Physics::Elasticity::linear_continuum_strain
+            MAST::Physics::Elasticity::LinearContinuum::strain
             <scalar_t, scalar_t, FEVarType, Dim>(*_fe_var_data, i, epsilon, Bxmat);
             stress = mat * epsilon;
             Bxmat.vector_mult_transpose(vec, stress);
@@ -143,7 +138,7 @@ public:
             c.qp = i;
             
             _property->derivative(c, f, mat);
-            MAST::Physics::Elasticity::linear_continuum_strain
+            MAST::Physics::Elasticity::LinearContinuum::strain
             <scalar_t, scalar_t, FEVarType, Dim>(*_fe_var_data, i, epsilon, Bxmat);
             stress = mat * epsilon;
             Bxmat.vector_mult_transpose(vec, stress);
