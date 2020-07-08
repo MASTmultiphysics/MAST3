@@ -3,6 +3,7 @@ target_sources(mast_catch_tests
                ${CMAKE_CURRENT_LIST_DIR}/isotropic_stiffness.cpp
                ${CMAKE_CURRENT_LIST_DIR}/linear_strain_energy.cpp
                ${CMAKE_CURRENT_LIST_DIR}/pressure_load.cpp
+               ${CMAKE_CURRENT_LIST_DIR}/stress_evaluation.cpp
                ${CMAKE_CURRENT_LIST_DIR}/von_mises_stress.cpp)
 
 #Linear elasticity kernel
@@ -33,6 +34,15 @@ set_tests_properties(IsotropicLinearMaterial
         LABELS "SEQ"
         #FIXTURES_REQUIRED  "Element_Property_Card_1D_Structural;libMesh_Mesh_Generation_1d"
         FIXTURES_SETUP     IsotropicLinearMaterial)
+
+
+#stress evaluation
+add_test(NAME StressEvaluation
+         COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "stress_evaluation")
+set_tests_properties(StressEvaluation
+        PROPERTIES
+        LABELS "SEQ"
+        FIXTURES_SETUP     StressEvaluation)
 
 
 #von Mises stress
