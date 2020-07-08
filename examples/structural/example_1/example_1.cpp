@@ -38,6 +38,10 @@ class Context {
 public:
     
     Context(libMesh::Parallel::Communicator& comm):
+    q_type    (libMesh::QGAUSS),
+    q_order   (libMesh::FOURTH),
+    fe_order  (libMesh::SECOND),
+    fe_family (libMesh::LAGRANGE),
     mesh      (new libMesh::ReplicatedMesh(comm)),
     eq_sys    (new libMesh::EquationSystems(*mesh)),
     sys       (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("structural")),
@@ -45,6 +49,24 @@ public:
     qp        (-1),
     p_side_id (1) {
 
+
+
+        libMesh::MeshTools::Generation::build_square(*mesh,
+                                                     5, 5,
+                                                     0.0, 10.0,
+                                                     0.0, 10.0,
+                                                     libMesh::QUAD9);
+
+        sys->add_variable("u_x", libMesh::FEType(fe_order, fe_family));
+        sys->add_variable("u_y", libMesh::FEType(fe_order, fe_family));
+
+        sys->get_dof_map().add_dirichlet_boundary
+        (libMesh::DirichletBoundary({3}, {0, 1}, libMesh::ZeroFunction<real_t>()));
+        
+        eq_sys->init();
+
+        mesh->print_info(std::cout);
+        eq_sys->print_info(std::cout);
     }
 
     virtual ~Context() {
@@ -62,6 +84,10 @@ public:
     inline bool if_compute_pressure_load_on_side(const uint_t s)
     { return mesh->boundary_info->has_boundary_id(elem, s, p_side_id);}
 
+    libMesh::QuadratureType           q_type;
+    libMesh::Order                    q_order;
+    libMesh::Order                    fe_order;
+    libMesh::FEFamily                 fe_family;
     libMesh::ReplicatedMesh          *mesh;
     libMesh::EquationSystems         *eq_sys;
     libMesh::NonlinearImplicitSystem *sys;
@@ -243,17 +269,13 @@ private:
 
 template <typename TraitsType>
 inline void
-compute_sol(libMesh::QuadratureType                   q_type,
-            libMesh::Order                            q_order,
-            libMesh::Order                            fe_order,
-            libMesh::FEFamily                         fe_family,
-            Context                                  &c,
+compute_sol(Context                                  &c,
             typename TraitsType::assembled_vector_t  &sol) {
     
     using scalar_t   = typename TraitsType::scalar_t;
     using elem_ops_t = ElemOps<TraitsType>;
     
-    elem_ops_t e_ops(q_order, q_type, fe_order, fe_family);
+    elem_ops_t e_ops(c.q_order, c.q_type, c.fe_order, c.fe_family);
 
     MAST::Base::Assembly::libMeshWrapper::ResidualAndJacobian<scalar_t, elem_ops_t>
     assembly;
@@ -280,35 +302,14 @@ compute_sol(libMesh::QuadratureType                   q_type,
 } // namespace Examples
 } // namespace MAST
 
-
+#ifndef MAST_TESTING
 
 int main(int argc, const char** argv) {
 
     libMesh::LibMeshInit init(argc, argv);
     
-    libMesh::QuadratureType q_type    = libMesh::QGAUSS;
-    libMesh::Order          q_order   = libMesh::FOURTH;
-    libMesh::Order          fe_order  = libMesh::SECOND;
-    libMesh::FEFamily       fe_family = libMesh::LAGRANGE;
-
     MAST::Examples::Structural::Example1::Context c(init.comm());
 
-    libMesh::MeshTools::Generation::build_square(*c.mesh,
-                                                 5, 5,
-                                                 0.0, 10.0,
-                                                 0.0, 10.0,
-                                                 libMesh::QUAD9);
-
-    c.sys->add_variable("u_x", libMesh::FEType(fe_order, fe_family));
-    c.sys->add_variable("u_y", libMesh::FEType(fe_order, fe_family));
-
-    c.sys->get_dof_map().add_dirichlet_boundary
-    (libMesh::DirichletBoundary({3}, {0, 1}, libMesh::ZeroFunction<real_t>()));
-    
-    c.eq_sys->init();
-
-    c.mesh->print_info(std::cout);
-    c.eq_sys->print_info(std::cout);
     
     using traits_t           = MAST::Examples::Structural::Example1::Traits<real_t, real_t,    real_t, 2>;
     using traits_complex_t   = MAST::Examples::Structural::Example1::Traits<real_t, real_t, complex_t, 2>;
@@ -316,12 +317,7 @@ int main(int argc, const char** argv) {
     typename traits_t::assembled_vector_t
     sol;
     
-    MAST::Examples::Structural::Example1::compute_sol<traits_t>(q_type,
-                                                                q_order,
-                                                                fe_order,
-                                                                fe_family,
-                                                                c,
-                                                                sol);
+    MAST::Examples::Structural::Example1::compute_sol<traits_t>(c, sol);
     
     
     for (uint_t i=0; i<sol.size(); i++)
@@ -332,3 +328,5 @@ int main(int argc, const char** argv) {
     // END_TRANSLATE
     return 0;
 }
+
+#endif // MAST_TESTING
