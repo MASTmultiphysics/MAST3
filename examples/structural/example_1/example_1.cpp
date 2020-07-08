@@ -11,6 +11,7 @@
 #include <mast/physics/elasticity/linear_strain_energy.hpp>
 #include <mast/physics/elasticity/pressure_load.hpp>
 #include <mast/base/assembly/libmesh/residual_and_jacobian.hpp>
+#include <mast/base/assembly/libmesh/residual_sensitivity.hpp>
 #include <mast/numerics/libmesh/sparse_matrix_initialization.hpp>
 
 // libMesh includes
@@ -139,16 +140,16 @@ public:
             libMesh::QuadratureType q_type,
             libMesh::Order          fe_order,
             libMesh::FEFamily       fe_family):
+    E             (nullptr),
+    nu            (nullptr),
+    press         (nullptr),
+    area          (nullptr),
     _fe_data      (nullptr),
     _fe_side_data (nullptr),
     _fe_var       (nullptr),
     _fe_side_var  (nullptr),
-    _E            (nullptr),
-    _nu           (nullptr),
     _prop         (nullptr),
     _energy       (nullptr),
-    _press        (nullptr),
-    _area         (nullptr),
     _p_load       (nullptr) {
         
         _fe_data       = new typename TraitsType::fe_data_t;
@@ -175,17 +176,18 @@ public:
         _fe_var->set_compute_du_dx(true);
         
         // variables for physics
-        _E        = new typename TraitsType::modulus_t(72.e9);
-        _nu       = new typename TraitsType::nu_t(0.33);
-        _press    = new typename TraitsType::press_t(1.e2);
-        _area     = new typename TraitsType::area_t(1.0);
-        _prop     = new typename TraitsType::prop_t;
-        _prop->set_modulus_and_nu(*_E, *_nu);
+        E        = new typename TraitsType::modulus_t(72.e9);
+        nu       = new typename TraitsType::nu_t(0.33);
+        press    = new typename TraitsType::press_t(1.e2);
+        area     = new typename TraitsType::area_t(1.0);
+        _prop    = new typename TraitsType::prop_t;
+        
+        _prop->set_modulus_and_nu(*E, *nu);
         _energy   = new typename TraitsType::energy_t;
         _energy->set_section_property(*_prop);
         _p_load   = new typename TraitsType::press_load_t;
-        _p_load->set_section_area(*_area);
-        _p_load->set_pressure(*_press);
+        _p_load->set_section_area(*area);
+        _p_load->set_pressure(*press);
         
         // tell physics kernels about the FE discretization information
         _energy->set_fe_var_data(*_fe_var);
@@ -195,12 +197,12 @@ public:
     virtual ~ElemOps() {
         
         delete _p_load;
-        delete _area;
-        delete _press;
+        delete area;
+        delete press;
         delete _energy;
         delete _prop;
-        delete _nu;
-        delete _E;
+        delete nu;
+        delete E;
         delete _fe_var;
         delete _fe_side_var;
         delete _fe_side_data;
@@ -248,6 +250,12 @@ public:
             }
     }
 
+    // parameters
+    typename TraitsType::modulus_t    *E;
+    typename TraitsType::nu_t         *nu;
+    typename TraitsType::press_t      *press;
+    typename TraitsType::area_t       *area;
+    
 private:
 
     // variables for quadrature and shape function
@@ -255,29 +263,21 @@ private:
     typename TraitsType::fe_side_data_t    *_fe_side_data;
     typename TraitsType::fe_var_t          *_fe_var;
     typename TraitsType::fe_var_t          *_fe_side_var;
-
-    // variables for physics
-    typename TraitsType::modulus_t    *_E;
-    typename TraitsType::nu_t         *_nu;
-    typename TraitsType::prop_t       *_prop;
-    typename TraitsType::energy_t     *_energy;
-    typename TraitsType::press_t      *_press;
-    typename TraitsType::area_t       *_area;
-    typename TraitsType::press_load_t *_p_load;
+    typename TraitsType::prop_t            *_prop;
+    typename TraitsType::energy_t          *_energy;
+    typename TraitsType::press_load_t      *_p_load;
 };
 
 
 template <typename TraitsType>
 inline void
 compute_sol(Context                                  &c,
+            ElemOps<TraitsType>                      &e_ops,
             typename TraitsType::assembled_vector_t  &sol) {
     
     using scalar_t   = typename TraitsType::scalar_t;
-    using elem_ops_t = ElemOps<TraitsType>;
-    
-    elem_ops_t e_ops(c.q_order, c.q_type, c.fe_order, c.fe_family);
 
-    MAST::Base::Assembly::libMeshWrapper::ResidualAndJacobian<scalar_t, elem_ops_t>
+    MAST::Base::Assembly::libMeshWrapper::ResidualAndJacobian<scalar_t, ElemOps<TraitsType>>
     assembly;
     
     assembly.set_elem_ops(e_ops);
@@ -297,6 +297,47 @@ compute_sol(Context                                  &c,
 }
 
 
+template <typename TraitsType, typename ScalarFieldType>
+inline void
+compute_sol_sensitivity(Context                                        &c,
+                        ElemOps<TraitsType>                            &e_ops,
+                        const ScalarFieldType                          &f,
+                        const typename TraitsType::assembled_vector_t  &sol,
+                        typename TraitsType::assembled_vector_t        &dsol) {
+    
+    using scalar_t   = typename TraitsType::scalar_t;
+    
+    typename TraitsType::assembled_vector_t
+    *res = nullptr,
+    dres;
+    typename TraitsType::assembled_matrix_t
+    jac,
+    *djac = nullptr;
+    
+    dsol = TraitsType::assembled_vector_t::Zero(c.sys->n_dofs());
+    dres = TraitsType::assembled_vector_t::Zero(c.sys->n_dofs());
+    MAST::Numerics::libMeshWrapper::init_sparse_matrix(c.sys->get_dof_map(), jac);
+
+    // assembly of Jacobian matrix
+    {
+        MAST::Base::Assembly::libMeshWrapper::ResidualAndJacobian<scalar_t, ElemOps<TraitsType>>
+        assembly;
+        assembly.set_elem_ops(e_ops);
+        assembly.assemble(c, sol, res, &jac);
+    }
+
+    // assembly of sensitivity RHS
+    {
+        MAST::Base::Assembly::libMeshWrapper::ResidualSensitivity<scalar_t, ElemOps<TraitsType>>
+        sens_assembly;
+        sens_assembly.set_elem_ops(e_ops);
+        sens_assembly.assemble(c, f, sol, &dres, djac);
+    }
+    
+    dsol = Eigen::SparseLU<typename TraitsType::assembled_matrix_t>(jac).solve(-dres);
+}
+
+
 } // namespace Example1
 } // namespace Structural
 } // namespace Examples
@@ -308,22 +349,63 @@ int main(int argc, const char** argv) {
 
     libMesh::LibMeshInit init(argc, argv);
     
-    MAST::Examples::Structural::Example1::Context c(init.comm());
-
-    
     using traits_t           = MAST::Examples::Structural::Example1::Traits<real_t, real_t,    real_t, 2>;
     using traits_complex_t   = MAST::Examples::Structural::Example1::Traits<real_t, real_t, complex_t, 2>;
 
-    typename traits_t::assembled_vector_t
-    sol;
-    
-    MAST::Examples::Structural::Example1::compute_sol<traits_t>(c, sol);
-    
-    
-    for (uint_t i=0; i<sol.size(); i++)
-        c.sys->solution->set(i, sol(i));
 
-    libMesh::ExodusII_IO(*c.mesh).write_equation_systems("solution.exo", *c.eq_sys);
+    MAST::Examples::Structural::Example1::Context c(init.comm());
+    MAST::Examples::Structural::Example1::ElemOps<traits_t> e_ops(c.q_order, c.q_type, c.fe_order, c.fe_family);
+
+    typename traits_t::assembled_vector_t
+    sol,
+    dsol;
+
+    // compute the solution
+    MAST::Examples::Structural::Example1::compute_sol<traits_t>(c, e_ops, sol);
+    
+    // write solution as first time-step
+    libMesh::ExodusII_IO writer(*c.mesh);
+    {
+        for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, sol(i));
+        writer.write_timestep("solution.exo", *c.eq_sys, 1, 1.);
+    }
+
+    // compute the solution sensitivity wrt E
+    MAST::Examples::Structural::Example1::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.E, sol, dsol);
+    
+    // write solution as first time-step
+    {
+        for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
+        writer.write_timestep("solution.exo", *c.eq_sys, 2, 2.);
+    }
+
+    // compute the solution sensitivity wrt nu
+    MAST::Examples::Structural::Example1::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.nu, sol, dsol);
+    
+    // write solution as first time-step
+    {
+        for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
+        writer.write_timestep("solution.exo", *c.eq_sys, 3, 3.);
+    }
+    
+    // compute the solution sensitivity wrt p
+    MAST::Examples::Structural::Example1::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.press, sol, dsol);
+    
+    // write solution as first time-step
+    {
+        for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
+        writer.write_timestep("solution.exo", *c.eq_sys, 4, 4.);
+    }
+
+    // compute the solution sensitivity wrt p
+    MAST::Examples::Structural::Example1::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.area, sol, dsol);
+    
+    // write solution as first time-step
+    {
+        for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
+        writer.write_timestep("solution.exo", *c.eq_sys, 5, 5.);
+    }
+
     
     // END_TRANSLATE
     return 0;
