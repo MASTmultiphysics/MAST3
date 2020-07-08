@@ -54,10 +54,11 @@ public:
         typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, VecType>
         sol_accessor(*c.sys, X);
 
-        typename ElemOpsType::vector_t
-        res_e;
-        typename ElemOpsType::matrix_t
-        jac_e;
+        using elem_vector_t = typename ElemOpsType::vector_t;
+        using elem_matrix_t = typename ElemOpsType::matrix_t;
+        
+        elem_vector_t res_e;
+        elem_matrix_t jac_e;
         
         
         libMesh::MeshBase::const_element_iterator
@@ -76,29 +77,21 @@ public:
             
             // perform the element level calculations
             _e_ops->compute(c, sol_accessor, res_e, J?&jac_e:nullptr);
-            
-            // copy to the libMesh matrix for further processing
-            using sub_vec_t = libMesh::DenseVector<ScalarType>;
-            using sub_mat_t = libMesh::DenseMatrix<ScalarType>;
-            sub_vec_t v;
-            sub_mat_t m;
-            if (R) MAST::Numerics::Utility::copy(res_e, v);
-            if (J) MAST::Numerics::Utility::copy(jac_e, m);
-            
+                        
             // constrain the quantities to account for hanging dofs,
             // Dirichlet constraints, etc.
             if (R && J)
-                MAST::Base::Assembly::libMeshWrapper::constrain_and_add
-                <ScalarType, VecType, MatType>
-                (*R, *J, c.sys->get_dof_map(), sol_accessor.dof_indices(), v, m);
+                MAST::Base::Assembly::libMeshWrapper::constrain_and_add_matrix_and_vector
+                <ScalarType, VecType, MatType, elem_vector_t, elem_matrix_t>
+                (*R, *J, c.sys->get_dof_map(), sol_accessor.dof_indices(), res_e, jac_e);
             else if (R)
-                MAST::Base::Assembly::libMeshWrapper::constrain_and_add
+                MAST::Base::Assembly::libMeshWrapper::constrain_and_add_vector
                 <ScalarType, VecType>
-                (*R, c.sys->get_dof_map(), sol_accessor.dof_indices(), v);
+                (*R, c.sys->get_dof_map(), sol_accessor.dof_indices(), res_e);
             else
-                MAST::Base::Assembly::libMeshWrapper::constrain_and_add
+                MAST::Base::Assembly::libMeshWrapper::constrain_and_add_matrix
                 <ScalarType, MatType>
-                (*J, c.sys->get_dof_map(), sol_accessor.dof_indices(), m);
+                (*J, c.sys->get_dof_map(), sol_accessor.dof_indices(), jac_e);
         }
 
         // parallel matrix/vector require finalization of communication

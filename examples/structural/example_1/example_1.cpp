@@ -354,11 +354,17 @@ int main(int argc, const char** argv) {
 
 
     MAST::Examples::Structural::Example1::Context c(init.comm());
-    MAST::Examples::Structural::Example1::ElemOps<traits_t> e_ops(c.q_order, c.q_type, c.fe_order, c.fe_family);
+    MAST::Examples::Structural::Example1::ElemOps<traits_t>
+    e_ops(c.q_order, c.q_type, c.fe_order, c.fe_family);
+    MAST::Examples::Structural::Example1::ElemOps<traits_complex_t>
+    e_ops_c(c.q_order, c.q_type, c.fe_order, c.fe_family);
 
     typename traits_t::assembled_vector_t
     sol,
     dsol;
+
+    typename traits_complex_t::assembled_vector_t
+    sol_c;
 
     // compute the solution
     MAST::Examples::Structural::Example1::compute_sol<traits_t>(c, e_ops, sol);
@@ -371,6 +377,8 @@ int main(int argc, const char** argv) {
     }
 
     // compute the solution sensitivity wrt E
+    (*e_ops_c.E)() += complex_t(0., ComplexStepDelta);
+    MAST::Examples::Structural::Example1::compute_sol<traits_complex_t>(c, e_ops_c, sol_c);
     MAST::Examples::Structural::Example1::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.E, sol, dsol);
     
     // write solution as first time-step
