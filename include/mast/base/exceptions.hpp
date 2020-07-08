@@ -70,7 +70,7 @@ public MAST::Exceptions::ExceptionBase {
   
 public:
     
-    Exception1(const Val1Type& v1,
+    Exception1(const Val1Type v1,
                const std::string& cond,
                const std::string& msg,
                const std::string& file,
@@ -97,8 +97,8 @@ public MAST::Exceptions::ExceptionBase {
   
 public:
     
-    Exception2(const Val1Type& v1,
-               const Val2Type& v2,
+    Exception2(const Val1Type v1,
+               const Val2Type v2,
                const std::string& cond,
                const std::string& msg,
                const std::string& file,
