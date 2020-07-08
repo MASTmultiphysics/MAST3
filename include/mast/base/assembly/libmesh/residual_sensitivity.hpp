@@ -1,6 +1,6 @@
 
-#ifndef __mast_libmesh_residual_and_jacobian_h__
-#define __mast_libmesh_residual_and_jacobian_h__
+#ifndef __mast_libmesh_residual_sensitivity_h__
+#define __mast_libmesh_residual_sensitivity_h__
 
 // MAST includes
 #include <mast/base/mast_data_types.h>
@@ -20,26 +20,24 @@ namespace libMeshWrapper {
 
 template <typename ScalarType,
           typename ElemOpsType>
-class ResidualAndJacobian {
+class ResidualSensitivity {
 
 public:
     
     static_assert(std::is_same<ScalarType, typename ElemOpsType::scalar_t>::value,
                   "Scalar type of assembly and element operations must be same");
     
-    ResidualAndJacobian():
-    _finalize_jac (true),
+    ResidualSensitivity():
     _e_ops        (nullptr)
     { }
     
-    virtual ~ResidualAndJacobian() { }
-    
-    inline void set_finalize_jac(bool f) { _finalize_jac = f;}
-    
+    virtual ~ResidualSensitivity() { }
+        
     inline void set_elem_ops(ElemOpsType& e_ops) { _e_ops = &e_ops; }
 
-    template <typename VecType, typename MatType, typename ContextType>
+    template <typename VecType, typename MatType, typename ContextType, typename ScalarFieldType>
     inline void assemble(ContextType   &c,
+                         const ScalarFieldType& f,
                          const VecType &X,
                          VecType       *R,
                          MatType       *J) {
@@ -59,7 +57,7 @@ public:
         
         elem_vector_t res_e;
         elem_matrix_t jac_e;
-        
+
         
         libMesh::MeshBase::const_element_iterator
         el     = c.mesh->active_local_elements_begin(),
@@ -76,8 +74,8 @@ public:
             if (J) jac_e.setZero(sol_accessor.n_dofs(), sol_accessor.n_dofs());
             
             // perform the element level calculations
-            _e_ops->compute(c, sol_accessor, res_e, J?&jac_e:nullptr);
-                        
+            _e_ops->derivative(c, f, sol_accessor, res_e, J?&jac_e:nullptr);
+            
             // constrain the quantities to account for hanging dofs,
             // Dirichlet constraints, etc.
             if (R && J)
@@ -110,4 +108,4 @@ private:
 } // namespace Base
 } // namespace MAST
 
-#endif // __mast_libmesh_residual_and_jacobian_h__
+#endif // __mast_libmesh_residual_sensitivity_h__
