@@ -135,6 +135,9 @@ inline uint_t quad_side_Jac_col(uint_t s) {
         default:
             Error(false, "Invalid side number for quad");
     }
+
+    // should not get here
+    return -1;
 }
 
 

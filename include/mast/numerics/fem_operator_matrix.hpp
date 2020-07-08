@@ -49,9 +49,9 @@ public:
     void clear();
     
     
-    unsigned int m() const {return _n_interpolated_vars;}
+    uint_t m() const {return _n_interpolated_vars;}
     
-    unsigned int n() const {return _n_discrete_vars*_n_dofs_per_var;}
+    uint_t n() const {return _n_discrete_vars*_n_dofs_per_var;}
     
     void print(std::ostream& o);
     
@@ -61,9 +61,9 @@ public:
      *   for structural strain operator matrices. Note that when this method is used
      *   the user must set the matrix entries by calling set_shape_functions
      */
-    void reinit(unsigned int n_interpolated_vars,
-                unsigned int n_discrete_vars,
-                unsigned int n_discrete_dofs_per_var);
+    void reinit(uint_t n_interpolated_vars,
+                uint_t n_discrete_vars,
+                uint_t n_discrete_dofs_per_var);
     
     /*!
      *   sets the shape function values for the block corresponding to
@@ -73,8 +73,8 @@ public:
      *    will be set equal to \p shape_func .
      */
     template <typename VecType>
-    void set_shape_function(unsigned int interpolated_var,
-                            unsigned int discrete_var,
+    void set_shape_function(uint_t interpolated_var,
+                            uint_t discrete_var,
                             const VecType& shape_func);
     
     /*!
@@ -84,7 +84,7 @@ public:
      *   for structural element inertial matrix calculations
      */
     template <typename VecType>
-    void reinit(unsigned int n_interpolated_vars,
+    void reinit(uint_t n_interpolated_vars,
                 const VecType& shape_func);
     
     /*!
@@ -142,17 +142,17 @@ protected:
     /*!
      *    number of rows of the operator
      */
-    unsigned int _n_interpolated_vars;
+    uint_t _n_interpolated_vars;
     
     /*!
      *    number of discrete variables in the system
      */
-    unsigned int _n_discrete_vars;
+    uint_t _n_discrete_vars;
     
     /*!
      *    number of dofs for each variable
      */
-    unsigned int _n_dofs_per_var;
+    uint_t _n_dofs_per_var;
     
     /*!
      *    stores the shape function values that defines the coupling
@@ -188,16 +188,16 @@ inline
 void
 MAST::Numerics::FEMOperatorMatrix<ScalarType>::print(std::ostream& o) {
     
-    unsigned int index = 0;
+    uint_t index = 0;
     
-    for (unsigned int i=0; i<_n_interpolated_vars; i++) {// row
-        for (unsigned int j=0; j<_n_discrete_vars; j++) { // column
+    for (uint_t i=0; i<_n_interpolated_vars; i++) {// row
+        for (uint_t j=0; j<_n_discrete_vars; j++) { // column
             index = j*_n_interpolated_vars+i;
             if (_var_shape_functions[index]) // check if this is non-nullptr
-                for (unsigned int k=0; k<_n_dofs_per_var; k++)
+                for (uint_t k=0; k<_n_dofs_per_var; k++)
                     o << std::setw(15) << _var_shape_functions[index][k];
             else
-                for (unsigned int k=0; k<_n_dofs_per_var; k++)
+                for (uint_t k=0; k<_n_dofs_per_var; k++)
                     o << std::setw(15) << 0.;
         }
         o << std::endl;
@@ -233,9 +233,9 @@ template <typename ScalarType>
 inline
 void
 MAST::Numerics::FEMOperatorMatrix<ScalarType>::
-reinit(unsigned int n_interpolated_vars,
-       unsigned int n_discrete_vars,
-       unsigned int n_discrete_dofs_per_var) {
+reinit(uint_t n_interpolated_vars,
+       uint_t n_discrete_vars,
+       uint_t n_discrete_dofs_per_var) {
     
     this->clear();
     _n_interpolated_vars = n_interpolated_vars;
@@ -251,8 +251,8 @@ template <typename VecType>
 inline
 void
 MAST::Numerics::FEMOperatorMatrix<ScalarType>::
-set_shape_function(unsigned int interpolated_var,
-                   unsigned int discrete_var,
+set_shape_function(uint_t interpolated_var,
+                   uint_t discrete_var,
                    const VecType& shape_func) {
     
     // make sure that reinit has been called.
@@ -289,17 +289,17 @@ template <typename VecType>
 inline
 void
 MAST::Numerics::FEMOperatorMatrix<ScalarType>::
-reinit(unsigned int n_vars,
+reinit(uint_t n_vars,
        const VecType& shape_func) {
     
     this->clear();
     
     _n_interpolated_vars = n_vars;
     _n_discrete_vars = n_vars;
-    _n_dofs_per_var = (unsigned int)shape_func.size();
+    _n_dofs_per_var = (uint_t)shape_func.size();
     _var_shape_functions.resize(n_vars*n_vars, nullptr);
     
-    for (unsigned int i=0; i<n_vars; i++)
+    for (uint_t i=0; i<n_vars; i++)
     {
         ScalarType *vec = new ScalarType[_n_dofs_per_var];
         for (uint_t i=0; i<_n_dofs_per_var; i++)
@@ -325,13 +325,13 @@ vector_mult(T& res, const T& v) const {
             "Incompatible vector size");
     
     res.setZero();
-    unsigned int index = 0;
+    uint_t index = 0;
     
-    for (unsigned int i=0; i<_n_interpolated_vars; i++) // row
-        for (unsigned int j=0; j<_n_discrete_vars; j++) { // column
+    for (uint_t i=0; i<_n_interpolated_vars; i++) // row
+        for (uint_t j=0; j<_n_discrete_vars; j++) { // column
             index = j*_n_interpolated_vars+i;
             if (_var_shape_functions[index]) // check if this is non-nullptr
-                for (unsigned int k=0; k<_n_dofs_per_var; k++)
+                for (uint_t k=0; k<_n_dofs_per_var; k++)
                     res(i) +=
                     _var_shape_functions[index][k] * v(j*_n_dofs_per_var+k);
         }
@@ -352,13 +352,13 @@ vector_mult_transpose(T1& res, const T2& v) const {
             "Incompatible vector size");
     
     res.setZero(res.size());
-    unsigned int index = 0;
+    uint_t index = 0;
     
-    for (unsigned int i=0; i<_n_interpolated_vars; i++) // row
-        for (unsigned int j=0; j<_n_discrete_vars; j++) { // column
+    for (uint_t i=0; i<_n_interpolated_vars; i++) // row
+        for (uint_t j=0; j<_n_discrete_vars; j++) { // column
             index = j*_n_interpolated_vars+i;
             if (_var_shape_functions[index]) // check if this is non-nullptr
-                for (unsigned int k=0; k<_n_dofs_per_var; k++)
+                for (uint_t k=0; k<_n_dofs_per_var; k++)
                     res(j*_n_dofs_per_var+k) +=
                     _var_shape_functions[index][k] * v(i);
         }
@@ -384,14 +384,14 @@ right_multiply(T& r, const T& m) const {
             "Incompatible matrix row dimension");
 
     r.setZero();
-    unsigned int index = 0;
+    uint_t index = 0;
     
-    for (unsigned int i=0; i<_n_interpolated_vars; i++) // row
-        for (unsigned int j=0; j<_n_discrete_vars; j++) { // column of operator
+    for (uint_t i=0; i<_n_interpolated_vars; i++) // row
+        for (uint_t j=0; j<_n_discrete_vars; j++) { // column of operator
             index = j*_n_interpolated_vars+i;
             if (_var_shape_functions[index]) { // check if this is non-nullptr
-                for (unsigned int l=0; l<m.cols(); l++) // column of matrix
-                    for (unsigned int k=0; k<_n_dofs_per_var; k++)
+                for (uint_t l=0; l<m.cols(); l++) // column of matrix
+                    for (uint_t k=0; k<_n_dofs_per_var; k++)
                         r(i,l) +=
                         _var_shape_functions[index][k] * m(j*_n_dofs_per_var+k,l);
             }
@@ -419,14 +419,14 @@ right_multiply_transpose(T& r, const T& m) const {
             "Incompatible matrix row dimension");
     
     r.setZero(r.rows(), r.cols());
-    unsigned int index = 0;
+    uint_t index = 0;
     
-    for (unsigned int i=0; i<_n_interpolated_vars; i++) // row
-        for (unsigned int j=0; j<_n_discrete_vars; j++) { // column of operator
+    for (uint_t i=0; i<_n_interpolated_vars; i++) // row
+        for (uint_t j=0; j<_n_discrete_vars; j++) { // column of operator
             index = j*_n_interpolated_vars+i;
             if (_var_shape_functions[index]) { // check if this is non-nullptr
-                for (unsigned int l=0; l<m.cols(); l++) // column of matrix
-                    for (unsigned int k=0; k<_n_dofs_per_var; k++)
+                for (uint_t l=0; l<m.cols(); l++) // column of matrix
+                    for (uint_t k=0; k<_n_dofs_per_var; k++)
                         r(j*_n_dofs_per_var+k,l) +=
                         _var_shape_functions[index][k] * m(i,l);
             }
@@ -453,11 +453,11 @@ right_multiply_transpose(T& r, const MAST::Numerics::FEMOperatorMatrix<ScalarTyp
             "Incompatible number of variables");
     
     r.setZero();
-    unsigned int index_i, index_j = 0;
+    uint_t index_i, index_j = 0;
     
-    for (unsigned int i=0; i<_n_discrete_vars; i++) // row of result
-        for (unsigned int j=0; j<m._n_discrete_vars; j++) // column of result
-            for (unsigned int k=0; k<_n_interpolated_vars; k++) {
+    for (uint_t i=0; i<_n_discrete_vars; i++) // row of result
+        for (uint_t j=0; j<m._n_discrete_vars; j++) // column of result
+            for (uint_t k=0; k<_n_interpolated_vars; k++) {
                 index_i = i*_n_interpolated_vars+k;
                 index_j = j*m._n_interpolated_vars+k;
                 if (_var_shape_functions[index_i] &&
@@ -465,8 +465,8 @@ right_multiply_transpose(T& r, const MAST::Numerics::FEMOperatorMatrix<ScalarTyp
                     const ScalarType
                     *n1 = _var_shape_functions[index_i],
                     *n2 = m._var_shape_functions[index_j];
-                    for (unsigned int i_n1=0; i_n1<_n_interpolated_vars; i_n1++)
-                        for (unsigned int i_n2=0; i_n2<m._n_interpolated_vars; i_n2++)
+                    for (uint_t i_n1=0; i_n1<_n_interpolated_vars; i_n1++)
+                        for (uint_t i_n2=0; i_n2<m._n_interpolated_vars; i_n2++)
                             r (i*_n_dofs_per_var+i_n1,
                                j*m._n_dofs_per_var+i_n2) += n1[i_n1] * n2[i_n2];
                 }
@@ -494,14 +494,14 @@ left_multiply(T1& r, const T2& m) const {
             "Incompatible matrix columns");
     
     r.setZero(r.rows(), r.cols());
-    unsigned int index = 0;
+    uint_t index = 0;
     
-    for (unsigned int i=0; i<_n_interpolated_vars; i++) // row
-        for (unsigned int j=0; j<_n_discrete_vars; j++) { // column of operator
+    for (uint_t i=0; i<_n_interpolated_vars; i++) // row
+        for (uint_t j=0; j<_n_discrete_vars; j++) { // column of operator
             index = j*_n_interpolated_vars+i;
             if (_var_shape_functions[index]) { // check if this is non-nullptr
-                for (unsigned int l=0; l<m.rows(); l++) // rows of matrix
-                    for (unsigned int k=0; k<_n_dofs_per_var; k++)
+                for (uint_t l=0; l<m.rows(); l++) // rows of matrix
+                    for (uint_t k=0; k<_n_dofs_per_var; k++)
                         r(l,j*_n_dofs_per_var+k) +=
                         _var_shape_functions[index][k] * m(l,i);
             }
@@ -528,14 +528,14 @@ left_multiply_transpose(T& r, const T& m) const {
             "Incompatible matrix columns");
     
     r.setZero();
-    unsigned int index = 0;
+    uint_t index = 0;
     
-    for (unsigned int i=0; i<_n_interpolated_vars; i++) // row
-        for (unsigned int j=0; j<_n_discrete_vars; j++) { // column of operator
+    for (uint_t i=0; i<_n_interpolated_vars; i++) // row
+        for (uint_t j=0; j<_n_discrete_vars; j++) { // column of operator
             index = j*_n_interpolated_vars+i;
             if (_var_shape_functions[index]) { // check if this is non-nullptr
-                for (unsigned int l=0; l<m.rows(); l++) // column of matrix
-                    for (unsigned int k=0; k<_n_dofs_per_var; k++)
+                for (uint_t l=0; l<m.rows(); l++) // column of matrix
+                    for (uint_t k=0; k<_n_dofs_per_var; k++)
                         r(l,i) +=
                         _var_shape_functions[index][k] * m(l,j*_n_dofs_per_var+k);
             }
