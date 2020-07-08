@@ -42,7 +42,7 @@ public:
     inline void assemble(ContextType   &c,
                          const VecType &X,
                          VecType       *R,
-                         MatType    *J) {
+                         MatType       *J) {
         
         Assert0( R || J, "Atleast one assembled quantity should be specified.");
         
