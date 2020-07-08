@@ -28,6 +28,11 @@
 
 // BEGIN_TRANSLATE Extension of bar
 
+namespace MAST {
+namespace Examples {
+namespace Structural {
+namespace Example1 {
+
 class Context {
     
 public:
@@ -86,16 +91,20 @@ struct Traits {
     using prop_t            = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<SolScalarType, Dim, modulus_t, nu_t, Context>;
     using energy_t          = typename MAST::Physics::Elasticity::LinearContinuum::StrainEnergy<fe_var_t, prop_t, Dim, Context>;
     using press_load_t      = typename MAST::Physics::Elasticity::SurfacePressureLoad<fe_var_t, press_t, area_t, Dim, Context>;
+    using element_vector_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
+    using element_matrix_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
+    using assembled_vector_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
+    using assembled_matrix_t = Eigen::SparseMatrix<scalar_t>;
 };
 
 
 
-template <typename Traits>
+template <typename TraitsType>
 class ElemOps {
   
 public:
     
-    using scalar_t = typename Traits::scalar_t;
+    using scalar_t = typename TraitsType::scalar_t;
     using vector_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using matrix_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     
@@ -116,12 +125,12 @@ public:
     _area         (nullptr),
     _p_load       (nullptr) {
         
-        _fe_data       = new typename Traits::fe_data_t;
+        _fe_data       = new typename TraitsType::fe_data_t;
         _fe_data->init(q_order, q_type, fe_order, fe_family);
-        _fe_side_data  = new typename Traits::fe_side_data_t;
+        _fe_side_data  = new typename TraitsType::fe_side_data_t;
         _fe_side_data->init(q_order, q_type, fe_order, fe_family);
-        _fe_var        = new typename Traits::fe_var_t;
-        _fe_side_var   = new typename Traits::fe_var_t;
+        _fe_var        = new typename TraitsType::fe_var_t;
+        _fe_side_var   = new typename TraitsType::fe_var_t;
 
         // associate variables with the shape functions
         _fe_var->set_fe_shape_data(_fe_data->fe_derivative());
@@ -140,15 +149,15 @@ public:
         _fe_var->set_compute_du_dx(true);
         
         // variables for physics
-        _E        = new typename Traits::modulus_t(72.e9);
-        _nu       = new typename Traits::nu_t(0.33);
-        _press    = new typename Traits::press_t(1.e2);
-        _area     = new typename Traits::area_t(1.0);
-        _prop     = new typename Traits::prop_t;
+        _E        = new typename TraitsType::modulus_t(72.e9);
+        _nu       = new typename TraitsType::nu_t(0.33);
+        _press    = new typename TraitsType::press_t(1.e2);
+        _area     = new typename TraitsType::area_t(1.0);
+        _prop     = new typename TraitsType::prop_t;
         _prop->set_modulus_and_nu(*_E, *_nu);
-        _energy   = new typename Traits::energy_t;
+        _energy   = new typename TraitsType::energy_t;
         _energy->set_section_property(*_prop);
-        _p_load   = new typename Traits::press_load_t;
+        _p_load   = new typename TraitsType::press_load_t;
         _p_load->set_section_area(*_area);
         _p_load->set_pressure(*_press);
         
@@ -174,10 +183,10 @@ public:
     
 
     template <typename ContextType, typename AccessorType>
-    inline void compute(ContextType& c,
-                        const AccessorType& v,
-                        vector_t& res,
-                        matrix_t* jac) {
+    inline void compute(ContextType                       &c,
+                        const AccessorType                &v,
+                        typename TraitsType::element_vector_t &res,
+                        typename TraitsType::element_matrix_t *jac) {
         
         _fe_data->reinit(c);
         _fe_var->init(c, v);
@@ -193,32 +202,84 @@ public:
     }
 
     
-    template <typename ScalarFieldType>
-    inline void derivative(Context& c,
-                           const ScalarFieldType& f,
-                           vector_t& res,
-                           matrix_t* jac) {
+    template <typename ContextType, typename AccessorType, typename ScalarFieldType>
+    inline void derivative(ContextType                       &c,
+                           const ScalarFieldType             &f,
+                           const AccessorType                &v,
+                           typename TraitsType::element_vector_t &res,
+                           typename TraitsType::element_matrix_t *jac) {
         
+        _fe_data->reinit(c);
+        _fe_var->init(c, v);
         _energy->derivative(c, f, res, jac);
+        
+        for (uint_t s=0; s<c.elem->n_sides(); s++)
+            if (c.if_compute_pressure_load_on_side(s)) {
+                                
+                _fe_side_data->reinit_for_side(c, s);
+                _fe_side_var->init(c, v);
+                _p_load->derivative(c, f, res, jac);
+            }
     }
 
 private:
 
     // variables for quadrature and shape function
-    typename Traits::fe_data_t         *_fe_data;
-    typename Traits::fe_side_data_t    *_fe_side_data;
-    typename Traits::fe_var_t          *_fe_var;
-    typename Traits::fe_var_t          *_fe_side_var;
+    typename TraitsType::fe_data_t         *_fe_data;
+    typename TraitsType::fe_side_data_t    *_fe_side_data;
+    typename TraitsType::fe_var_t          *_fe_var;
+    typename TraitsType::fe_var_t          *_fe_side_var;
 
     // variables for physics
-    typename Traits::modulus_t    *_E;
-    typename Traits::nu_t         *_nu;
-    typename Traits::prop_t       *_prop;
-    typename Traits::energy_t     *_energy;
-    typename Traits::press_t      *_press;
-    typename Traits::area_t       *_area;
-    typename Traits::press_load_t *_p_load;
+    typename TraitsType::modulus_t    *_E;
+    typename TraitsType::nu_t         *_nu;
+    typename TraitsType::prop_t       *_prop;
+    typename TraitsType::energy_t     *_energy;
+    typename TraitsType::press_t      *_press;
+    typename TraitsType::area_t       *_area;
+    typename TraitsType::press_load_t *_p_load;
 };
+
+
+template <typename TraitsType>
+inline void
+compute_sol(libMesh::QuadratureType                   q_type,
+            libMesh::Order                            q_order,
+            libMesh::Order                            fe_order,
+            libMesh::FEFamily                         fe_family,
+            Context                                  &c,
+            typename TraitsType::assembled_vector_t  &sol) {
+    
+    using scalar_t   = typename TraitsType::scalar_t;
+    using elem_ops_t = ElemOps<TraitsType>;
+    
+    elem_ops_t e_ops(q_order, q_type, fe_order, fe_family);
+
+    MAST::Base::Assembly::libMeshWrapper::ResidualAndJacobian<scalar_t, elem_ops_t>
+    assembly;
+    
+    assembly.set_elem_ops(e_ops);
+
+    typename TraitsType::assembled_vector_t
+    res;
+    typename TraitsType::assembled_matrix_t
+    jac;
+    
+    sol = TraitsType::assembled_vector_t::Zero(c.sys->n_dofs());
+    res = TraitsType::assembled_vector_t::Zero(c.sys->n_dofs());
+    MAST::Numerics::libMeshWrapper::init_sparse_matrix(c.sys->get_dof_map(), jac);
+    
+    assembly.assemble(c, sol, &res, &jac);
+    
+    sol = Eigen::SparseLU<typename TraitsType::assembled_matrix_t>(jac).solve(-res);
+}
+
+
+} // namespace Example1
+} // namespace Structural
+} // namespace Examples
+} // namespace MAST
+
 
 
 int main(int argc, const char** argv) {
@@ -230,7 +291,7 @@ int main(int argc, const char** argv) {
     libMesh::Order          fe_order  = libMesh::SECOND;
     libMesh::FEFamily       fe_family = libMesh::LAGRANGE;
 
-    Context c(init.comm());
+    MAST::Examples::Structural::Example1::Context c(init.comm());
 
     libMesh::MeshTools::Generation::build_square(*c.mesh,
                                                  5, 5,
@@ -249,30 +310,18 @@ int main(int argc, const char** argv) {
     c.mesh->print_info(std::cout);
     c.eq_sys->print_info(std::cout);
     
-    using basis_scalar_t = real_t;
-    using nodal_scalar_t = real_t;
-    using sol_scalar_t   = real_t;
-    using res_vec_t      = Eigen::Matrix<sol_scalar_t, Eigen::Dynamic, 1>;
-    using jac_mat_t      = Eigen::SparseMatrix<sol_scalar_t>;
-    using elem_ops_t     = ElemOps<Traits<basis_scalar_t, nodal_scalar_t, sol_scalar_t, 2>>;
-    
-    elem_ops_t e_ops(q_order, q_type, fe_order, fe_family);
+    using traits_t           = MAST::Examples::Structural::Example1::Traits<real_t, real_t,    real_t, 2>;
+    using traits_complex_t   = MAST::Examples::Structural::Example1::Traits<real_t, real_t, complex_t, 2>;
 
-    MAST::Base::Assembly::libMeshWrapper::ResidualAndJacobian<real_t, elem_ops_t>
-    assembly;
+    typename traits_t::assembled_vector_t
+    sol;
     
-    assembly.set_elem_ops(e_ops);
-
-    res_vec_t sol, res;
-    jac_mat_t jac;
-    
-    sol = res_vec_t::Zero(c.sys->n_dofs());
-    res = res_vec_t::Zero(c.sys->n_dofs());
-    MAST::Numerics::libMeshWrapper::init_sparse_matrix(c.sys->get_dof_map(), jac);
-    
-    assembly.assemble(c, sol, &res, &jac);
-    
-    sol = Eigen::SparseLU<jac_mat_t>(jac).solve(-res);
+    MAST::Examples::Structural::Example1::compute_sol<traits_t>(q_type,
+                                                                q_order,
+                                                                fe_order,
+                                                                fe_family,
+                                                                c,
+                                                                sol);
     
     
     for (uint_t i=0; i<sol.size(); i++)
