@@ -81,7 +81,7 @@ constrain_and_add_vector(VecType                           &v,
     dof_map.constrain_element_vector(v1, dof_indices);
 
     for (uint_t i=0; i<dof_indices.size(); i++)
-        v(dof_indices[i]) += v_sub(i);
+        v(dof_indices[i]) += v1(i);
 }
 
 
@@ -101,7 +101,7 @@ constrain_and_add_matrix(MatType                           &m,
 
     for (uint_t i=0; i<dof_indices.size(); i++)
         for (uint_t j=0; j<dof_indices.size(); j++)
-            add_to_matrix(m, dof_indices[i], dof_indices[j], m_sub(i,j));
+            add_to_matrix(m, dof_indices[i], dof_indices[j], m1(i,j));
 }
 
 

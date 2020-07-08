@@ -86,11 +86,11 @@ public:
                 (*R, *J, c.sys->get_dof_map(), sol_accessor.dof_indices(), res_e, jac_e);
             else if (R)
                 MAST::Base::Assembly::libMeshWrapper::constrain_and_add_vector
-                <ScalarType, VecType>
+                <ScalarType, VecType, elem_vector_t>
                 (*R, c.sys->get_dof_map(), sol_accessor.dof_indices(), res_e);
             else
                 MAST::Base::Assembly::libMeshWrapper::constrain_and_add_matrix
-                <ScalarType, MatType>
+                <ScalarType, MatType, elem_matrix_t>
                 (*J, c.sys->get_dof_map(), sol_accessor.dof_indices(), jac_e);
         }
 

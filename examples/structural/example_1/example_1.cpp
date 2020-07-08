@@ -53,7 +53,7 @@ public:
 
 
         libMesh::MeshTools::Generation::build_square(*mesh,
-                                                     5, 5,
+                                                     2, 2,
                                                      0.0, 10.0,
                                                      0.0, 10.0,
                                                      libMesh::QUAD9);
@@ -271,6 +271,55 @@ private:
 
 template <typename TraitsType>
 inline void
+compute_residual(Context                                        &c,
+                 ElemOps<TraitsType>                            &e_ops,
+                 const typename TraitsType::assembled_vector_t  &sol,
+                 typename TraitsType::assembled_vector_t        &res) {
+    
+    using scalar_t   = typename TraitsType::scalar_t;
+
+    MAST::Base::Assembly::libMeshWrapper::ResidualAndJacobian<scalar_t, ElemOps<TraitsType>>
+    assembly;
+    
+    assembly.set_elem_ops(e_ops);
+
+    typename TraitsType::assembled_matrix_t
+    *jac = nullptr;
+    
+    res = TraitsType::assembled_vector_t::Zero(c.sys->n_dofs());
+    
+    assembly.assemble(c, sol, &res, jac);
+}
+
+
+
+template <typename TraitsType, typename ScalarFieldType>
+inline void
+compute_residual_sensitivity(Context                                        &c,
+                             ElemOps<TraitsType>                            &e_ops,
+                             const ScalarFieldType                          &f,
+                             const typename TraitsType::assembled_vector_t  &sol,
+                             typename TraitsType::assembled_vector_t        &dres) {
+    
+    using scalar_t   = typename TraitsType::scalar_t;
+
+    MAST::Base::Assembly::libMeshWrapper::ResidualSensitivity<scalar_t, ElemOps<TraitsType>>
+    assembly;
+    
+    assembly.set_elem_ops(e_ops);
+
+    typename TraitsType::assembled_matrix_t
+    *jac = nullptr;
+    
+    dres = TraitsType::assembled_vector_t::Zero(c.sys->n_dofs());
+    
+    assembly.assemble(c, f, sol, &dres, jac);
+}
+
+
+
+template <typename TraitsType>
+inline void
 compute_sol(Context                                  &c,
             ElemOps<TraitsType>                      &e_ops,
             typename TraitsType::assembled_vector_t  &sol) {
@@ -379,6 +428,7 @@ int main(int argc, const char** argv) {
     // compute the solution sensitivity wrt E
     (*e_ops_c.E)() += complex_t(0., ComplexStepDelta);
     MAST::Examples::Structural::Example1::compute_sol<traits_complex_t>(c, e_ops_c, sol_c);
+    (*e_ops_c.E)() -= complex_t(0., ComplexStepDelta);
     MAST::Examples::Structural::Example1::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.E, sol, dsol);
     
     // write solution as first time-step
@@ -386,8 +436,13 @@ int main(int argc, const char** argv) {
         for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
         writer.write_timestep("solution.exo", *c.eq_sys, 2, 2.);
     }
+    dsol -= sol_c.imag()/ComplexStepDelta;
+    std::cout << dsol.norm() << std::endl;
 
     // compute the solution sensitivity wrt nu
+    (*e_ops_c.nu)() += complex_t(0., ComplexStepDelta);
+    MAST::Examples::Structural::Example1::compute_sol<traits_complex_t>(c, e_ops_c, sol_c);
+    (*e_ops_c.nu)() -= complex_t(0., ComplexStepDelta);
     MAST::Examples::Structural::Example1::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.nu, sol, dsol);
     
     // write solution as first time-step
@@ -395,8 +450,13 @@ int main(int argc, const char** argv) {
         for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
         writer.write_timestep("solution.exo", *c.eq_sys, 3, 3.);
     }
-    
+    dsol -= sol_c.imag()/ComplexStepDelta;
+    std::cout << dsol.norm() << std::endl;
+
     // compute the solution sensitivity wrt p
+    (*e_ops_c.press)() += complex_t(0., ComplexStepDelta);
+    MAST::Examples::Structural::Example1::compute_sol<traits_complex_t>(c, e_ops_c, sol_c);
+    (*e_ops_c.press)() -= complex_t(0., ComplexStepDelta);
     MAST::Examples::Structural::Example1::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.press, sol, dsol);
     
     // write solution as first time-step
@@ -404,8 +464,13 @@ int main(int argc, const char** argv) {
         for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
         writer.write_timestep("solution.exo", *c.eq_sys, 4, 4.);
     }
+    dsol -= sol_c.imag()/ComplexStepDelta;
+    std::cout << dsol.norm() << std::endl;
 
-    // compute the solution sensitivity wrt p
+    // compute the solution sensitivity wrt section area
+    (*e_ops_c.area)() += complex_t(0., ComplexStepDelta);
+    MAST::Examples::Structural::Example1::compute_sol<traits_complex_t>(c, e_ops_c, sol_c);
+    (*e_ops_c.area)() -= complex_t(0., ComplexStepDelta);
     MAST::Examples::Structural::Example1::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.area, sol, dsol);
     
     // write solution as first time-step
@@ -413,6 +478,8 @@ int main(int argc, const char** argv) {
         for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
         writer.write_timestep("solution.exo", *c.eq_sys, 5, 5.);
     }
+    dsol -= sol_c.imag()/ComplexStepDelta;
+    std::cout << dsol.norm() << std::endl;
 
     
     // END_TRANSLATE
