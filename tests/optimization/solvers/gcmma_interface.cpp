@@ -67,6 +67,8 @@ TEST_CASE("gcmma_interface",
           "[Optimization][Solvers][GCMMA]") {
     
     MAST::Test::Optimization::Solvers::GCMMA::RosenbrockFunction f;
+#if MAST_ENABLE_GCMMA == 1
+
     MAST::Optimization::Solvers::GCMMAInterface<RosenbrockFunction>
     opt;
     opt.set_function_evaluation(f);
@@ -75,6 +77,7 @@ TEST_CASE("gcmma_interface",
     
     CHECK(f.obj == Catch::Detail::Approx(0.).margin(1.e-5));
     CHECK_THAT(f.x, Catch::Approx(std::vector<real_t>({1., 1.})).epsilon(1.e-2));
+#endif
 }
 
 } // namespace GCMMA
