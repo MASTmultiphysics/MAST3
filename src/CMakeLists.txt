@@ -75,19 +75,6 @@ endif()
 
 # Add subdirectories containing sources.
 #add_subdirectory(aeroelasticity)
-#add_subdirectory(base)
-#add_subdirectory(boundary_condition)
-#add_subdirectory(coordinates)
-#add_subdirectory(elasticity)
-#add_subdirectory(fluid)
-#add_subdirectory(heat_conduction)
-#add_subdirectory(level_set)
-#add_subdirectory(mesh)
-#add_subdirectory(numerics)
-#add_subdirectory(optimization)
-#add_subdirectory(property_cards)
-#add_subdirectory(solver)
-#add_subdirectory(utility)
 
 # NOTE: There is an argument to be made for why we might want to switch the
 #       add_subdirectory(<dir>) above to include(<dir>/CMakeLists.txt).

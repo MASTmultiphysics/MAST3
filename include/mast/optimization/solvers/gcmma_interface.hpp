@@ -20,7 +20,11 @@
 #ifndef __mast_gcmma_optimization_interface_h__
 #define __mast_gcmma_optimization_interface_h__
 
+// C++ includes
+#include <iomanip>
+
 // MAST includes
+#include <mast/base/mast_config.h>
 #include <mast/base/mast_data_types.h>
 #include <mast/base/exceptions.hpp>
 
@@ -79,13 +83,16 @@ class GCMMAInterface {
 public:
     
     GCMMAInterface():
-    constr_penalty       (5.e1),
-    initial_rel_step     (5.e-1),
-    asymptote_reduction  (0.7),
-    asymptote_expansion  (1.2),
-    max_inner_iters      (15),
-    max_iters            (1000),
-    _feval               (nullptr)
+    constr_penalty                (5.e1),
+    initial_rel_step              (1.e-2),
+    asymptote_reduction           (0.7),
+    asymptote_expansion           (1.2),
+    rel_change_tol                (1.e-8),
+    max_inner_iters               (15),
+    max_iters                     (1000),
+    n_rel_change_iters            (5),
+    write_internal_iteration_data (false),
+    _feval                        (nullptr)
     { }
 
     
@@ -96,8 +103,11 @@ public:
     real_t           initial_rel_step;
     real_t           asymptote_reduction;
     real_t           asymptote_expansion;
+    real_t           rel_change_tol;
     uint_t           max_inner_iters;
     uint_t           max_iters;
+    uint_t           n_rel_change_iters;
+    bool             write_internal_iteration_data;
     
     inline void set_function_evaluation(FunctionEvaluationType& feval) {
         
@@ -115,12 +125,11 @@ public:
                 
         int
         N                  = _feval->n_vars(),
-        M                  = _feval->n_eq() + _feval->n_ineq(),
-        n_rel_change_iters = _feval->n_iters_relative_change();
+        M                  = _feval->n_eq() + _feval->n_ineq();
         
-        libmesh_assert_greater(N, 0);
+        Assert1(N > 0, N, "Design variables must be greater than 0");
         
-        std::vector<Real>  XVAL(N, 0.), XOLD1(N, 0.), XOLD2(N, 0.),
+        std::vector<real_t>  XVAL(N, 0.), XOLD1(N, 0.), XOLD2(N, 0.),
         XMMA(N, 0.), XMIN(N, 0.), XMAX(N, 0.), XLOW(N, 0.), XUPP(N, 0.),
         ALFA(N, 0.), BETA(N, 0.), DF0DX(N, 0.),
         A(M, 0.), B(M, 0.), C(M, 0.), Y(M, 0.), RAA(M, 0.), ULAM(M, 0.),
@@ -132,17 +141,17 @@ public:
         std::vector<int> IYFREE(M, 0);
         std::vector<bool> eval_grads(M, false);
         
-        Real
+        real_t
         ALBEFA  = 0.1,
-        GHINIT  = _initial_rel_step,
-        GHDECR  = _asymptote_reduction,
-        GHINCR  = _asymptote_expansion,
+        GHINIT  = initial_rel_step,
+        GHDECR  = asymptote_reduction,
+        GHINCR  = asymptote_expansion,
         F0VAL   = 0.,
         F0NEW   = 0.,
         F0APP   = 0.,
         RAA0    = 0.,
         Z       = 0.,
-        GEPS    =_feval->tolerance();
+        GEPS    = rel_change_tol;
         
         
         /*C********+*********+*********+*********+*********+*********+*********+
@@ -224,22 +233,22 @@ public:
         // Assumed:  FMAX == A
         _feval->init_dvar(XVAL, XMIN, XMAX);
         // set the value of C[i] to be very large numbers
-        Real max_x = 0.;
+        real_t max_x = 0.;
         for (uint_t i=0; i<N; i++)
             if (max_x < fabs(XVAL[i]))
                 max_x = fabs(XVAL[i]);
         
-        int INNMAX=_max_inner_iters, ITER=0, ITE=0, INNER=0, ICONSE=0;
+        int INNMAX=max_inner_iters, ITER=0, ITE=0, INNER=0, ICONSE=0;
         /*
          *  The outer iterative process starts.
          */
         bool terminate = false, inner_terminate=false;
         while (!terminate) {
             
-            std::fill(C.begin(), C.end(), std::max(1.e0*max_x, _constr_penalty));
-            GHINIT  = _initial_rel_step,
-            GHDECR  = _asymptote_reduction,
-            GHINCR  = _asymptote_expansion,
+            std::fill(C.begin(), C.end(), std::max(1.e0*max_x, constr_penalty));
+            GHINIT  = initial_rel_step,
+            GHDECR  = asymptote_reduction,
+            GHINCR  = asymptote_expansion,
             
             ITER=ITER+1;
             ITE=ITE+1;
@@ -253,7 +262,7 @@ public:
                              FVAL, eval_grads, DFDX);
             if (ITER == 1)
                 // output the very first iteration
-                _feval->output(0, XVAL, F0VAL, FVAL, true);
+                _feval->output(0, XVAL, F0VAL, FVAL);
             
             /*
              *  RAA0,RAA,XLOW,XUPP,ALFA and BETA are calculated.
@@ -267,7 +276,8 @@ public:
              */
             
             // write the asymptote data for the inneriterations
-            _output_iteration_data(ITER, XVAL, XMIN, XMAX, XLOW, XUPP, ALFA, BETA);
+            if (write_internal_iteration_data)
+                _output_iteration_data(ITER, XVAL, XMIN, XMAX, XLOW, XUPP, ALFA, BETA);
             
             INNER=0;
             inner_terminate = false;
@@ -292,9 +302,9 @@ public:
                 
                 ///////////////////////////////////////////////////////////////
                 // if the solution is poor, backtrack
-                std::vector<Real> XMMA_new(XMMA);
-                Real frac = 0.02;
-                while (FNEW[0] > 1.e2) {
+                std::vector<real_t> XMMA_new(XMMA);
+                real_t frac = 0.5;
+                while (M && FNEW[0] > 1.e2) {
                     std::cout << "*** Backtracking: frac = "
                     << frac
                     << "  constr: " << FNEW[0]
@@ -352,7 +362,7 @@ public:
             /*
              *  The USER may now write the current solution.
              */
-            _feval->output(ITER, XVAL, F0VAL, FVAL, true);
+            _feval->output(ITER, XVAL, F0VAL, FVAL);
             f0_iters[(ITE-1)%n_rel_change_iters] = F0VAL;
             
             /*
@@ -368,7 +378,7 @@ public:
             
             // relative change in objective
             bool rel_change_conv = true;
-            Real f0_curr = f0_iters[n_rel_change_iters-1];
+            real_t f0_curr = f0_iters[n_rel_change_iters-1];
             
             for (uint_t i=0; i<n_rel_change_iters-1; i++) {
                 if (f0_curr > sqrt(GEPS))
@@ -391,16 +401,16 @@ public:
     }
     
     
-protected:
+private:
     
     inline void _output_iteration_data(uint_t i,
-                                       const std::vector<Real>& XVAL,
-                                       const std::vector<Real>& XMIN,
-                                       const std::vector<Real>& XMAX,
-                                       const std::vector<Real>& XLOW,
-                                       const std::vector<Real>& XUPP,
-                                       const std::vector<Real>& ALFA,
-                                       const std::vector<Real>& BETA) {
+                                       const std::vector<real_t>& XVAL,
+                                       const std::vector<real_t>& XMIN,
+                                       const std::vector<real_t>& XMAX,
+                                       const std::vector<real_t>& XLOW,
+                                       const std::vector<real_t>& XUPP,
+                                       const std::vector<real_t>& ALFA,
+                                       const std::vector<real_t>& BETA) {
 
         Assert0(_feval, "Evaluation function not initialized");
         Assert2(XVAL.size() == _feval->n_vars(),
