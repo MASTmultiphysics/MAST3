@@ -27,7 +27,7 @@
 // Eigen includes
 #include <Eigen/SparseLU>
 
-// BEGIN_TRANSLATE Extension of bar
+// BEGIN_TRANSLATE Extension of membrane
 
 namespace MAST {
 namespace Examples {
