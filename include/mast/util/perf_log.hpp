@@ -11,7 +11,6 @@
 #include <mast/base/exceptions.hpp>
 
 namespace MAST {
-
 namespace Utility {
 
 class PerformanceLogging {
@@ -128,8 +127,9 @@ protected:
     stack_type _event_stack;
     map_type   _event_time;
 };
-}
-}
+
+}  // namespace Utility
+}  // namespace MAST
 
 #endif // __mast__perflog_h__
 
