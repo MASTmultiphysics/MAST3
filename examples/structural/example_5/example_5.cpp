@@ -14,6 +14,7 @@
 #include <mast/base/assembly/libmesh/residual_sensitivity.hpp>
 #include <mast/numerics/libmesh/sparse_matrix_initialization.hpp>
 #include <mast/util/getpot_wrapper.hpp>
+#include <mast/mesh/libmesh/geometric_filter.hpp>
 
 // libMesh includes
 #include <libmesh/replicated_mesh.h>
@@ -40,7 +41,10 @@ class Context {
     
 public:
     
-    Context(libMesh::Parallel::Communicator& comm):
+    Context(libMesh::Parallel::Communicator &mpi_comm,
+            MAST::Utility::GetPotWrapper    &inp):
+    comm      (mpi_comm),
+    input     (inp),
     q_type    (libMesh::QGAUSS),
     q_order   (libMesh::FOURTH),
     fe_order  (libMesh::SECOND),
@@ -51,7 +55,6 @@ public:
     elem      (nullptr),
     qp        (-1),
     p_side_id (1) {
-
 
 
         libMesh::MeshTools::Generation::build_square(*mesh,
@@ -78,6 +81,7 @@ public:
         delete mesh;
     }
     
+    // assembly methods
     uint_t elem_dim() const {return elem->dim();}
     uint_t  n_nodes() const {return elem->n_nodes();}
     real_t  nodal_coord(uint_t nd, uint_t c) const {return elem->point(nd)(c);}
@@ -87,6 +91,9 @@ public:
     inline bool if_compute_pressure_load_on_side(const uint_t s)
     { return mesh->boundary_info->has_boundary_id(elem, s, p_side_id);}
 
+    
+    libMesh::Parallel::Communicator  &comm;
+    MAST::Utility::GetPotWrapper     &input;
     libMesh::QuadratureType           q_type;
     libMesh::Order                    q_order;
     libMesh::Order                    fe_order;
@@ -271,6 +278,49 @@ private:
 };
 
 
+
+template <typename TraitsType>
+class FunctionEvaluation {
+
+public:
+    
+    FunctionEvaluation()
+    {}
+    
+    virtual ~FunctionEvaluation() {}
+
+    
+    inline uint_t n_vars() const {return 2;}
+    inline uint_t   n_eq() const {return 0;}
+    inline uint_t n_ineq() const {return 0;}
+    virtual void init_dvar(std::vector<real_t>& x,
+                           std::vector<real_t>& xmin,
+                           std::vector<real_t>& xmax) {
+        
+        
+    }
+
+    
+    virtual void evaluate(const std::vector<real_t>& x,
+                          real_t& obj,
+                          bool eval_obj_grad,
+                          std::vector<real_t>& obj_grad,
+                          std::vector<real_t>& fvals,
+                          std::vector<bool>& eval_grads,
+                          std::vector<real_t>& grads) {
+       
+    }
+
+    
+    inline void output(const uint_t                iter,
+                       const std::vector<real_t>  &dvars,
+                       real_t                     &o,
+                       std::vector<real_t>        &fvals) {
+
+    }
+};
+
+
 template <typename TraitsType>
 inline void
 compute_residual(Context                                        &c,
@@ -389,22 +439,23 @@ compute_sol_sensitivity(Context                                        &c,
 }
 
 
-} // namespace Example1
+} // namespace Example5
 } // namespace Structural
 } // namespace Examples
 } // namespace MAST
 
 #ifndef MAST_TESTING
 
-int main(int argc, const char** argv) {
+int main(int argc, char** argv) {
 
     libMesh::LibMeshInit init(argc, argv);
+    MAST::Utility::GetPotWrapper input(argc, argv);
     
     using traits_t           = MAST::Examples::Structural::Example5::Traits<real_t, real_t,    real_t, 2>;
     using traits_complex_t   = MAST::Examples::Structural::Example5::Traits<real_t, real_t, complex_t, 2>;
 
 
-    MAST::Examples::Structural::Example5::Context c(init.comm());
+    MAST::Examples::Structural::Example5::Context c(init.comm(), input);
     MAST::Examples::Structural::Example5::ElemOps<traits_t>
     e_ops(c.q_order, c.q_type, c.fe_order, c.fe_family);
     MAST::Examples::Structural::Example5::ElemOps<traits_complex_t>
