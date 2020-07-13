@@ -23,7 +23,8 @@
 
 
 // MAST includes
-#include "base/mast_data_types.h"
+#include <mast/base/mast_data_types.h>
+#include <mast/base/exceptions.hpp>
 
 // libMesh includes
 #include "libmesh/system.h"
@@ -46,7 +47,6 @@ namespace libMeshWrapper {
  *   Creates a geometric filter for the location-based design variables, for example density and
  *   level-set function parmaters in topology optimization.
  */
-template <ScalarType>
 class FilterBase {
     
 public:
@@ -57,9 +57,9 @@ public:
      *   \param dv_dof_ids dof ids that are design variables. If a id is not in this set, then
      *   the dof value assumes its value from the input
      */
-    FilterBase(libMesh::System& sys,
-               const Real radius,
-               const std::set<uint_t>& dv_dof_ids):
+    FilterBase(libMesh::System         &sys,
+               const real_t            radius,
+               const std::set<uint_t>  &dv_dof_ids):
     _system            (sys),
     _radius            (radius),
     _fe_size           (0.),
@@ -81,8 +81,8 @@ public:
     /*!
      *   computes the filtered output from the provided input.
      */
-    void compute_filtered_values(const libMesh::NumericVector<Real>& input,
-                                 libMesh::NumericVector<Real>& output,
+    void compute_filtered_values(const libMesh::NumericVector<real_t>& input,
+                                 libMesh::NumericVector<real_t>& output,
                                  bool close_vector = true) const {
         
         Assert2(input.size() == _filter_map.size(),
@@ -94,16 +94,16 @@ public:
         
         output.zero();
         
-        std::vector<Real> input_vals(input.size(), 0.);
+        std::vector<real_t> input_vals(input.size(), 0.);
         input.localize(input_vals);
         
-        std::map<uint_t, std::vector<std::pair<uint_t, Real>>>::const_iterator
+        std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>::const_iterator
         map_it   = _filter_map.begin(),
         map_end  = _filter_map.end();
         
         for ( ; map_it != map_end; map_it++) {
             
-            std::vector<std::pair<uint_t, Real>>::const_iterator
+            std::vector<std::pair<uint_t, real_t>>::const_iterator
             vec_it  = map_it->second.begin(),
             vec_end = map_it->second.end();
             
@@ -130,9 +130,9 @@ public:
      *  If \p close_vector is \p true then \p output.close() will be called in this
      *  routines, otherwise not.
      */
-    void compute_filtered_values(std::map<uint_t, Real>& nonzero_vals,
-                                 libMesh::NumericVector<Real>& output,
-                                 bool close_vector) const {
+    template <typename ScalarType, typename VecType>
+    void compute_filtered_values(std::map<uint_t, ScalarType> &nonzero_vals,
+                                 VecType                      &output) const {
         
         Assert2(output.size() == _filter_map.size(),
                 output.size(), _filter_map.size(),
@@ -143,33 +143,32 @@ public:
         
         output.zero();
         
-        std::map<uint_t, std::vector<std::pair<uint_t, Real>>>::const_iterator
+        std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>::const_iterator
         map_it   = _filter_map.begin(),
         map_end  = _filter_map.end();
         
         for ( ; map_it != map_end; map_it++) {
             
-            std::vector<std::pair<uint_t, Real>>::const_iterator
+            std::vector<std::pair<uint_t, real_t>>::const_iterator
             vec_it  = map_it->second.begin(),
             vec_end = map_it->second.end();
             
             for ( ; vec_it != vec_end; vec_it++) {
-                if (nonzero_input.count(vec_it->first)) {
+                if (nonzero_vals.count(vec_it->first)) {
                     
                     if (_dv_dof_ids.count(map_it->first))
-                        output.add(map_it->first, nonzero_input[vec_it->first] * vec_it->second);
+                        output.add(map_it->first, nonzero_vals[vec_it->first] * vec_it->second);
                     else
-                        output.set(map_it->first, nonzero_input[map_it->first]);
+                        output.set(map_it->first, nonzero_vals[map_it->first]);
                 }
             }
         }
-        
-        if (close_vector)
-            output.close();
     }
     
-    void compute_filtered_values(const std::vector<Real>& input,
-                                 std::vector<Real>& output) const {
+    
+    template <typename ScalarType>
+    void compute_filtered_values(const std::vector<ScalarType>  &input,
+                                 std::vector<ScalarType>        &output) const {
         
         Assert2(input.size() == _filter_map.size(),
                 input.size(), _filter_map.size(),
@@ -180,13 +179,13 @@ public:
 
         std::fill(output.begin(), output.end(), 0.);
         
-        std::map<uint_t, std::vector<std::pair<uint_t, Real>>>::const_iterator
+        std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>::const_iterator
         map_it   = _filter_map.begin(),
         map_end  = _filter_map.end();
         
         for ( ; map_it != map_end; map_it++) {
             
-            std::vector<std::pair<uint_t, Real>>::const_iterator
+            std::vector<std::pair<uint_t, real_t>>::const_iterator
             vec_it  = map_it->second.begin(),
             vec_end = map_it->second.end();
             
@@ -199,6 +198,7 @@ public:
         }
     }
     
+    
     /*!
      *   function identifies if the given element is within the domain of
      *   influence of this specified level set design variable. Currently,
@@ -207,9 +207,9 @@ public:
      *   and the element sizes.
      */
     bool if_elem_in_domain_of_influence(const libMesh::Elem& elem,
-                                        const libMesh::Node& level_set_node) const {
+                                        const libMesh::Node& node) const {
         
-        Real
+        real_t
         d    = 1.e12; // arbitrarily large value to initialize the search
         
         libMesh::Point
@@ -218,7 +218,7 @@ public:
         // first get the smallest distance from the node to the element nodes
         for (uint_t i=0; i<elem.n_nodes(); i++) {
             pt  = elem.point(i);
-            pt -= level_set_node;
+            pt -= node;
             
             if (pt.norm() < d)
                 d = pt.norm();
@@ -226,10 +226,7 @@ public:
         
         // if this distance is outside the domain of influence, then this
         // element is not influenced by the design variable
-        if (d > _radius + _fe_size)
-            return false;
-        else
-            return true;
+        return (d>_radius+_fe_size);
     }
     
     
@@ -245,7 +242,7 @@ public:
         << std::setw(20) << "Filtered ID"
         << std::setw(20) << "Dependent Vars" << std::endl;
         
-        std::map<uint_t, std::vector<std::pair<uint_t, Real>>>::const_iterator
+        std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>::const_iterator
         map_it   = _filter_map.begin(),
         map_end  = _filter_map.end();
         
@@ -254,7 +251,7 @@ public:
             o
             << std::setw(20) << map_it->first;
             
-            std::vector<std::pair<uint_t, Real>>::const_iterator
+            std::vector<std::pair<uint_t, real_t>>::const_iterator
             vec_it  = map_it->second.begin(),
             vec_end = map_it->second.end();
             
@@ -291,7 +288,7 @@ private:
         /**
          * libMesh \p Point coordinate type
          */
-        typedef Real coord_t;
+        typedef real_t coord_t;
         
         /**
          * Must return the number of data points
@@ -333,7 +330,7 @@ private:
         {
             Assert2(dim < (int) Dim, dim, (int) Dim,
                     "Incompatible dimension");
-            Assert2(idx < _mesh.n_nodes(), idx < _mesh.n_nodes(),
+            Assert2(idx < _mesh.n_nodes(), idx, _mesh.n_nodes(),
                     "Invalid node index");
             Assert1(dim < 3, dim, "Invalid dimension");
             
@@ -350,8 +347,7 @@ private:
         bool kdtree_get_bbox(BBOX & /* bb */) const { return false; }
     };
     
-    void
-    MAST::FilterBase::_init2() {
+    inline void _init2() {
                 
         libMesh::MeshBase& mesh = _system.get_mesh();
         
@@ -365,7 +361,7 @@ private:
         // contrib/nanoflann/examples/pointcloud_adaptor_example.cpp
         
         // Declare a type templated on NanoflannMeshAdaptor
-        typedef nanoflann::L2_Simple_Adaptor<Real, NanoflannMeshAdaptor<3> > adatper_t;
+        typedef nanoflann::L2_Simple_Adaptor<real_t, NanoflannMeshAdaptor<3> > adatper_t;
         
         // Declare a KDTree type based on NanoflannMeshAdaptor
         typedef nanoflann::KDTreeSingleIndexAdaptor<adatper_t, NanoflannMeshAdaptor<3>, 3> kd_tree_t;
@@ -377,7 +373,7 @@ private:
         // Construct the tree
         kd_tree.buildIndex();
         
-        Real
+        real_t
         d_12 = 0.,
         sum  = 0.;
         
@@ -398,11 +394,11 @@ private:
             
             dof_1 = node->dof_number(_system.number(), 0, 0);
             
-            Real query_pt[3] = {(*node)(0), (*node)(1), (*node)(2)};
+            real_t query_pt[3] = {(*node)(0), (*node)(1), (*node)(2)};
             
-            std::vector<std::pair<size_t, Real>>
+            std::vector<std::pair<size_t, real_t>>
             indices_dists;
-            nanoflann::RadiusResultSet<Real, size_t>
+            nanoflann::RadiusResultSet<real_t, size_t>
             resultSet(_radius*_radius, indices_dists);
             
             kd_tree.findNeighbors(resultSet, query_pt, nanoflann::SearchParams());
@@ -421,14 +417,14 @@ private:
                 sum  += _radius - d_12;
                 dof_2 = mesh.node_ptr(indices_dists[r].first)->dof_number(_system.number(), 0, 0);
                 
-                _filter_map[dof_1].push_back(std::pair<uint_t, Real>(dof_2, _radius - d_12));
+                _filter_map[dof_1].push_back(std::pair<uint_t, real_t>(dof_2, _radius - d_12));
             }
             
             Assert1(sum > 0., sum, "Weight must be > 0.");
             
             // with the coefficients computed for dof_1, divide each coefficient
             // with the sum
-            std::vector<std::pair<uint_t, Real>>& vec = _filter_map[dof_1];
+            std::vector<std::pair<uint_t, real_t>>& vec = _filter_map[dof_1];
             for (uint_t i=0; i<vec.size(); i++) {
                 
                 vec[i].second /= sum;
@@ -474,7 +470,7 @@ private:
         libMesh::Point
         d;
         
-        Real
+        real_t
         d_12 = 0.,
         sum  = 0.;
         
@@ -501,7 +497,7 @@ private:
                     sum  += _radius - d_12;
                     dof_2 = (*node_it_2)->dof_number(_system.number(), 0, 0);
                     
-                    _filter_map[dof_1].push_back(std::pair<uint_t, Real>(dof_2, _radius - d_12));
+                    _filter_map[dof_1].push_back(std::pair<uint_t, real_t>(dof_2, _radius - d_12));
                 }
             }
             
@@ -509,11 +505,11 @@ private:
 
             // with the coefficients computed for dof_1, divide each coefficient
             // with the sum
-            std::vector<std::pair<uint_t, Real>>& vec = _filter_map[dof_1];
+            std::vector<std::pair<uint_t, real_t>>& vec = _filter_map[dof_1];
             for (uint_t i=0; i<vec.size(); i++) {
                 
                 vec[i].second /= sum;
-                Assert1(vec[i].second <= 1.,
+                Assert1(vec[i].second <= 1., vec[i].second,
                         "Normalized weight must be <= 1.");
             }
         }
@@ -540,13 +536,13 @@ private:
     /*!
      *   radius of the filter.
      */
-    Real _radius;
+    real_t _radius;
     
     
     /*!
      *   largest element size in the level set mesh
      */
-    Real _fe_size;
+    real_t _fe_size;
     
     /*!
      *   dof ids that are design variables. If a id is not in this set, then
@@ -558,7 +554,7 @@ private:
      *   Algebraic relation between filtered level set values and the
      *   design variables \f$ \tilde{\phi}_i = B_{ij} \phi_j \f$
      */
-    std::map<uint_t, std::vector<std::pair<uint_t, Real>>> _filter_map;
+    std::map<uint_t, std::vector<std::pair<uint_t, real_t>>> _filter_map;
 };
 
 
