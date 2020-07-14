@@ -16,6 +16,9 @@
 #include <mast/util/getpot_wrapper.hpp>
 #include <mast/mesh/libmesh/geometric_filter.hpp>
 
+// topology optimization benchmark cases
+#include <mast/mesh/generation/bracket2d.hpp>
+
 // libMesh includes
 #include <libmesh/replicated_mesh.h>
 #include <libmesh/elem.h>
