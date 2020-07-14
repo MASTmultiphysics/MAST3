@@ -20,6 +20,7 @@ target_include_directories(mast
             ${libMesh_INCLUDE_DIRS}
             ${EIGEN3_INCLUDE_DIR}
             ${NLOPT_INCLUDE_DIR}
+            ${ADOLC_INCLUDE_DIR}
             ${Boost_INCLUDE_DIRS}) # Could possibly move this into src/optimization since it is closer to where Boost is actually used.
 
 # Add libraries.
@@ -31,6 +32,7 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo" OR "${USE_LIBMESH_DEVEL}")
                 ${GCMMA_LIBRARY}
                 ${DOT_LIBRARY}
                 ${NLOPT_LIBRARY}
+                ${ADOLC_LIBRARY}
                 ${SNOPT_LIBRARY}
                 ${LAPACK_LIBRARIES}
                 ${PETSc_LIBRARIES}

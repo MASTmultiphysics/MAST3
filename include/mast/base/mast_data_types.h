@@ -24,6 +24,9 @@
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
 
+#if MAST_ENABLE_ADOLC == 1
+#include <adolc/adolc.h>
+#endif
 
 typedef double               real_t;
 typedef unsigned int         uint_t;

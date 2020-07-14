@@ -4,7 +4,8 @@ target_sources(mast_catch_tests
                ${CMAKE_CURRENT_LIST_DIR}/linear_strain_energy.cpp
                ${CMAKE_CURRENT_LIST_DIR}/pressure_load.cpp
                ${CMAKE_CURRENT_LIST_DIR}/stress_evaluation.cpp
-               ${CMAKE_CURRENT_LIST_DIR}/von_mises_stress.cpp)
+               ${CMAKE_CURRENT_LIST_DIR}/von_mises_stress_complex_step_sensitivity.cpp
+               ${CMAKE_CURRENT_LIST_DIR}/von_mises_stress_adolc_sensitivity.cpp)
 
 #Linear elasticity kernel
 add_test(NAME LinearElasticStrainEnergy
@@ -45,12 +46,22 @@ set_tests_properties(StressEvaluation
         FIXTURES_SETUP     StressEvaluation)
 
 
-#von Mises stress
-add_test(NAME vonMisesStress
-         COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "von_mises_stress")
-set_tests_properties(vonMisesStress
+#von Mises stress: complex-step sensitivity
+add_test(NAME vonMisesStressComplexStep
+         COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "von_mises_stress_complex_step")
+set_tests_properties(vonMisesStressComplexStep
         PROPERTIES
         LABELS "SEQ"
-        FIXTURES_SETUP     vonMisesStress)
+        FIXTURES_SETUP     vonMisesStressComplexStep)
 
+
+#von Mises stress: adol-c sensitivity
+if (ENABLE_ADOLC)
+    add_test(NAME vonMisesStressAdolC
+             COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "von_mises_stress_adolc")
+    set_tests_properties(vonMisesStressAdolC
+            PROPERTIES
+            LABELS "SEQ"
+            FIXTURES_SETUP     vonMisesStressAdolC)
+endif()
 

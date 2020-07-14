@@ -13,6 +13,7 @@ namespace Test {
 namespace Physics {
 namespace Elasticity {
 namespace vonMisesStress {
+namespace ComplexStep {
 
 template <typename ScalarType, uint_t Dim>
 using stress_vec_t = MAST::Physics::Elasticity::LinearContinuum::stress_vec_t<ScalarType, Dim>;
@@ -76,14 +77,15 @@ inline void test_von_mises_stress_sensitivity()  {
 
 
 
-TEST_CASE("von_mises_stress",
-          "[Physics][Elasticity][vonMisesStress]") {
+TEST_CASE("von_mises_stress_complex_step",
+          "[Physics][Elasticity][vonMisesStress][ComplexStep]") {
     
     test_von_mises_stress_sensitivity<2>();
     
     test_von_mises_stress_sensitivity<3>();
 }
 
+} // namespace ComplexStep
 } // namespace vonMisesStress
 } // namespace Elasticity
 } // namespace Physics
