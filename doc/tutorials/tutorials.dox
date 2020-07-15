@@ -4,6 +4,9 @@
   Several examples have been implemented in MAST, some of which have been
   ported as descriptive tutorials listed below.
 
+\subpage Code Structure
+  - \ref variational_statement_to_compute_kernels
+
 \subpage TutorialsStructural
   - \ref structural_example_1
   - \ref structural_example_2
