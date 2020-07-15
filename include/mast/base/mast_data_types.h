@@ -20,10 +20,23 @@
 #ifndef __mast__data_types__
 #define __mast__data_types__
 
+// MAST configuration
+#include <mast/base/mast_config.h>
+
 // Eigen includes
 #include <Eigen/Dense>
 #include <Eigen/SparseCore>
 
+#if MAST_ENABLE_ADOLC == 1
+// AdolC includes
+#include <adolc/adtl.h>
+// Eigen support for Adol-C
+#include <unsupported/Eigen/AdolcForward>
+// adouble for trace mode
+typedef adouble              adouble_t;
+// traceless adouble
+typedef adtl::adouble        adouble_tl_t;
+#endif
 
 typedef double               real_t;
 typedef unsigned int         uint_t;
