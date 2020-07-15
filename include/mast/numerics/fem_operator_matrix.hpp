@@ -284,6 +284,46 @@ set_shape_function(uint_t interpolated_var,
 
 
 
+//template <typename ScalarType>
+//template <typename VecType>
+//inline
+//void
+//MAST::Numerics::FEMOperatorMatrix<ScalarType>::
+//set_shape_function(uint_t interpolated_var,
+//                   uint_t discrete_var,
+//                   const ScalarType v,
+//                   const VecType& shape_func) {
+//    
+//    // make sure that reinit has been called.
+//    Assert0(_var_shape_functions.size(), "Object not initialized");
+//    
+//    // also make sure that the specified indices are within bounds
+//    Assert2(interpolated_var < _n_interpolated_vars,
+//            interpolated_var, _n_interpolated_vars,
+//            "Invalid interpolation variable index");
+//    Assert2(discrete_var < _n_discrete_vars,
+//            discrete_var, _n_discrete_vars,
+//            "Invalid discrete variable index");
+//    Assert2(shape_func.size() == _n_dofs_per_var,
+//            shape_func.size(), _n_dofs_per_var,
+//            "Invalid basis function vector size.");
+//    
+//    ScalarType* vec =
+//    _var_shape_functions[discrete_var*_n_interpolated_vars+interpolated_var];
+//    
+//    if (!vec) {
+//        
+//        vec = new ScalarType[shape_func.size()];
+//        _var_shape_functions[discrete_var*_n_interpolated_vars+interpolated_var] = vec;
+//    }
+//    
+//    for (uint_t i=0; i<_n_dofs_per_var; i++)
+//        vec[i] = v*shape_func(i);
+//}
+
+
+
+
 template <typename ScalarType>
 template <typename VecType>
 inline

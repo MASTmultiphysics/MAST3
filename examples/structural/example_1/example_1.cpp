@@ -27,7 +27,7 @@
 // Eigen includes
 #include <Eigen/SparseLU>
 
-// BEGIN_TRANSLATE Extension of bar
+// BEGIN_TRANSLATE Two-dimensional Linear Continuum with Pressure Load
 
 namespace MAST {
 namespace Examples {
