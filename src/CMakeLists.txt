@@ -32,7 +32,7 @@ if("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo" OR "${USE_LIBMESH_DEVEL}")
                 ${GCMMA_LIBRARY}
                 ${DOT_LIBRARY}
                 ${NLOPT_LIBRARY}
-                ${ADOLC_LIBRARY}
+                ${ADOLC_LIBRARIES}
                 ${SNOPT_LIBRARY}
                 ${LAPACK_LIBRARIES}
                 ${PETSc_LIBRARIES}
@@ -56,6 +56,7 @@ else()
                 ${GCMMA_LIBRARY}
                 ${DOT_LIBRARY}
                 ${NLOPT_LIBRARY}
+                ${ADOLC_LIBRARIES}
                 ${SNOPT_LIBRARY}
                 ${LAPACK_LIBRARIES}
                 ${PETSc_LIBRARIES}

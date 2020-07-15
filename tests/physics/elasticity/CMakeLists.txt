@@ -56,7 +56,7 @@ set_tests_properties(vonMisesStressComplexStep
 
 
 #von Mises stress: adol-c sensitivity
-if (ENABLE_ADOLC)
+if (MAST_ENABLE_ADOLC EQUAL 1)
     add_test(NAME vonMisesStressAdolC
              COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "von_mises_stress_adolc")
     set_tests_properties(vonMisesStressAdolC

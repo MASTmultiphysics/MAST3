@@ -51,22 +51,47 @@ inline void test_von_mises_stress_sensitivity()  {
                                                                                 stress_adj_mat,
                                                                                 vm_adj);
     
-    // extremely small perturbations do not work for this routine that involves
-    // square and square-root operations
-    for (uint_t i=0; i<n_strain; i++) {
+    {
+        // the number of directions for which we compute the sensitivity is = n_strain
+        stress_vec_t<adouble_tl_t, Dim>
+        stress_ad;
         
-        stress_vec_t<complex_t, Dim>
-        stress_c   = stress.template cast<complex_t>();
+        for (uint_t i=0; i<n_strain; i++) {
+            
+            stress_ad(i) = stress(i);
+            stress_ad(i).setADValue(&(dstress.data()[i]));
+        }
         
-        stress_c(i) += complex_t(0., sqrt(ComplexStepDelta));
-        
-        // linearized contribution of ith stress component
-        dvm_cs += dstress(i)/sqrt(ComplexStepDelta) *
-        MAST::Physics::Elasticity::LinearContinuum::vonMises_stress<complex_t, Dim>(stress_c).imag();
+        adouble_tl_t
+        vm_ad = MAST::Physics::Elasticity::LinearContinuum::vonMises_stress<adouble_tl_t, Dim>(stress_ad);
 
-        // linearized contribution of ith stress component
-        vm_adj_cs += stress_adj_mat.row(i)/sqrt(ComplexStepDelta) *
-        MAST::Physics::Elasticity::LinearContinuum::vonMises_stress<complex_t, Dim>(stress_c).imag();
+        dvm_cs = *vm_ad.getADValue();
+    }
+    
+    // adjoint
+    {
+        adtl::setNumDir(n_basis);
+
+        stress_vec_t<adouble_tl_t, Dim>
+        stress_ad;
+
+        // the adjoint can be computed in adol-c traceless vector mode
+        // with ndof components.
+        for (uint_t i=0; i<n_strain; i++) {
+
+            stress_ad(i) = stress(i);
+
+            for (uint_t j=0; j<n_basis; j++) {
+                
+                stress_ad(i).setADValue(j, stress_adj_mat(i,j));
+            }
+        }
+        
+        adouble_tl_t
+        vm_ad = MAST::Physics::Elasticity::LinearContinuum::vonMises_stress<adouble_tl_t, Dim>(stress_ad);
+        
+        for (uint_t j=0; j<n_basis; j++)
+            vm_adj_cs(j) = vm_ad.getADValue(j);
     }
     
     CHECK(dvm == Catch::Detail::Approx(dvm_cs));
