@@ -85,7 +85,7 @@
 *   approximated through numerical quadrature as
 *   \f[
 *        \int_{\Omega_e} \delta \mathbf{\epsilon} \cdot \mathbf{\sigma}~d\!\Omega \approx
-*        \sum_{i=1}^{N_\text{qp}} \text{det}(J) W_i
+*        \sum_{i=1}^{N_{\text{qp}}} \text{det}(J) W_i
 *        \left.\left(\delta \mathbf{\epsilon} \mathbf{C} \mathbf{\epsilon}\right)\right|_{i}.
 *   \f]
 *   This is implemented for linear continuum problems in
@@ -98,7 +98,7 @@
 *   approximated through numerical quadrature on a side of the element
 *   \f[
 *        \int_{{\Gamma_p}_e} \{\delta u, \delta v\}^T p \hat{n}~d\!\Gamma \approx
-*        \sum_{i=1}^{N_\text{qp}} \text{det}(J) W_i
+*        \sum_{i=1}^{N_{\text{qp}}} \text{det}(J) W_i
 *        \left.\left(\{\delta u, \delta v\}^T p \hat{n})\right|_{i}.
 *   \f]
 *   This is implemented for linear continuum problems in
