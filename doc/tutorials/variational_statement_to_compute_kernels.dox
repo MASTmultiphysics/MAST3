@@ -1,0 +1,108 @@
+/*!
+* \page variational_statement_to_compute_kernels Translating Variational Statement to Code
+*
+*   \tableofcontents
+*
+*   Finite element analysis (FEA) is a numerical approach to solving partial differential
+*   equations (PDEs).
+*   At its core FEA is a combination of a variational statement and a discretization approach.
+*   Both can be changed independent of the other to create a new FEA scheme with its own
+*   convergence and stability properties. It is expected that the Euler-Lagrange equations of
+*   the variational statement match the governing PDE to be solved.
+*
+*   The following discussion demonstrates how a variational statement is translated into code
+*   in MAST in order to enable sensitivity analysis using direct and adjoint approaches.
+*   Currently, MAST provides a collection of classes in MAST::Physics that implement the
+*   most commonly used variational statements in various disciplines.
+*
+*   \section membrane_pressure_load_fea Two-dimensional Elasticity
+*
+*   We will begin the discussion with structural FEA, which most commonly uses the principle of
+*   virtual work as the foundation for creation of a variational statement. The discretization,
+*   in most applications, uses first or second-order \f$ C-0 \f$ continuous Lagrange shape
+*   functions, although there are a multitude of examples of more elaborate approaches.
+*
+*   \subsection var_kernel_1  Variational Statement
+*   A variational statement for finite element analysis of a two-dimensional elasticity problem
+*   with a pressure load on the domain boundary is: find \f$ \{u, v\} \f$ such that for all
+*   \a admissible variations \f$ \{\delta u, \delta v\} \f$
+*   \f{eqnarray*}{
+*     \int_\Omega \delta \mathbf{\epsilon} \cdot \mathbf{\sigma}~d\!\Omega - \int_{\Gamma_p} \{\delta u, \delta v\}^T p \hat{n}~d\!\Gamma & = & 0.
+*   \f}
+*   Note the following:
+*       * \f$ \Omega \f$ is the domain of analysis,
+*       * \f$ \Gamma_p \f$ is the portion of domain boundary where pressure load \p p is applied,
+*       * \f$ \mathbf{\epsilon} \f$ is the strain that is related to the displacements \f$ \{u, v\} \f$ through the strain-displacement relations (more on this later),
+*       *  likewise, \f$ \delta \mathbf{\epsilon} \f$ is the variational strain that is related to the variational displacements \f$ \{\delta u, \delta v \} \f$,
+*       * \f$ \mathbf{\sigma} \f$ is related to the strain \f$ \mathbf{\epsilon} \f$ through the stress-strain relations, and
+*       * \a admissible variation assumes that the variational displacement is zero on the boundary with Dirichlet constraints.
+*       *  The Euler-Lagrange equations of this variational statement can be show to be the same as
+*   the elasticity equations (assuming zero body-force).
+*
+*   This variational statement consists of two terms: the first term corresponds to the strain
+*   energy with an integration over the domain, and the second terms corresponds to the pressure
+*   load which is integrated only over the boundary \f$ \Gamma_p \f$. During global assembly the
+*   first term will be computed and summed over all elements and the second term will be computed
+*   on sides of element that coincide with \f$ \Gamma_p \f$. Numerical quadrature is used to
+*   compute these terms on an element.
+*
+*   \subsubsection elasticity_strain_operator Strain-Displacement Operator
+*
+*   The strain-displacement relation for this problem is defined in Voigt notation as
+*   \f[
+*       \mathbf{\epsilon} =
+*         \left\{ \begin{array}{c}
+*            \epsilon_{xx} \\ \epsilon_{yy} \\ \gamma_{xy}
+*         \end{array} \right\}
+*       =
+*       \left[ \begin{array}{cc}
+*            \partial_x & 0 \\
+*            0 & \partial_y \\
+*            \partial_y & \partial_x \\
+*       \end{array} \right]
+*         \left\{ \begin{array}{c}
+*            u \\ v
+*         \end{array} \right\}
+*   \f]
+*   This is implemented in the function \ref MAST::Physics::Elasticity::LinearContinuum::strain "strain".
+*   This function is templated for scalar types used to compute the nodal locations and the
+*   degree-of-freedom coefficients in order to enable complex-step and automatic differentiation
+*   sensitivity analysis.
+*
+*   \subsubsection stress_strain_relation Stress-Strain Relation
+*   This discussion assumes a linear stress-strain relationship
+*   \f[
+*       \mathbf{\sigma} = \mathbf{C} \mathbf{\epsilon}.
+*   \f]
+*   A standard isotropic material law is defined in
+*   \ref MAST::Physics::Elasticity::IsotropicMaterialStiffness "IsotropicMaterialStiffness".
+*   This requires two material parameters, Youngs Modulus (\f$ E \f$) and Poisson's
+*   ratio (\f$ \nu \f$), which can be defined as \ref MAST::Base::ScalarConstant "ScalarConstant"
+*   to enable sensitivity analysis.
+*
+*   \subsubsection strain_energy_quadrature Strain-Energy Quadrature
+*   With this assumption the first term in the variational statement above can be
+*   approximated through numerical quadrature as
+*   \f[
+*        \int_{\Omega_e} \delta \mathbf{\epsilon} \cdot \mathbf{\sigma}~d\!\Omega \approx
+*        \sum_{i=1}^{N_{\textrm{qp}}} {\textrm{det}}(J) W_i
+*        \left.\left(\delta \mathbf{\epsilon} \mathbf{C} \mathbf{\epsilon}\right)\right|_{i}.
+*   \f]
+*   This is implemented for linear continuum problems in
+*   \ref MAST::Physics::Elasticity::LinearContinuum::StrainEnergy::compute "StrainEnergy::compute".
+*   The condensed form of this function (after stripping away the variable initializations)
+*   \include{lineno} code_snippets/physics_elasticity_linear_continuum_strain_energy.cpp
+*
+*   \subsubsection pressure_load_quadrature Pressure Load Quadrature
+*   The second term in the variational statement above can be
+*   approximated through numerical quadrature on a side of the element
+*   \f[
+*        \int_{{\Gamma_p}_e} \{\delta u, \delta v\}^T p \hat{n}~d\!\Gamma \approx
+*        \sum_{i=1}^{N_{\textrm{qp}}} \textrm{det}(J) W_i
+*        \left.\left(\{\delta u, \delta v\}^T p \hat{n}\right)\right|_{i}.
+*   \f]
+*   This is implemented for linear continuum problems in
+*   \ref MAST::Physics::Elasticity::SurfacePressureLoad::compute "SurfacePressureLoad::compute".
+*   The condensed form of this function (after stripping away the variable initializations)
+*   \include{lineno} code_snippets/physics_elasticity_linear_pressure_load.cpp
+*/
