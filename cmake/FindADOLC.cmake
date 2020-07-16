@@ -12,7 +12,9 @@ find_path(ADOLC_INCLUDE_DIR adolc/adolc.h
 find_library(ADOLC_LIBRARY
              NAMES adolc
              HINTS ${ADOLC_DIR}/lib
-                   ${ADOLC_DIR}/lib64)
+                   ${ADOLC_DIR}/lib64
+                   ${ADOLC_DIR}/x86_64-linux-gnu
+                   ${ADOLC_DIR}/i386-linux-gnu)
 
 # Set variables.
 include(FindPackageHandleStandardArgs)

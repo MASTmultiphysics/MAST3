@@ -17,6 +17,7 @@ if [ "${TRAVIS_OS_NAME}" = linux ]; then # Ubuntu Linux
     sudo apt-get -qq install -y libnetcdf11 libnetcdf-dev
     sudo apt-get -qq install -y libboost-all-dev
     sudo apt-get -qq install -y libeigen3-dev
+    sudo apt-get -qq install -y libadolc-dev
     sudo apt-get -qq install -y doxygen graphviz rsync
     sudo apt-get -qq install -y texlive-latex-base dvi2ps ghostscript
     sudo apt-get -qq install -y python3.7 python3.7-dev libpython3.7
@@ -33,6 +34,7 @@ if [ "${TRAVIS_OS_NAME}" = linux ]; then # Ubuntu Linux
     sudo apt-get -qq install -y libnetcdf11 libnetcdf-dev
     sudo apt-get -qq install -y libboost-all-dev
     sudo apt-get -qq install -y libeigen3-dev
+    sudo apt-get -qq install -y libadolc-dev
     sudo apt-get -qq install -y doxygen graphviz rsync
     sudo apt-get -qq install -y texlive-latex-base dvi2ps ghostscript
     sudo apt-get -qq install -y python3.7 python3.7-dev libpython3.7
