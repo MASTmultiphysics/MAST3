@@ -30,6 +30,7 @@
 #if MAST_ENABLE_ADOLC == 1
 // AdolC includes
 #include <adolc/adtl.h>
+#include <adolc/adouble.h>
 // Eigen support for Adol-C
 #include <unsupported/Eigen/AdolcForward>
 // adouble for trace mode
