@@ -91,7 +91,7 @@
 *   This is implemented for linear continuum problems in
 *   \ref MAST::Physics::Elasticity::LinearContinuum::StrainEnergy::compute "StrainEnergy::compute".
 *   The condensed form of this function (after stripping away the variable initializations)
-*   \include{lineno} code_snippets/physics_elasticity_linear_continuum_strain_energy.cpp
+*   \includelineno code_snippets/physics_elasticity_linear_continuum_strain_energy.cpp
 *
 *   \subsubsection pressure_load_quadrature Pressure Load Quadrature
 *   The second term in the variational statement above can be
@@ -104,5 +104,5 @@
 *   This is implemented for linear continuum problems in
 *   \ref MAST::Physics::Elasticity::SurfacePressureLoad::compute "SurfacePressureLoad::compute".
 *   The condensed form of this function (after stripping away the variable initializations)
-*   \include{lineno} code_snippets/physics_elasticity_linear_pressure_load.cpp
+*   \includelineno code_snippets/physics_elasticity_linear_pressure_load.cpp
 */
