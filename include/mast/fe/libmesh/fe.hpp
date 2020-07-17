@@ -87,7 +87,13 @@ public:
             _elem   = &e;
             _side   = -1;
             _q_side = nullptr;
+
+            _phi.setZero(this->n_basis(), this->n_q_points());
             
+            for (uint_t k=0; k<this->n_q_points(); k++)
+                for (uint_t j=0; j<this->n_basis(); j++)
+                    _phi(j, k) = _fe->get_phi()[j][k];
+
             if (_compute_dphi_dxi) {
 
                 _dphi_dxi.setZero(Dim*this->n_basis(), this->n_q_points());
@@ -130,6 +136,12 @@ public:
             _side   = s;
             _q_side = &q;
             
+            _phi.setZero(this->n_basis(), this->n_q_points());
+            
+            for (uint_t k=0; k<this->n_q_points(); k++)
+                for (uint_t j=0; j<this->n_basis(); j++)
+                    _phi(j, k) = _fe->get_phi()[j][k];
+
             if (_compute_dphi_dxi) {
                 
                 _dphi_dxi.setZero(Dim*this->n_basis(), this->n_q_points());
@@ -164,11 +176,25 @@ public:
     }
 
     inline phi_vec_t phi(uint_t qp) const {
-        
+
+        Assert2(qp < this->n_q_points(),
+                qp, this->n_q_points(),
+                "Invalid quadrature point index");
+
         return phi_vec_t(_phi.col(qp).data(), this->n_basis());
     }
 
-    inline scalar_t phi(uint_t qp, uint_t phi_i) const { return _fe->get_phi()[phi_i][qp];}
+    inline scalar_t phi(uint_t qp, uint_t phi_i) const {
+        
+        Assert2(phi_i < this->n_basis(),
+                phi_i, this->n_basis(),
+                "Invalid shape function index");
+        Assert2(qp < this->n_q_points(),
+                qp, this->n_q_points(),
+                "Invalid quadrature point index");
+        
+        return _phi(phi_i, qp);
+    }
     
     inline const dphi_dxi_vec_t
     dphi_dxi(uint_t qp, uint_t xi_i) const {
