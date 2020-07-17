@@ -27,6 +27,7 @@ public:
     using nodal_scalar_t = NodalScalarType;
     using scalar_t       = typename MAST::DeducedScalarType<BasisScalarType, NodalScalarType>::type;
     using fe_basis_t     = FEBasisType;
+    using phi_vec_t      = typename fe_basis_t::phi_vec_t;
     using dxi_dx_mat_t   = typename Eigen::Map<const typename Eigen::Matrix<NodalScalarType, ElemDim, SpatialDim>>;
     using dx_dxi_mat_t   = typename Eigen::Map<const typename Eigen::Matrix<NodalScalarType, SpatialDim, ElemDim>>;
     using dphi_dx_mat_t  = typename Eigen::Map<const typename Eigen::Matrix<NodalScalarType, Eigen::Dynamic, SpatialDim>>;
@@ -198,6 +199,12 @@ public:
         return _fe_basis->n_basis();
     }
     
+    inline phi_vec_t         phi(uint_t qp) const
+    {
+        Assert0(_fe_basis, "FE Basis not initialized.");
+         return _fe_basis->phi(qp);
+    }
+
     inline BasisScalarType         phi(uint_t qp, uint_t phi_i) const
     {
         Assert0(_fe_basis, "FE Basis not initialized.");
