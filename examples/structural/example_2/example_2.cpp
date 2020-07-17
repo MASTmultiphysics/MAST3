@@ -40,7 +40,8 @@ public:
     
     Context(libMesh::Parallel::Communicator& comm):
     q_type    (libMesh::QGAUSS),
-    q_order   (libMesh::FOURTH),
+    q_order_b (libMesh::FOURTH),
+    q_order_s (libMesh::SECOND),
     fe_order  (libMesh::SECOND),
     fe_family (libMesh::LAGRANGE),
     mesh      (new libMesh::ReplicatedMesh(comm)),
@@ -52,7 +53,7 @@ public:
 
 
         libMesh::MeshTools::Generation::build_square(*mesh,
-                                                     2, 2,
+                                                     5, 5,
                                                      0.0, 10.0,
                                                      0.0, 10.0,
                                                      libMesh::QUAD9);
@@ -84,7 +85,8 @@ public:
                                               elem->type() == libMesh::QUAD9);}
 
     libMesh::QuadratureType           q_type;
-    libMesh::Order                    q_order;
+    libMesh::Order                    q_order_b;
+    libMesh::Order                    q_order_s;
     libMesh::Order                    fe_order;
     libMesh::FEFamily                 fe_family;
     libMesh::ReplicatedMesh          *mesh;
@@ -132,7 +134,8 @@ public:
     using matrix_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     
 
-    ElemOps(libMesh::Order          q_order,
+    ElemOps(libMesh::Order          q_order_b,
+            libMesh::Order          q_order_s,
             libMesh::QuadratureType q_type,
             libMesh::Order          fe_order,
             libMesh::FEFamily       fe_family):
@@ -140,33 +143,44 @@ public:
     nu            (nullptr),
     press         (nullptr),
     thickness     (nullptr),
-    _fe_data      (nullptr),
-    _fe_var       (nullptr),
+    _fe_data_b    (nullptr),
+    _fe_data_s    (nullptr),
+    _fe_var_b     (nullptr),
+    _fe_var_s     (nullptr),
     _material     (nullptr),
     _section      (nullptr),
     _energy       (nullptr),
     _p_load       (nullptr) {
         
-        _fe_data       = new typename TraitsType::fe_data_t;
-        _fe_data->init(q_order, q_type, fe_order, fe_family);
-        _fe_var        = new typename TraitsType::fe_var_t;
+        _fe_data_b       = new typename TraitsType::fe_data_t;
+        _fe_data_b->init(q_order_b, q_type, fe_order, fe_family);
+        _fe_var_b        = new typename TraitsType::fe_var_t;
+
+        _fe_data_s       = new typename TraitsType::fe_data_t;
+        _fe_data_s->init(q_order_s, q_type, fe_order, fe_family);
+        _fe_var_s        = new typename TraitsType::fe_var_t;
 
         // associate variables with the shape functions
-        _fe_var->set_fe_shape_data(_fe_data->fe_derivative());
+        _fe_var_b->set_fe_shape_data(_fe_data_b->fe_derivative());
+        _fe_var_s->set_fe_shape_data(_fe_data_s->fe_derivative());
 
         // tell the FE computations which quantities are needed for computation
-        _fe_data->fe_basis().set_compute_dphi_dxi(true);
-        
-        _fe_data->fe_derivative().set_compute_dphi_dx(true);
-        _fe_data->fe_derivative().set_compute_detJxW(true);
-        
-        _fe_var->set_compute_du_dx(true);
-        
+        _fe_data_b->fe_basis().set_compute_dphi_dxi(true);
+        _fe_data_s->fe_basis().set_compute_dphi_dxi(true);
+
+        _fe_data_b->fe_derivative().set_compute_dphi_dx(true);
+        _fe_data_b->fe_derivative().set_compute_detJxW(true);
+        _fe_data_s->fe_derivative().set_compute_dphi_dx(true);
+        _fe_data_s->fe_derivative().set_compute_detJxW(true);
+
+        _fe_var_b->set_compute_du_dx(true);
+        _fe_var_s->set_compute_du_dx(true);
+
         // variables for physics
         E         = new typename TraitsType::modulus_t(72.e9);
         nu        = new typename TraitsType::nu_t(0.33);
         press     = new typename TraitsType::press_t(1.e2);
-        thickness = new typename TraitsType::thickness_t(3.0e-4);
+        thickness = new typename TraitsType::thickness_t(3.0e-2);
         _material = new typename TraitsType::material_t;
         _section  = new typename TraitsType::section_t;
         
@@ -178,8 +192,8 @@ public:
         _p_load->set_pressure(*press);
         
         // tell physics kernels about the FE discretization information
-        _energy->set_fe_var_data(*_fe_var);
-        _p_load->set_fe_var_data(*_fe_var, 0);
+        _energy->set_fe_var_data(*_fe_var_b, *_fe_var_s);
+        _p_load->set_fe_var_data(*_fe_var_b, 0);
     }
     
     virtual ~ElemOps() {
@@ -192,8 +206,10 @@ public:
         delete _material;
         delete nu;
         delete E;
-        delete _fe_var;
-        delete _fe_data;
+        delete _fe_var_b;
+        delete _fe_data_b;
+        delete _fe_var_s;
+        delete _fe_data_s;
     }
     
 
@@ -203,8 +219,10 @@ public:
                         typename TraitsType::element_vector_t &res,
                         typename TraitsType::element_matrix_t *jac) {
         
-        _fe_data->reinit(c);
-        _fe_var->init(c, v);
+        _fe_data_b->reinit(c);
+        _fe_var_b->init(c, v);
+        _fe_data_s->reinit(c);
+        _fe_var_s->init(c, v);
         _energy->compute(c, res, jac);
         _p_load->compute(c, res, jac);
     }
@@ -217,8 +235,10 @@ public:
                            typename TraitsType::element_vector_t &res,
                            typename TraitsType::element_matrix_t *jac) {
         
-        _fe_data->reinit(c);
-        _fe_var->init(c, v);
+        _fe_data_b->reinit(c);
+        _fe_var_b->init(c, v);
+        _fe_data_s->reinit(c);
+        _fe_var_s->init(c, v);
         _energy->derivative(c, f, res, jac);
         _p_load->derivative(c, f, res, jac);
     }
@@ -232,8 +252,10 @@ public:
 private:
 
     // variables for quadrature and shape function
-    typename TraitsType::fe_data_t         *_fe_data;
-    typename TraitsType::fe_var_t          *_fe_var;
+    typename TraitsType::fe_data_t         *_fe_data_b;
+    typename TraitsType::fe_data_t         *_fe_data_s;
+    typename TraitsType::fe_var_t          *_fe_var_b;
+    typename TraitsType::fe_var_t          *_fe_var_s;
     typename TraitsType::material_t        *_material;
     typename TraitsType::section_t         *_section;
     typename TraitsType::thickness_t       *_thickness;
@@ -377,9 +399,9 @@ int main(int argc, const char** argv) {
 
     MAST::Examples::Structural::Example2::Context c(init.comm());
     MAST::Examples::Structural::Example2::ElemOps<traits_t>
-    e_ops(c.q_order, c.q_type, c.fe_order, c.fe_family);
+    e_ops(c.q_order_b, c.q_order_s, c.q_type, c.fe_order, c.fe_family);
     MAST::Examples::Structural::Example2::ElemOps<traits_complex_t>
-    e_ops_c(c.q_order, c.q_type, c.fe_order, c.fe_family);
+    e_ops_c(c.q_order_b, c.q_order_s, c.q_type, c.fe_order, c.fe_family);
 
     typename traits_t::assembled_vector_t
     sol,

@@ -38,27 +38,7 @@ public:
         _init_coefficients(c, coeffs);
         _init_variables(c);
     }
-
     
-    inline void init_for_complex_step_sens(const ContextType& c,
-                                           const uint_t complex_step_dof) {
-        
-        this->_init_coefficients(c, nullptr);
-
-        // the provided coefficients shoudl not already have
-        Assert1(_coeff_vec.imag().norm() == 0.,
-                _coeff_vec.imag().norm(),
-                "Complex-step perturbation must start with zero complex part of coefficients.");
-        
-        // add complex-step perturbation to the complex-step dof specified
-        Assert2(complex_step_dof <= _coeff_vec.size(),
-                complex_step_dof, _coeff_vec.size(),
-                "Invalid dof number.");
-        this->_add_complex_perturbation(_coeff_vec, complex_step_dof);
-        
-        this->_init_variables(c);
-    }
-
     inline void clear_coeffs_and_vars() {
         
         _coeff_vec.setZero();
@@ -80,6 +60,8 @@ public:
         Assert0(_fe, "FE pointer not initialized.");
         return *_fe;
     }
+    
+    inline uint_t n_components() const { return NComponents;}
     
     inline uint_t n_q_points() const {
         
