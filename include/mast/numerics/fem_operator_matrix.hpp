@@ -61,9 +61,9 @@ public:
      *   for structural strain operator matrices. Note that when this method is used
      *   the user must set the matrix entries by calling set_shape_functions
      */
-    void reinit(uint_t n_interpolated_vars,
-                uint_t n_discrete_vars,
-                uint_t n_discrete_dofs_per_var);
+    inline void reinit(uint_t n_interpolated_vars,
+                       uint_t n_discrete_vars,
+                       uint_t n_discrete_dofs_per_var);
     
     /*!
      *   sets the shape function values for the block corresponding to
@@ -73,10 +73,16 @@ public:
      *    will be set equal to \p shape_func .
      */
     template <typename VecType>
-    void set_shape_function(uint_t interpolated_var,
-                            uint_t discrete_var,
-                            const VecType& shape_func);
+    inline void set_shape_function(uint_t interpolated_var,
+                                   uint_t discrete_var,
+                                   const VecType& shape_func);
     
+    template <typename VecType>
+    inline void
+    set_shape_function(uint_t interpolated_var,
+                       uint_t discrete_var,
+                       const ScalarType v,
+                       const VecType& shape_func);
     /*!
      *   this initializes all variables to use the same interpolation function.
      *   It is assumed that the number of discrete vars is same as the number of
@@ -84,57 +90,58 @@ public:
      *   for structural element inertial matrix calculations
      */
     template <typename VecType>
-    void reinit(uint_t n_interpolated_vars,
-                const VecType& shape_func);
+    inline void reinit(uint_t n_interpolated_vars,
+                       const VecType& shape_func);
     
     /*!
      *   res = [this] * v
      */
     template <typename T>
-    void vector_mult(T& res, const T& v) const;
+    inline void vector_mult(T& res, const T& v) const;
     
     
     /*!
      *   res = v^T * [this]
      */
     template <typename T1, typename T2>
-    void vector_mult_transpose(T1& res, const T2& v) const;
+    inline void vector_mult_transpose(T1& res, const T2& v) const;
     
     
     /*!
      *   [R] = [this] * [M]
      */
     template <typename T>
-    void right_multiply(T& r, const T& m) const;
+    inline void right_multiply(T& r, const T& m) const;
     
     
     /*!
      *   [R] = [this]^T * [M]
      */
     template <typename T>
-    void right_multiply_transpose(T& r, const T& m) const;
+    inline void right_multiply_transpose(T& r, const T& m) const;
     
     
     /*!
      *   [R] = [this]^T * [M]
      */
     template <typename T>
-    void right_multiply_transpose(T& r,
-                                  const MAST::Numerics::FEMOperatorMatrix<ScalarType>& m) const;
+    inline void right_multiply_transpose
+    (T& r,
+     const MAST::Numerics::FEMOperatorMatrix<ScalarType>& m) const;
     
     
     /*!
      *   [R] = [M] * [this]
      */
     template <typename T1, typename T2>
-    void left_multiply(T1& r, const T2& m) const;
+    inline void left_multiply(T1& r, const T2& m) const;
     
     
     /*!
      *   [R] = [M] * [this]^T
      */
     template <typename T>
-    void left_multiply_transpose(T& r, const T& m) const;
+    inline void left_multiply_transpose(T& r, const T& m) const;
     
     
 protected:
@@ -284,42 +291,42 @@ set_shape_function(uint_t interpolated_var,
 
 
 
-//template <typename ScalarType>
-//template <typename VecType>
-//inline
-//void
-//MAST::Numerics::FEMOperatorMatrix<ScalarType>::
-//set_shape_function(uint_t interpolated_var,
-//                   uint_t discrete_var,
-//                   const ScalarType v,
-//                   const VecType& shape_func) {
-//    
-//    // make sure that reinit has been called.
-//    Assert0(_var_shape_functions.size(), "Object not initialized");
-//    
-//    // also make sure that the specified indices are within bounds
-//    Assert2(interpolated_var < _n_interpolated_vars,
-//            interpolated_var, _n_interpolated_vars,
-//            "Invalid interpolation variable index");
-//    Assert2(discrete_var < _n_discrete_vars,
-//            discrete_var, _n_discrete_vars,
-//            "Invalid discrete variable index");
-//    Assert2(shape_func.size() == _n_dofs_per_var,
-//            shape_func.size(), _n_dofs_per_var,
-//            "Invalid basis function vector size.");
-//    
-//    ScalarType* vec =
-//    _var_shape_functions[discrete_var*_n_interpolated_vars+interpolated_var];
-//    
-//    if (!vec) {
-//        
-//        vec = new ScalarType[shape_func.size()];
-//        _var_shape_functions[discrete_var*_n_interpolated_vars+interpolated_var] = vec;
-//    }
-//    
-//    for (uint_t i=0; i<_n_dofs_per_var; i++)
-//        vec[i] = v*shape_func(i);
-//}
+template <typename ScalarType>
+template <typename VecType>
+inline
+void
+MAST::Numerics::FEMOperatorMatrix<ScalarType>::
+set_shape_function(uint_t interpolated_var,
+                   uint_t discrete_var,
+                   const ScalarType v,
+                   const VecType& shape_func) {
+    
+    // make sure that reinit has been called.
+    Assert0(_var_shape_functions.size(), "Object not initialized");
+    
+    // also make sure that the specified indices are within bounds
+    Assert2(interpolated_var < _n_interpolated_vars,
+            interpolated_var, _n_interpolated_vars,
+            "Invalid interpolation variable index");
+    Assert2(discrete_var < _n_discrete_vars,
+            discrete_var, _n_discrete_vars,
+            "Invalid discrete variable index");
+    Assert2(shape_func.size() == _n_dofs_per_var,
+            shape_func.size(), _n_dofs_per_var,
+            "Invalid basis function vector size.");
+    
+    ScalarType* vec =
+    _var_shape_functions[discrete_var*_n_interpolated_vars+interpolated_var];
+    
+    if (!vec) {
+        
+        vec = new ScalarType[shape_func.size()];
+        _var_shape_functions[discrete_var*_n_interpolated_vars+interpolated_var] = vec;
+    }
+    
+    for (uint_t i=0; i<_n_dofs_per_var; i++)
+        vec[i] = v*shape_func(i);
+}
 
 
 
