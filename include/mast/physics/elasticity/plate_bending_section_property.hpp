@@ -4,7 +4,7 @@
 
 // MAST includes
 #include <mast/base/mast_data_types.h>
-
+#include <mast/base/exceptions.hpp>
 
 namespace MAST {
 namespace Physics {

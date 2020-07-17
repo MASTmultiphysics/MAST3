@@ -1,6 +1,7 @@
 target_sources(mast_catch_tests
                PRIVATE
                ${CMAKE_CURRENT_LIST_DIR}/isotropic_stiffness.cpp
+               ${CMAKE_CURRENT_LIST_DIR}/plate_bending_section_property_complex_step_sensitivity.cpp
                ${CMAKE_CURRENT_LIST_DIR}/linear_strain_energy.cpp
                ${CMAKE_CURRENT_LIST_DIR}/pressure_load.cpp
                ${CMAKE_CURRENT_LIST_DIR}/stress_evaluation.cpp
@@ -34,6 +35,15 @@ set_tests_properties(IsotropicLinearMaterial
         LABELS "SEQ"
         #FIXTURES_REQUIRED  "Element_Property_Card_1D_Structural;libMesh_Mesh_Generation_1d"
         FIXTURES_SETUP     IsotropicLinearMaterial)
+
+
+#plate bending section property
+add_test(NAME PlateBendingSectionPropertyComplexStep
+         COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "plate_bending_section_complex_step")
+set_tests_properties(PlateBendingSectionPropertyComplexStep
+        PROPERTIES
+        LABELS "SEQ"
+        FIXTURES_SETUP     PlateBendingSectionPropertyComplexStep)
 
 
 #stress evaluation
