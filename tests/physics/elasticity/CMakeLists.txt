@@ -1,5 +1,6 @@
 target_sources(mast_catch_tests
                PRIVATE
+               ${CMAKE_CURRENT_LIST_DIR}/flat_shell_face_pressure_load_complex_step_sensitivity.cpp
                ${CMAKE_CURRENT_LIST_DIR}/isotropic_stiffness.cpp
                ${CMAKE_CURRENT_LIST_DIR}/linear_strain_energy.cpp
                ${CMAKE_CURRENT_LIST_DIR}/mindlin_plate_strain_energy_complex_step_sensitivity.cpp
@@ -26,6 +27,15 @@ set_tests_properties(LinearPressureLoad
         LABELS "SEQ"
         #FIXTURES_REQUIRED  "Element_Property_Card_1D_Structural;libMesh_Mesh_Generation_1d"
         FIXTURES_SETUP     LinearPressureLoad)
+
+#Flat shellface pressure load kernel
+add_test(NAME FlatShellFaceLinearPressureLoad
+         COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "flat_shell_face_linear_pressure_load")
+set_tests_properties(FlatShellFaceLinearPressureLoad
+        PROPERTIES
+        LABELS "SEQ"
+        #FIXTURES_REQUIRED  "Element_Property_Card_1D_Structural;libMesh_Mesh_Generation_1d"
+        FIXTURES_SETUP     FlatShellFaceLinearPressureLoad)
 
 
 #Isotropic linear material
