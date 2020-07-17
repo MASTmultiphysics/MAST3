@@ -30,12 +30,12 @@ inplane_strain(const FEVarType&                                    fe_var,
     // make sure all matrices are the right size
     Assert1(epsilon.size() == 3,
             epsilon.size(),
-            "Strain vector for 2D continuum strain should be 3");
+            "Strain vector dimension for inplane strain of Mindlin plate should be 3");
     Assert1(Bmat.m() == 3,
             Bmat.m(),
-            "Strain vector for 2D continuum strain should be 3");
-    Assert2(Bmat.n() == 2*fe.n_basis(),
-            Bmat.n(), 2*fe.n_basis(),
+            "Strain vector dimension for inplane strain of Mindlin plate should be 3");
+    Assert2(Bmat.n() == 3*fe.n_basis(),
+            Bmat.n(), 3*fe.n_basis(),
             "Incompatible Operator size.");
     
     
@@ -58,44 +58,31 @@ template <typename NodalScalarType, typename VarScalarType, typename FEVarType>
 inline void
 transverse_shear_strain(const FEVarType&                                    fe_var,
                         const uint_t                                        qp,
-                        const VarScalarType                                 z,
-                        typename Eigen::Matrix<VarScalarType, 3, 1>        &epsilon,
+                        typename Eigen::Matrix<VarScalarType, 2, 1>        &epsilon,
                         MAST::Numerics::FEMOperatorMatrix<NodalScalarType>& Bmat) {
     
-    // initialize the strain operator
-    for ( unsigned int i_nd=0; i_nd<phi.size(); i_nd++ )
-        phi_vec(i_nd) = dphi[i_nd][qp](0);  // dphi/dx
+    epsilon.setZero();
     
-    Bmat.set_shape_function(0, 0, fe.dphi_dx(qp, 0)); // gamma-xz:  dw/dx
+    const typename FEVarType::fe_shape_deriv_t
+    &fe = fe_var.get_fe_shape_data();
     
-    for ( unsigned int i_nd=0; i_nd<phi.size(); i_nd++ )
-        phi_vec(i_nd) = dphi[i_nd][qp](1);  // dphi/dy
-    
-    Bmat.set_shape_function(1, 0, fe.dphi_dx(qp, 1)); // gamma-yz : dw/dy
-    
-    for ( unsigned int i_nd=0; i_nd<phi.size(); i_nd++ )
-        phi_vec(i_nd) = phi[i_nd][qp];  // phi
-    
-    Bmat.set_shape_function(0, 4, phi_vec); // gamma-xz:  thetay
-    phi_vec  *= -1.0;
-    Bmat.set_shape_function(1, 3, phi_vec); // gamma-yz : thetax
-    
-    
-    // now add the transverse shear component
-    Bmat.vector_mult(vec_2, _structural_elem.local_solution());
-    vec_2 = material * vec_2;
-    Bmat.vector_mult_transpose(vec_n2, vec_2);
-    local_f += JxW[qp] * vec_n2;
-    
-    if (request_jacobian) {
-        
-        // now add the transverse shear component
-        Bmat.left_multiply(mat_2n2, material);
-        Bmat.right_multiply_transpose(mat_n2n2, mat_2n2);
-        local_jac += JxW[qp] * mat_n2n2;
-    }
-}
+    // make sure all matrices are the right size
+    Assert1(epsilon.size() == 2,
+            epsilon.size(),
+            "Strain vector dimension for transverse shear strain of Mindlin plate should be 2");
+    Assert1(Bmat.m() == 2,
+            Bmat.m(),
+            "Strain vector dimension for transverse shear strain of Mindlin plate should be 2");
+    Assert2(Bmat.n() == 3*fe.n_basis(),
+            Bmat.n(), 3*fe.n_basis(),
+            "Incompatible Operator size.");
 
+    Bmat.set_shape_function(0, 2,  1., fe.phi(qp)); // gamma-xz:  thetay
+    Bmat.set_shape_function(1, 1, -1., fe.phi(qp)); // gamma-yz : thetax
+
+    epsilon(0) = fe_var.du_dx(qp, 0, 0) + fe_var.u(qp, 2);  // gamma-xz = dw/dx + ty
+    epsilon(1) = fe_var.du_dx(qp, 0, 1) - fe_var.u(qp, 1);  // gamma-xz = dw/dy - tx
+}
 
 }  // namespace MindlinPlate
 }  // namespace Elasticity
