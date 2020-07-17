@@ -4,7 +4,6 @@
 #include <mast/util/perf_log.hpp>
 #include <mast/fe/eval/fe_basis_derivatives.hpp>
 #include <mast/fe/libmesh/fe_data.hpp>
-#include <mast/fe/libmesh/fe_side_data.hpp>
 #include <mast/fe/fe_var_data.hpp>
 #include <mast/physics/elasticity/isotropic_stiffness.hpp>
 #include <mast/base/scalar_constant.hpp>
@@ -48,8 +47,7 @@ public:
     eq_sys    (new libMesh::EquationSystems(*mesh)),
     sys       (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("structural")),
     elem      (nullptr),
-    qp        (-1),
-    p_side_id (1) {
+    qp        (-1) {
 
 
 
@@ -59,11 +57,12 @@ public:
                                                      0.0, 10.0,
                                                      libMesh::QUAD9);
 
-        sys->add_variable("u_x", libMesh::FEType(fe_order, fe_family));
-        sys->add_variable("u_y", libMesh::FEType(fe_order, fe_family));
+        sys->add_variable("w", libMesh::FEType(fe_order, fe_family));
+        sys->add_variable("t_x", libMesh::FEType(fe_order, fe_family));
+        sys->add_variable("t_y", libMesh::FEType(fe_order, fe_family));
 
         sys->get_dof_map().add_dirichlet_boundary
-        (libMesh::DirichletBoundary({3}, {0, 1}, libMesh::ZeroFunction<real_t>()));
+        (libMesh::DirichletBoundary({3}, {0, 1, 2}, libMesh::ZeroFunction<real_t>()));
         
         eq_sys->init();
 
@@ -83,8 +82,6 @@ public:
     inline bool elem_is_quad() const {return (elem->type() == libMesh::QUAD4 ||
                                               elem->type() == libMesh::QUAD8 ||
                                               elem->type() == libMesh::QUAD9);}
-    inline bool if_compute_pressure_load_on_side(const uint_t s)
-    { return mesh->boundary_info->has_boundary_id(elem, s, p_side_id);}
 
     libMesh::QuadratureType           q_type;
     libMesh::Order                    q_order;
@@ -95,7 +92,6 @@ public:
     libMesh::NonlinearImplicitSystem *sys;
     const libMesh::Elem              *elem;
     uint_t                            qp;
-    uint_t                            p_side_id;
 };
 
 
@@ -109,8 +105,7 @@ struct Traits {
     using fe_basis_t        = typename MAST::FEBasis::libMeshWrapper::FEBasis<BasisScalarType, 2>;
     using fe_shape_t        = typename MAST::FEBasis::Evaluation::FEShapeDerivative<BasisScalarType, NodalScalarType, 2, 2, fe_basis_t>;
     using fe_data_t         = typename MAST::FEBasis::libMeshWrapper::FEData<2, fe_basis_t, fe_shape_t>;
-    using fe_side_data_t    = typename MAST::FEBasis::libMeshWrapper::FESideData<2, fe_basis_t, fe_shape_t>;
-    using fe_var_t          = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, 2, 2, Context, fe_shape_t>;
+    using fe_var_t          = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, 3, 2, Context, fe_shape_t>;
     using modulus_t         = typename MAST::Base::ScalarConstant<SolScalarType>;
     using nu_t              = typename MAST::Base::ScalarConstant<SolScalarType>;
     using press_t           = typename MAST::Base::ScalarConstant<SolScalarType>;
@@ -146,9 +141,7 @@ public:
     press         (nullptr),
     thickness     (nullptr),
     _fe_data      (nullptr),
-    _fe_side_data (nullptr),
     _fe_var       (nullptr),
-    _fe_side_var  (nullptr),
     _material     (nullptr),
     _section      (nullptr),
     _energy       (nullptr),
@@ -156,14 +149,10 @@ public:
         
         _fe_data       = new typename TraitsType::fe_data_t;
         _fe_data->init(q_order, q_type, fe_order, fe_family);
-        _fe_side_data  = new typename TraitsType::fe_side_data_t;
-        _fe_side_data->init(q_order, q_type, fe_order, fe_family);
         _fe_var        = new typename TraitsType::fe_var_t;
-        _fe_side_var   = new typename TraitsType::fe_var_t;
 
         // associate variables with the shape functions
         _fe_var->set_fe_shape_data(_fe_data->fe_derivative());
-        _fe_side_var->set_fe_shape_data(_fe_side_data->fe_derivative());
 
         // tell the FE computations which quantities are needed for computation
         _fe_data->fe_basis().set_compute_dphi_dxi(true);
@@ -171,10 +160,6 @@ public:
         _fe_data->fe_derivative().set_compute_dphi_dx(true);
         _fe_data->fe_derivative().set_compute_detJxW(true);
         
-        _fe_side_data->fe_basis().set_compute_dphi_dxi(true);
-        _fe_side_data->fe_derivative().set_compute_normal(true);
-        _fe_side_data->fe_derivative().set_compute_detJxW(true);
-
         _fe_var->set_compute_du_dx(true);
         
         // variables for physics
@@ -194,7 +179,7 @@ public:
         
         // tell physics kernels about the FE discretization information
         _energy->set_fe_var_data(*_fe_var);
-        _p_load->set_fe_var_data(*_fe_side_var);
+        _p_load->set_fe_var_data(*_fe_var);
     }
     
     virtual ~ElemOps() {
@@ -208,8 +193,6 @@ public:
         delete nu;
         delete E;
         delete _fe_var;
-        delete _fe_side_var;
-        delete _fe_side_data;
         delete _fe_data;
     }
     
@@ -223,14 +206,7 @@ public:
         _fe_data->reinit(c);
         _fe_var->init(c, v);
         _energy->compute(c, res, jac);
-        
-        for (uint_t s=0; s<c.elem->n_sides(); s++)
-            if (c.if_compute_pressure_load_on_side(s)) {
-                                
-                _fe_side_data->reinit_for_side(c, s);
-                _fe_side_var->init(c, v);
-                _p_load->compute(c, res, jac);
-            }
+        _p_load->compute(c, res, jac);
     }
 
     
@@ -244,14 +220,7 @@ public:
         _fe_data->reinit(c);
         _fe_var->init(c, v);
         _energy->derivative(c, f, res, jac);
-        
-        for (uint_t s=0; s<c.elem->n_sides(); s++)
-            if (c.if_compute_pressure_load_on_side(s)) {
-                                
-                _fe_side_data->reinit_for_side(c, s);
-                _fe_side_var->init(c, v);
-                _p_load->derivative(c, f, res, jac);
-            }
+        _p_load->derivative(c, f, res, jac);
     }
 
     // parameters
@@ -264,9 +233,7 @@ private:
 
     // variables for quadrature and shape function
     typename TraitsType::fe_data_t         *_fe_data;
-    typename TraitsType::fe_side_data_t    *_fe_side_data;
     typename TraitsType::fe_var_t          *_fe_var;
-    typename TraitsType::fe_var_t          *_fe_side_var;
     typename TraitsType::material_t        *_material;
     typename TraitsType::section_t         *_section;
     typename TraitsType::thickness_t       *_thickness;
