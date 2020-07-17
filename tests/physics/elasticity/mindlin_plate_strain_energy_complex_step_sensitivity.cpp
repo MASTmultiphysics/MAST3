@@ -5,6 +5,7 @@
 // MAST includes
 #include <mast/fe/libmesh/fe.hpp>
 #include <mast/fe/eval/fe_basis_derivatives.hpp>
+#include <mast/fe/libmesh/fe_data.hpp>
 #include <mast/fe/fe_var_data.hpp>
 #include <mast/physics/elasticity/isotropic_stiffness.hpp>
 #include <mast/physics/elasticity/plate_bending_section_property.hpp>
@@ -47,6 +48,7 @@ struct Traits {
     using quadrature_t      = MAST::Quadrature::libMeshWrapper::Quadrature<BasisScalarType, 2>;
     using fe_basis_t        = typename MAST::FEBasis::libMeshWrapper::FEBasis<BasisScalarType, 2>;
     using fe_shape_t        = typename MAST::FEBasis::Evaluation::FEShapeDerivative<BasisScalarType, NodalScalarType, 2, 2, fe_basis_t>;
+    using fe_data_t         = typename MAST::FEBasis::libMeshWrapper::FEData<2, fe_basis_t, fe_shape_t>;
     using fe_var_t          = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, 3, 2, Context, fe_shape_t>;
     using modulus_t         = typename MAST::Base::ScalarConstant<scalar_t>;
     using nu_t              = typename MAST::Base::ScalarConstant<scalar_t>;
@@ -61,36 +63,48 @@ template <typename Traits>
 struct ElemOps {
   
     ElemOps():
-    q        (new typename Traits::quadrature_t(libMesh::QGAUSS, libMesh::FOURTH)),
-    fe       (new typename Traits::fe_basis_t(libMesh::FEType(libMesh::FIRST, libMesh::LAGRANGE))),
-    fe_deriv (new typename Traits::fe_shape_t),
-    fe_var   (new typename Traits::fe_var_t),
-    E        (new typename Traits::modulus_t(72.e9)),
-    nu       (new typename Traits::nu_t(0.33)),
-    th       (new typename Traits::thickness_t(0.003)),
-    material (new typename Traits::material_t),
-    section  (new typename Traits::section_t),
-    strain_e (new typename Traits::energy_t) {
+    fe_data_b  (new typename Traits::fe_data_t),
+    fe_data_s  (new typename Traits::fe_data_t),
+    fe_var_b   (new typename Traits::fe_var_t),
+    fe_var_s   (new typename Traits::fe_var_t),
+    E          (new typename Traits::modulus_t(72.e9)),
+    nu         (new typename Traits::nu_t(0.33)),
+    th         (new typename Traits::thickness_t(0.003)),
+    material   (new typename Traits::material_t),
+    section    (new typename Traits::section_t),
+    strain_e   (new typename Traits::energy_t) {
+        
+        fe_data_b->init(libMesh::FOURTH, libMesh::QGAUSS, libMesh::FIRST, libMesh::LAGRANGE);
+        fe_data_s->init(libMesh::FIRST, libMesh::QGAUSS, libMesh::FIRST, libMesh::LAGRANGE);
         
         // initialize the shape function derivatives wrt reference coordinates
-        fe->set_compute_dphi_dxi(true);
+        fe_data_b->fe_basis().set_compute_dphi_dxi(true);
+        fe_data_s->fe_basis().set_compute_dphi_dxi(true);
         
         // initialize the shape function derivatives wrt spatial coordinates
-        fe_deriv->set_compute_dphi_dx(true);
-        fe_deriv->set_compute_detJ(true);
-        fe_deriv->set_compute_detJxW(true);
-        fe_deriv->set_compute_Jac_inverse(true);
-        fe_deriv->set_fe_basis(*fe);
+        fe_data_b->fe_derivative().set_compute_dphi_dx(true);
+        fe_data_b->fe_derivative().set_compute_detJ(true);
+        fe_data_b->fe_derivative().set_compute_detJxW(true);
+        fe_data_b->fe_derivative().set_compute_Jac_inverse(true);
+
+        fe_data_s->fe_derivative().set_compute_dphi_dx(true);
+        fe_data_s->fe_derivative().set_compute_detJ(true);
+        fe_data_s->fe_derivative().set_compute_detJxW(true);
+        fe_data_s->fe_derivative().set_compute_Jac_inverse(true);
 
         // initialize the variable data
-        fe_var->set_compute_du_dx(true);
-        fe_var->set_fe_shape_data(*fe_deriv);
+        fe_var_b->set_compute_du_dx(true);
+        fe_var_s->set_compute_du_dx(true);
+        fe_var_b->set_fe_shape_data(fe_data_b->fe_derivative());
+        fe_var_s->set_fe_shape_data(fe_data_s->fe_derivative());
+
         
+
         material->set_modulus_and_nu(*E, *nu);
         section->set_material_and_thickness(*material, *th);
 
         strain_e->set_section_property(*section);
-        strain_e->set_fe_var_data(*fe_var);
+        strain_e->set_fe_var_data(*fe_var_b, *fe_var_s);
     }
     
     virtual ~ElemOps() {}
@@ -100,15 +114,16 @@ struct ElemOps {
     inline void init(const libMesh::Elem* e) {
         
         c.elem = e;
-        fe->reinit(*e, *q);
-        fe_deriv->reinit(c);
+        fe_data_b->reinit(c);
+        fe_data_s->reinit(c);
     }
     
     inline void compute(const typename Traits::vector_t& sol,
                         typename Traits::vector_t& res,
                         typename Traits::matrix_t* jac=nullptr) {
 
-        fe_var->init(c, sol);
+        fe_var_b->init(c, sol);
+        fe_var_s->init(c, sol);
         strain_e->compute(c, res, jac);
     }
 
@@ -120,10 +135,10 @@ struct ElemOps {
         strain_e->derivative(c, f, res, jac);
     }
     
-    std::unique_ptr<typename Traits::quadrature_t>   q;
-    std::unique_ptr<typename Traits::fe_basis_t>     fe;
-    std::unique_ptr<typename Traits::fe_shape_t>     fe_deriv;
-    std::unique_ptr<typename Traits::fe_var_t>       fe_var;
+    std::unique_ptr<typename Traits::fe_data_t>      fe_data_b;
+    std::unique_ptr<typename Traits::fe_data_t>      fe_data_s;
+    std::unique_ptr<typename Traits::fe_var_t>       fe_var_b;
+    std::unique_ptr<typename Traits::fe_var_t>       fe_var_s;
     std::unique_ptr<typename Traits::modulus_t>      E;
     std::unique_ptr<typename Traits::nu_t>           nu;
     std::unique_ptr<typename Traits::thickness_t>    th;
