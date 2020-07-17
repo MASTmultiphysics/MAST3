@@ -23,7 +23,6 @@ public:
     using basis_scalar_t   = typename FEVarType::fe_shape_deriv_t::scalar_t;
     using vector_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using matrix_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
-    using section_scalar_t = typename SectionPropertyType::scalar_t;
     using fe_shape_deriv_t = typename FEVarType::fe_shape_deriv_t;
     static const uint_t
     n_strain               = MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<Dim>::value;
