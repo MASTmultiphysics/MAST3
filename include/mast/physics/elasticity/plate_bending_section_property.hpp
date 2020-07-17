@@ -58,7 +58,7 @@ public:
 
         Assert0(_material && _th, "Material and thickness not provided");
 
-        const typename MaterialType::value_t
+        typename MaterialType::value_t
         dm;
         
         _material->value(c, m);

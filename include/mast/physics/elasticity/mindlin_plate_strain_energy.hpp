@@ -158,41 +158,88 @@ public:
         const typename FEVarType::fe_shape_deriv_t
         &fe = _fe_var_data->get_fe_shape_data();
 
-//        typename Eigen::Matrix<scalar_t, n_strain, 1>
-//        epsilon,
-//        stress;
-//        vector_t
-//        vec     = vector_t::Zero(Dim*fe.n_basis());
-//
-//        typename SectionPropertyType::value_t
-//        mat;
-//        matrix_t
-//        mat1 = matrix_t::Zero(n_strain, Dim*fe.n_basis()),
-//        mat2 = matrix_t::Zero(Dim*fe.n_basis(), Dim*fe.n_basis());
-//
-//        MAST::Numerics::FEMOperatorMatrix<scalar_t>
-//        Bxmat;
-//        Bxmat.reinit(n_strain, Dim, fe.n_basis());
-//
-//
-//        for (uint_t i=0; i<fe.n_q_points(); i++) {
-//
-//            c.qp = i;
-//
-//            _property->derivative(c, f, mat);
-//            MAST::Physics::Elasticity::LinearContinuum::strain
-//            <scalar_t, scalar_t, FEVarType, Dim>(*_fe_var_data, i, epsilon, Bxmat);
-//            stress = mat * epsilon;
-//            Bxmat.vector_mult_transpose(vec, stress);
-//            res += fe.detJxW(i) * vec;
-//
-//            if (jac) {
-//
-//                Bxmat.left_multiply(mat1, mat);
-//                Bxmat.right_multiply_transpose(mat2, mat1);
-//                (*jac) += fe.detJxW(i) * mat2;
-//            }
-//        }
+        
+        // process the inplane strain components
+        {
+            typename Eigen::Matrix<scalar_t, 3, 1>
+            epsilon,
+            stress;
+            vector_t
+            vec     = vector_t::Zero(3*fe.n_basis());
+            
+            typename SectionPropertyType::inplane_value_t
+            mat;
+            
+            matrix_t
+            mat1 = matrix_t::Zero(3, 3*fe.n_basis()),
+            mat2 = matrix_t::Zero(3*fe.n_basis(), 3*fe.n_basis());
+            
+            MAST::Numerics::FEMOperatorMatrix<scalar_t>
+            Bxmat;
+            Bxmat.reinit(3, 3, fe.n_basis());
+            
+            
+            for (uint_t i=0; i<fe.n_q_points(); i++) {
+                
+                c.qp = i;
+                
+                _property->inplane_derivative(c, f, mat);
+                MAST::Physics::Elasticity::MindlinPlate::inplane_strain
+                <scalar_t, scalar_t, FEVarType>
+                (*_fe_var_data, i, 1., epsilon, Bxmat);
+                stress = mat * epsilon;
+                Bxmat.vector_mult_transpose(vec, stress);
+                res += fe.detJxW(i) * vec;
+                
+                if (jac) {
+                    
+                    Bxmat.left_multiply(mat1, mat);
+                    Bxmat.right_multiply_transpose(mat2, mat1);
+                    (*jac) += fe.detJxW(i) * mat2;
+                }
+            }
+        }
+        
+        // process the transverse shear strain components
+        {
+            typename Eigen::Matrix<scalar_t, 2, 1>
+            epsilon,
+            stress;
+            vector_t
+            vec     = vector_t::Zero(3*fe.n_basis());
+            
+            typename SectionPropertyType::shear_value_t
+            mat;
+            
+            matrix_t
+            mat1 = matrix_t::Zero(2, 3*fe.n_basis()),
+            mat2 = matrix_t::Zero(3*fe.n_basis(), 3*fe.n_basis());
+            
+            MAST::Numerics::FEMOperatorMatrix<scalar_t>
+            Bxmat;
+            Bxmat.reinit(2, 3, fe.n_basis());
+            
+            
+            for (uint_t i=0; i<fe.n_q_points(); i++) {
+                
+                c.qp = i;
+                
+                _property->shear_derivative(c, f, mat);
+                MAST::Physics::Elasticity::MindlinPlate::transverse_shear_strain
+                <scalar_t, scalar_t, FEVarType>
+                (*_fe_var_data, i, epsilon, Bxmat);
+                stress = mat * epsilon;
+                Bxmat.vector_mult_transpose(vec, stress);
+                res += fe.detJxW(i) * vec;
+                
+                if (jac) {
+                    
+                    Bxmat.left_multiply(mat1, mat);
+                    Bxmat.right_multiply_transpose(mat2, mat1);
+                    (*jac) += fe.detJxW(i) * mat2;
+                }
+            }
+        }
     }
 
     
