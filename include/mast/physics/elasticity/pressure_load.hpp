@@ -24,7 +24,11 @@ public:
     using vector_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using matrix_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
 
-    SurfacePressureLoad() { }
+    SurfacePressureLoad():
+    _section       (nullptr),
+    _pressure      (nullptr),
+    _fe_var_data   (nullptr)
+    { }
     
     virtual ~SurfacePressureLoad() { }
     
