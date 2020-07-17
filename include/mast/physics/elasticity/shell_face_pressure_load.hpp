@@ -41,11 +41,15 @@ public:
      *
      *  For a 2D element the surface normal is assumed to be along the +ve \a z-axis so that a
      *  positive pressure results in a force along this direction.
+     *
+     *  \p displ_index is the component of variable in \p fe that serves as the transverse displacement
+     *   used to compute work done. 
      */
-    inline void set_fe_var_data(const FEVarType& fe) {
+    inline void set_fe_var_data(const FEVarType& fe,
+                                const uint_t     displ_index) {
         
         _fe_var_data = &fe;
-        //_displ_index = displ_index;
+        _displ_index = displ_index;
     }
 
     inline uint_t n_dofs() const {

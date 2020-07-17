@@ -179,7 +179,7 @@ public:
         
         // tell physics kernels about the FE discretization information
         _energy->set_fe_var_data(*_fe_var);
-        _p_load->set_fe_var_data(*_fe_var);
+        _p_load->set_fe_var_data(*_fe_var, 0);
     }
     
     virtual ~ElemOps() {

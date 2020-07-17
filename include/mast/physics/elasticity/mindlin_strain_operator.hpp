@@ -77,11 +77,14 @@ transverse_shear_strain(const FEVarType&                                    fe_v
             Bmat.n(), 3*fe.n_basis(),
             "Incompatible Operator size.");
 
+    Bmat.set_shape_function(0, 0, fe.dphi_dx(qp, 0)); // gamma-xz:  dw/dx
+    Bmat.set_shape_function(1, 0, fe.dphi_dx(qp, 1)); // gamma-yz : dw/dy
+
     Bmat.set_shape_function(0, 2,  1., fe.phi(qp)); // gamma-xz:  thetay
     Bmat.set_shape_function(1, 1, -1., fe.phi(qp)); // gamma-yz : thetax
 
     epsilon(0) = fe_var.du_dx(qp, 0, 0) + fe_var.u(qp, 2);  // gamma-xz = dw/dx + ty
-    epsilon(1) = fe_var.du_dx(qp, 0, 1) - fe_var.u(qp, 1);  // gamma-xz = dw/dy - tx
+    epsilon(1) = fe_var.du_dx(qp, 0, 1) - fe_var.u(qp, 1);  // gamma-yz = dw/dy - tx
 }
 
 }  // namespace MindlinPlate
