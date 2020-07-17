@@ -25,8 +25,9 @@ public:
     using fe_shape_deriv_t = typename FEVarType::fe_shape_deriv_t;
 
     StrainEnergy():
-    _property    (nullptr),
-    _fe_var_data (nullptr)
+    _property            (nullptr),
+    _bending_fe_var_data (nullptr),
+    _shear_fe_var_data   (nullptr)
     { }
     
     virtual ~StrainEnergy() { }
@@ -39,32 +40,39 @@ public:
         _property = &p;
     }
 
-    inline void set_fe_var_data(const FEVarType& fe_data)
-    {
-        Assert0(!_fe_var_data, "FE data already initialized.");
-        _fe_var_data = &fe_data;
+    inline void set_fe_var_data(const FEVarType& bending_fe_data,
+                                const FEVarType& shear_fe_data) {
+        
+        Assert0(!_bending_fe_var_data && !_shear_fe_var_data,
+                "FE data already initialized.");
+        Assert2(bending_fe_data.n_components() == shear_fe_data.n_components(),
+                bending_fe_data.n_components(), shear_fe_data.n_components(),
+                "Bending and shear FE data must have same number of components");
+        
+        _bending_fe_var_data = &bending_fe_data;
+        _shear_fe_var_data   = &shear_fe_data;
     }
 
     inline uint_t n_dofs() const {
 
-        Assert0(_fe_var_data, "FE data not initialized.");
+        Assert0(_bending_fe_var_data, "FE data not initialized.");
 
-        return 3*_fe_var_data->get_fe_shape_data().n_basis();
+        return 3*_bending_fe_var_data->get_fe_shape_data().n_basis();
     }
     
     inline void compute(ContextType& c,
                         vector_t& res,
                         matrix_t* jac = nullptr) const {
         
-        Assert0(_fe_var_data, "FE data not initialized.");
+        Assert0(_bending_fe_var_data && _shear_fe_var_data,
+                "FE data not initialized.");
         Assert0(_property, "Section property not initialized");
-        
-        const typename FEVarType::fe_shape_deriv_t
-        &fe = _fe_var_data->get_fe_shape_data();
-
-        
+                
         // process the inplane strain components
         {
+            const typename FEVarType::fe_shape_deriv_t
+            &fe = _bending_fe_var_data->get_fe_shape_data();
+
             typename Eigen::Matrix<scalar_t, 3, 1>
             epsilon,
             stress;
@@ -90,7 +98,7 @@ public:
                 _property->inplane_value(c, mat);
                 MAST::Physics::Elasticity::MindlinPlate::inplane_strain
                 <scalar_t, scalar_t, FEVarType>
-                (*_fe_var_data, i, 1., epsilon, Bxmat);
+                (*_bending_fe_var_data, i, 1., epsilon, Bxmat);
                 stress = mat * epsilon;
                 Bxmat.vector_mult_transpose(vec, stress);
                 res += fe.detJxW(i) * vec;
@@ -106,6 +114,9 @@ public:
         
         // process the transverse shear strain components
         {
+            const typename FEVarType::fe_shape_deriv_t
+            &fe = _shear_fe_var_data->get_fe_shape_data();
+
             typename Eigen::Matrix<scalar_t, 2, 1>
             epsilon,
             stress;
@@ -131,7 +142,7 @@ public:
                 _property->shear_value(c, mat);
                 MAST::Physics::Elasticity::MindlinPlate::transverse_shear_strain
                 <scalar_t, scalar_t, FEVarType>
-                (*_fe_var_data, i, epsilon, Bxmat);
+                (*_shear_fe_var_data, i, epsilon, Bxmat);
                 stress = mat * epsilon;
                 Bxmat.vector_mult_transpose(vec, stress);
                 res += fe.detJxW(i) * vec;
@@ -152,15 +163,15 @@ public:
                            vector_t& res,
                            matrix_t* jac = nullptr) const {
         
-        Assert0(_fe_var_data, "FE data not initialized.");
+        Assert0(_bending_fe_var_data && _shear_fe_var_data,
+                "FE data not initialized.");
         Assert0(_property, "Section property not initialized");
-        
-        const typename FEVarType::fe_shape_deriv_t
-        &fe = _fe_var_data->get_fe_shape_data();
-
-        
+                
         // process the inplane strain components
         {
+            const typename FEVarType::fe_shape_deriv_t
+            &fe = _bending_fe_var_data->get_fe_shape_data();
+
             typename Eigen::Matrix<scalar_t, 3, 1>
             epsilon,
             stress;
@@ -186,7 +197,7 @@ public:
                 _property->inplane_derivative(c, f, mat);
                 MAST::Physics::Elasticity::MindlinPlate::inplane_strain
                 <scalar_t, scalar_t, FEVarType>
-                (*_fe_var_data, i, 1., epsilon, Bxmat);
+                (*_bending_fe_var_data, i, 1., epsilon, Bxmat);
                 stress = mat * epsilon;
                 Bxmat.vector_mult_transpose(vec, stress);
                 res += fe.detJxW(i) * vec;
@@ -202,6 +213,9 @@ public:
         
         // process the transverse shear strain components
         {
+            const typename FEVarType::fe_shape_deriv_t
+            &fe = _shear_fe_var_data->get_fe_shape_data();
+
             typename Eigen::Matrix<scalar_t, 2, 1>
             epsilon,
             stress;
@@ -227,7 +241,7 @@ public:
                 _property->shear_derivative(c, f, mat);
                 MAST::Physics::Elasticity::MindlinPlate::transverse_shear_strain
                 <scalar_t, scalar_t, FEVarType>
-                (*_fe_var_data, i, epsilon, Bxmat);
+                (*_shear_fe_var_data, i, epsilon, Bxmat);
                 stress = mat * epsilon;
                 Bxmat.vector_mult_transpose(vec, stress);
                 res += fe.detJxW(i) * vec;
@@ -248,7 +262,8 @@ private:
     
     
     const SectionPropertyType       *_property;
-    const FEVarType                 *_fe_var_data;
+    const FEVarType                 *_bending_fe_var_data;
+    const FEVarType                 *_shear_fe_var_data;
 };
 
 }  // namespace MindlinPlate
