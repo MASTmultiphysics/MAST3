@@ -298,14 +298,14 @@ struct Bracket2D {
     inline void
     init_simp_dvs
     (Context& c,
-     std::vector<std::pair<uint_t, MAST::Optimization::DesignParameter<ScalarType>>> &dvs) {
-        
-        libmesh_assert(c._initialized);
+     std::vector<std::pair<uint_t, MAST::Optimization::DesignParameter<ScalarType>*>> &dvs) {
         
         //
         // this assumes that density variable has a constant value per element
         //
-        libmesh_assert_equal_to(c._density_fetype.family, libMesh::LAGRANGE);
+        Assert2(c.fe_family == libMesh::LAGRANGE,
+                c.fe_family, libMesh::LAGRANGE,
+                "Method assumes Lagrange interpolation function for density");
         
         real_t
         tol           = 1.e-12,
@@ -316,10 +316,11 @@ struct Bracket2D {
         x_lim         = length * l_frac,
         y_lim         = height * (1.-h_frac),
         frac          = c.input("loadlength_fraction", "fraction of boundary length on which pressure will act", 0.125),
-        filter_radius = c.input("filter_radius", "radius of geometric filter for level set field", 0.015);
+        filter_radius = c.input("filter_radius", "radius of geometric filter for level set field", 0.015),
+        rho_min       = c.input("rho_min", "lower limit on density variable", 0.);
         
         uint_t
-        sys_num = c._density_sys->number(),
+        sys_num = c.rho_sys->number(),
         dof_id  = 0,
         n_vars  = 0;
         
@@ -330,21 +331,22 @@ struct Bracket2D {
         // all ranks will have DVs defined for all variables. So, we should be
         // operating on a replicated mesh
         //
-        libmesh_assert(c._mesh->is_replicated());
+        Assert0(c.mesh->is_replicated(),
+                "Function currently assumes replicated mesh");
         
-        std::vector<real_t> local_phi(c._density_sys->solution->size());
-        c._density_sys->solution->localize(local_phi);
+        std::vector<real_t> local_phi(c.rho_sys->solution->size());
+        c.rho_sys->solution->localize(local_phi);
         
         // iterate over all the element values
         libMesh::MeshBase::const_node_iterator
-        it  = c._mesh->nodes_begin(),
-        end = c._mesh->nodes_end();
+        it  = c.mesh->nodes_begin(),
+        end = c.mesh->nodes_end();
         
         //
         // maximum number of dvs is the number of nodes on the level set function
         // mesh. We will evaluate the actual number of dvs
         //
-        c._dv_params.reserve(c._mesh->n_elem());
+        dvs.reserve(c.mesh->n_elem());
         
         for ( ; it!=end; it++) {
             
@@ -359,9 +361,9 @@ struct Bracket2D {
                 // set value at the constrained points to a small positive number
                 // material here
                 //
-                if (dof_id >= c._density_sys->solution->first_local_index() &&
-                    dof_id <  c._density_sys->solution->last_local_index())
-                    c._density_sys->solution->set(dof_id, 1.e0);
+                if (dof_id >= c.rho_sys->solution->first_local_index() &&
+                    dof_id <  c.rho_sys->solution->last_local_index())
+                    c.rho_sys->solution->set(dof_id, 1.e0);
             }
             else {
                 
@@ -378,16 +380,16 @@ struct Bracket2D {
                     std::fabs(n(1) - height) < tol ||  // top boundary
                     (n(0) >= x_lim && n(1) <= y_lim)) {
                     
-                    if (dof_id >= c._density_sys->solution->first_local_index() &&
-                        dof_id <  c._density_sys->solution->last_local_index())
-                        c._density_sys->solution->set(dof_id, c._rho_min);
-                    val = c._rho_min;
+                    if (dof_id >= c.rho_sys->solution->first_local_index() &&
+                        dof_id <  c.rho_sys->solution->last_local_index())
+                        c.rho_sys->solution->set(dof_id, rho_min);
+                    val = rho_min;
                 }
                 
                 dvs.push_back(std::pair<uint_t, MAST::Optimization::DesignParameter<ScalarType>*>());
                 dvs[n_vars].first  = dof_id;
                 dvs[n_vars].second = new MAST::Optimization::DesignParameter<ScalarType>(val);
-                dvs[n_vars]->set_point(n(0), n(1), n(2));
+                dvs[n_vars].second->set_point(n(0), n(1), n(2));
                 //c._dv_params[n_vars].second->set_as_topology_parameter(true);
                 //c._dv_dof_ids.insert(dof_id);
                 
@@ -395,8 +397,7 @@ struct Bracket2D {
             }
         }
         
-        c.set_n_vars(n_vars);
-        c._density_sys->solution->close();
+        c.rho_sys->solution->close();
     }
     
     

@@ -55,12 +55,17 @@ public:
     mesh      (new libMesh::ReplicatedMesh(comm)),
     eq_sys    (new libMesh::EquationSystems(*mesh)),
     sys       (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("structural")),
+    rho_sys   (&eq_sys->add_system<libMesh::ExplicitSystem>("density")),
     p_side_id (-1) {
         
         model->init_analysis_mesh(*this, *mesh);
-        
+
+        // displacement variables for elasticity solution
         sys->add_variable("u_x", libMesh::FEType(fe_order, fe_family));
         sys->add_variable("u_y", libMesh::FEType(fe_order, fe_family));
+        
+        // density field
+        rho_sys->add_variable("rho", libMesh::FEType(fe_order, fe_family));
         
         model->init_analysis_dirichlet_conditions(*this);
         
@@ -90,16 +95,19 @@ public:
     libMesh::ReplicatedMesh          *mesh;
     libMesh::EquationSystems         *eq_sys;
     libMesh::NonlinearImplicitSystem *sys;
+    libMesh::ExplicitSystem          *rho_sys;
     uint_t                            p_side_id;
 };
 
 
 
-template <typename TraitsType, typename ModelType>
+template <typename TraitsType>
 class Context {
     
 public:
-    Context(InitExample<ModelType>& init):
+    using model_t = typename TraitsType::model_t;
+    
+    Context(InitExample<model_t>& init):
     ex_init   (init),
     mesh      (init.mesh),
     eq_sys    (init.eq_sys),
@@ -122,7 +130,7 @@ public:
     { return ex_init.mesh->boundary_info->has_boundary_id(elem, s, ex_init.p_side_id);}
     
     
-    InitExample<ModelType>           &ex_init;
+    InitExample<model_t>            &ex_init;
     libMesh::ReplicatedMesh          *mesh;
     libMesh::EquationSystems         *eq_sys;
     libMesh::NonlinearImplicitSystem *sys;
@@ -141,7 +149,7 @@ struct Traits {
     static const uint_t dim = ModelType::dim;
     using traits_t          = MAST::Examples::Structural::Example5::Traits<BasisScalarType, NodalScalarType, SolScalarType, ModelType>;
     using model_t           = ModelType;
-    using context_t         = Context<traits_t, ModelType>;
+    using context_t         = Context<traits_t>;
     using ex_init_t         = InitExample<model_t>;
     using scalar_t          = typename MAST::DeducedScalarType<typename MAST::DeducedScalarType<BasisScalarType, NodalScalarType>::type, SolScalarType>::type;
     using fe_basis_t        = typename MAST::FEBasis::libMeshWrapper::FEBasis<BasisScalarType, dim>;
@@ -317,19 +325,27 @@ class FunctionEvaluation {
     
 public:
     
-    FunctionEvaluation()
-    {}
+    using scalar_t  = typename TraitsType::scalar_t;
+    using context_t = typename TraitsType::context_t;
+    
+    FunctionEvaluation(ElemOps<TraitsType> &e_ops,
+                       context_t           &c):
+    _e_ops  (e_ops),
+    _c      (c) {
+        
+        // initialize the design variable vector
+        _c.ex_init.model->init_simp_dvs(_c.ex_init, _dvs);
+    }
     
     virtual ~FunctionEvaluation() {}
     
     
-    inline uint_t n_vars() const {return 2;}
+    inline uint_t n_vars() const {return _dvs.size();}
     inline uint_t   n_eq() const {return 0;}
-    inline uint_t n_ineq() const {return 0;}
+    inline uint_t n_ineq() const {return 1;}
     virtual void init_dvar(std::vector<real_t>& x,
                            std::vector<real_t>& xmin,
                            std::vector<real_t>& xmax) {
-        
         
     }
     
@@ -351,6 +367,12 @@ public:
                        std::vector<real_t>        &fvals) {
         
     }
+    
+private:
+    
+    ElemOps<TraitsType>   &_e_ops;
+    context_t             &_c;
+    std::vector<std::pair<uint_t, MAST::Optimization::DesignParameter<scalar_t>*>> _dvs;
 };
 
 
@@ -486,15 +508,26 @@ int main(int argc, char** argv) {
     MAST::Utility::GetPotWrapper input(argc, argv);
     
     using model_t            = MAST::Mesh::Generation::Bracket2D;
-    using traits_t           = MAST::Examples::Structural::Example5::Traits<real_t, real_t,    real_t, model_t>;
-    using traits_complex_t   = MAST::Examples::Structural::Example5::Traits<real_t, real_t, complex_t, model_t>;
     
+    using traits_t           = MAST::Examples::Structural::Example5::Traits<real_t, real_t,    real_t, model_t>;
+    using elem_ops_t         = MAST::Examples::Structural::Example5::ElemOps<traits_t>;
+    using func_eval_t        = MAST::Examples::Structural::Example5::FunctionEvaluation<traits_t>;
+
+    using traits_complex_t   = MAST::Examples::Structural::Example5::Traits<real_t, real_t, complex_t, model_t>;
+    using elem_ops_complex_t = MAST::Examples::Structural::Example5::ElemOps<traits_complex_t>;
+    using func_eval_complex_t= MAST::Examples::Structural::Example5::FunctionEvaluation<traits_complex_t>;
+
     
     traits_t::ex_init_t ex_init(init.comm(), input);
+
     traits_t::context_t  c(ex_init);
+    elem_ops_t           e_ops(c);
+    func_eval_t          f_eval(e_ops, c);
+    
     traits_complex_t::context_t  c_cmplx(ex_init);
-    MAST::Examples::Structural::Example5::ElemOps<traits_t>           e_ops(c);
-    MAST::Examples::Structural::Example5::ElemOps<traits_complex_t> e_ops_c(c_cmplx);
+    elem_ops_complex_t           e_ops_c(c_cmplx);
+    func_eval_complex_t          f_eval_c(e_ops_c, c_cmplx);
+
     
     typename traits_t::assembled_vector_t
     sol,
