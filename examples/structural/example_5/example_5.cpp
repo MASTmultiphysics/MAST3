@@ -15,6 +15,7 @@
 #include <mast/numerics/libmesh/sparse_matrix_initialization.hpp>
 #include <mast/util/getpot_wrapper.hpp>
 #include <mast/mesh/libmesh/geometric_filter.hpp>
+#include <mast/optimization/design_parameter.hpp>
 
 // topology optimization benchmark cases
 #include <mast/mesh/generation/bracket2d.hpp>
@@ -25,8 +26,6 @@
 #include <libmesh/mesh_generation.h>
 #include <libmesh/equation_systems.h>
 #include <libmesh/boundary_info.h>
-#include <libmesh/dirichlet_boundaries.h>
-#include <libmesh/zero_function.h>
 #include <libmesh/exodusII_io.h>
 
 // Eigen includes
@@ -40,6 +39,7 @@ namespace Examples {
 namespace Structural {
 namespace Example5 {
 
+template <typename ModelType>
 class Context {
     
 public:
@@ -48,6 +48,7 @@ public:
             MAST::Utility::GetPotWrapper    &inp):
     comm      (mpi_comm),
     input     (inp),
+    model     (new ModelType),
     q_type    (libMesh::QGAUSS),
     q_order   (libMesh::FOURTH),
     fe_order  (libMesh::SECOND),
@@ -60,15 +61,13 @@ public:
     p_side_id (1) {
 
 
-        libMesh::MeshTools::Generation::build_square(*mesh,
-                                                     2, 2,
-                                                     0.0, 10.0,
-                                                     0.0, 10.0,
-                                                     libMesh::QUAD9);
+        model->init_analysis_mesh(*this, *mesh);
 
         sys->add_variable("u_x", libMesh::FEType(fe_order, fe_family));
         sys->add_variable("u_y", libMesh::FEType(fe_order, fe_family));
 
+        model->init_analysis_dirichlet_conditions(*this);
+        
         sys->get_dof_map().add_dirichlet_boundary
         (libMesh::DirichletBoundary({3}, {0, 1}, libMesh::ZeroFunction<real_t>()));
         
@@ -85,9 +84,10 @@ public:
     }
     
     // assembly methods
-    uint_t elem_dim() const {return elem->dim();}
+    uint_t  elem_dim() const {return elem->dim();}
     uint_t  n_nodes() const {return elem->n_nodes();}
     real_t  nodal_coord(uint_t nd, uint_t c) const {return elem->point(nd)(c);}
+    real_t  qp_location(uint_t i) const {;}
     inline bool elem_is_quad() const {return (elem->type() == libMesh::QUAD4 ||
                                               elem->type() == libMesh::QUAD8 ||
                                               elem->type() == libMesh::QUAD9);}
@@ -97,6 +97,7 @@ public:
     
     libMesh::Parallel::Communicator  &comm;
     MAST::Utility::GetPotWrapper     &input;
+    ModelType                        *model;
     libMesh::QuadratureType           q_type;
     libMesh::Order                    q_order;
     libMesh::Order                    fe_order;
@@ -114,22 +115,24 @@ public:
 template <typename BasisScalarType,
           typename NodalScalarType,
           typename SolScalarType,
-          uint_t   Dim>
+          typename ModelType>
 struct Traits {
 
+    static const uint_t dim = ModelType::dim;
+    using context_t         = Context<ModelType>;
     using scalar_t          = typename MAST::DeducedScalarType<typename MAST::DeducedScalarType<BasisScalarType, NodalScalarType>::type, SolScalarType>::type;
-    using fe_basis_t        = typename MAST::FEBasis::libMeshWrapper::FEBasis<BasisScalarType, Dim>;
-    using fe_shape_t        = typename MAST::FEBasis::Evaluation::FEShapeDerivative<BasisScalarType, NodalScalarType, Dim, Dim, fe_basis_t>;
-    using fe_data_t         = typename MAST::FEBasis::libMeshWrapper::FEData<Dim, fe_basis_t, fe_shape_t>;
-    using fe_side_data_t    = typename MAST::FEBasis::libMeshWrapper::FESideData<Dim, fe_basis_t, fe_shape_t>;
-    using fe_var_t          = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, Dim, Dim, Context, fe_shape_t>;
+    using fe_basis_t        = typename MAST::FEBasis::libMeshWrapper::FEBasis<BasisScalarType, dim>;
+    using fe_shape_t        = typename MAST::FEBasis::Evaluation::FEShapeDerivative<BasisScalarType, NodalScalarType, dim, dim, fe_basis_t>;
+    using fe_data_t         = typename MAST::FEBasis::libMeshWrapper::FEData<dim, fe_basis_t, fe_shape_t>;
+    using fe_side_data_t    = typename MAST::FEBasis::libMeshWrapper::FESideData<dim, fe_basis_t, fe_shape_t>;
+    using fe_var_t          = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, dim, dim, context_t, fe_shape_t>;
     using modulus_t         = typename MAST::Base::ScalarConstant<SolScalarType>;
     using nu_t              = typename MAST::Base::ScalarConstant<SolScalarType>;
-    using press_t           = typename MAST::Base::ScalarConstant<SolScalarType>;
+    using press_t           = typename ModelType::template pressure_t<scalar_t>;
     using area_t            = typename MAST::Base::ScalarConstant<SolScalarType>;
-    using prop_t            = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<SolScalarType, Dim, modulus_t, nu_t, Context>;
-    using energy_t          = typename MAST::Physics::Elasticity::LinearContinuum::StrainEnergy<fe_var_t, prop_t, Dim, Context>;
-    using press_load_t      = typename MAST::Physics::Elasticity::SurfacePressureLoad<fe_var_t, press_t, area_t, Dim, Context>;
+    using prop_t            = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<SolScalarType, dim, modulus_t, nu_t, context_t>;
+    using energy_t          = typename MAST::Physics::Elasticity::LinearContinuum::StrainEnergy<fe_var_t, prop_t, dim, context_t>;
+    using press_load_t      = typename MAST::Physics::Elasticity::SurfacePressureLoad<fe_var_t, press_t, area_t, dim, context_t>;
     using element_vector_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using element_matrix_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     using assembled_vector_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
@@ -143,15 +146,13 @@ class ElemOps {
   
 public:
     
-    using scalar_t = typename TraitsType::scalar_t;
-    using vector_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
-    using matrix_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
+    using scalar_t  = typename TraitsType::scalar_t;
+    using context_t = typename TraitsType::context_t;
+    using vector_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
+    using matrix_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     
 
-    ElemOps(libMesh::Order          q_order,
-            libMesh::QuadratureType q_type,
-            libMesh::Order          fe_order,
-            libMesh::FEFamily       fe_family):
+    ElemOps(context_t  &c):
     E             (nullptr),
     nu            (nullptr),
     press         (nullptr),
@@ -165,9 +166,9 @@ public:
     _p_load       (nullptr) {
         
         _fe_data       = new typename TraitsType::fe_data_t;
-        _fe_data->init(q_order, q_type, fe_order, fe_family);
+        _fe_data->init(c.q_order, c.q_type, c.fe_order, c.fe_family);
         _fe_side_data  = new typename TraitsType::fe_side_data_t;
-        _fe_side_data->init(q_order, q_type, fe_order, fe_family);
+        _fe_side_data->init(c.q_order, c.q_type, c.fe_order, c.fe_family);
         _fe_var        = new typename TraitsType::fe_var_t;
         _fe_side_var   = new typename TraitsType::fe_var_t;
 
@@ -190,7 +191,7 @@ public:
         // variables for physics
         E        = new typename TraitsType::modulus_t(72.e9);
         nu       = new typename TraitsType::nu_t(0.33);
-        press    = new typename TraitsType::press_t(1.e2);
+        press    = c.model->template build_pressure_load<scalar_t, context_t>(c).release();
         area     = new typename TraitsType::area_t(1.0);
         _prop    = new typename TraitsType::prop_t;
         
@@ -326,7 +327,7 @@ public:
 
 template <typename TraitsType>
 inline void
-compute_residual(Context                                        &c,
+compute_residual(typename TraitsType::context_t                 &c,
                  ElemOps<TraitsType>                            &e_ops,
                  const typename TraitsType::assembled_vector_t  &sol,
                  typename TraitsType::assembled_vector_t        &res) {
@@ -350,7 +351,7 @@ compute_residual(Context                                        &c,
 
 template <typename TraitsType, typename ScalarFieldType>
 inline void
-compute_residual_sensitivity(Context                                        &c,
+compute_residual_sensitivity(typename TraitsType::context_t                 &c,
                              ElemOps<TraitsType>                            &e_ops,
                              const ScalarFieldType                          &f,
                              const typename TraitsType::assembled_vector_t  &sol,
@@ -375,7 +376,7 @@ compute_residual_sensitivity(Context                                        &c,
 
 template <typename TraitsType>
 inline void
-compute_sol(Context                                  &c,
+compute_sol(typename TraitsType::context_t           &c,
             ElemOps<TraitsType>                      &e_ops,
             typename TraitsType::assembled_vector_t  &sol) {
     
@@ -403,7 +404,7 @@ compute_sol(Context                                  &c,
 
 template <typename TraitsType, typename ScalarFieldType>
 inline void
-compute_sol_sensitivity(Context                                        &c,
+compute_sol_sensitivity(typename TraitsType::context_t                 &c,
                         ElemOps<TraitsType>                            &e_ops,
                         const ScalarFieldType                          &f,
                         const typename TraitsType::assembled_vector_t  &sol,
@@ -454,15 +455,13 @@ int main(int argc, char** argv) {
     libMesh::LibMeshInit init(argc, argv);
     MAST::Utility::GetPotWrapper input(argc, argv);
     
-    using traits_t           = MAST::Examples::Structural::Example5::Traits<real_t, real_t,    real_t, 2>;
-    using traits_complex_t   = MAST::Examples::Structural::Example5::Traits<real_t, real_t, complex_t, 2>;
+    using traits_t           = MAST::Examples::Structural::Example5::Traits<real_t, real_t,    real_t, MAST::Mesh::Generation::Bracket2D>;
+    using traits_complex_t   = MAST::Examples::Structural::Example5::Traits<real_t, real_t, complex_t, MAST::Mesh::Generation::Bracket2D>;
 
 
-    MAST::Examples::Structural::Example5::Context c(init.comm(), input);
-    MAST::Examples::Structural::Example5::ElemOps<traits_t>
-    e_ops(c.q_order, c.q_type, c.fe_order, c.fe_family);
-    MAST::Examples::Structural::Example5::ElemOps<traits_complex_t>
-    e_ops_c(c.q_order, c.q_type, c.fe_order, c.fe_family);
+    traits_t::context_t c(init.comm(), input);
+    MAST::Examples::Structural::Example5::ElemOps<traits_t>           e_ops(c);
+    MAST::Examples::Structural::Example5::ElemOps<traits_complex_t> e_ops_c(c);
 
     typename traits_t::assembled_vector_t
     sol,
@@ -494,49 +493,6 @@ int main(int argc, char** argv) {
     }
     dsol -= sol_c.imag()/ComplexStepDelta;
     std::cout << dsol.norm() << std::endl;
-
-    // compute the solution sensitivity wrt nu
-    (*e_ops_c.nu)() += complex_t(0., ComplexStepDelta);
-    MAST::Examples::Structural::Example5::compute_sol<traits_complex_t>(c, e_ops_c, sol_c);
-    (*e_ops_c.nu)() -= complex_t(0., ComplexStepDelta);
-    MAST::Examples::Structural::Example5::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.nu, sol, dsol);
-    
-    // write solution as first time-step
-    {
-        for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
-        writer.write_timestep("solution.exo", *c.eq_sys, 3, 3.);
-    }
-    dsol -= sol_c.imag()/ComplexStepDelta;
-    std::cout << dsol.norm() << std::endl;
-
-    // compute the solution sensitivity wrt p
-    (*e_ops_c.press)() += complex_t(0., ComplexStepDelta);
-    MAST::Examples::Structural::Example5::compute_sol<traits_complex_t>(c, e_ops_c, sol_c);
-    (*e_ops_c.press)() -= complex_t(0., ComplexStepDelta);
-    MAST::Examples::Structural::Example5::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.press, sol, dsol);
-    
-    // write solution as first time-step
-    {
-        for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
-        writer.write_timestep("solution.exo", *c.eq_sys, 4, 4.);
-    }
-    dsol -= sol_c.imag()/ComplexStepDelta;
-    std::cout << dsol.norm() << std::endl;
-
-    // compute the solution sensitivity wrt section area
-    (*e_ops_c.area)() += complex_t(0., ComplexStepDelta);
-    MAST::Examples::Structural::Example5::compute_sol<traits_complex_t>(c, e_ops_c, sol_c);
-    (*e_ops_c.area)() -= complex_t(0., ComplexStepDelta);
-    MAST::Examples::Structural::Example5::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.area, sol, dsol);
-    
-    // write solution as first time-step
-    {
-        for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
-        writer.write_timestep("solution.exo", *c.eq_sys, 5, 5.);
-    }
-    dsol -= sol_c.imag()/ComplexStepDelta;
-    std::cout << dsol.norm() << std::endl;
-
     
     // END_TRANSLATE
     return 0;
