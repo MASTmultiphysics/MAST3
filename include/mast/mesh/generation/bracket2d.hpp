@@ -172,14 +172,15 @@ struct Bracket2D {
     
     
     
-    template <typename ScalarType, typename ContextType>
+    template <typename ScalarType, typename InitType>
     std::unique_ptr<pressure_t<ScalarType>>
-    build_pressure_load(ContextType& c) {
+    build_pressure_load(InitType& c) {
         
         real_t
-        length  = c.input("length", "length of domain along x-axis", 0.3),
-        frac    = c.input("loadlength_fraction", "fraction of boundary length on which pressure will act", 0.125),
-        p_val   = c.input("pressure", "pressure on side of domain",   5.e7);
+        length      = c.input("length", "length of domain along x-axis", 0.3),
+        frac        = c.input("loadlength_fraction", "fraction of boundary length on which pressure will act", 0.125),
+        p_val       = c.input("pressure", "pressure on side of domain",   5.e7);
+        c.p_side_id = 5;
         
         std::unique_ptr<pressure_t<ScalarType>>
         press(new pressure_t<ScalarType>(p_val, length, frac));
