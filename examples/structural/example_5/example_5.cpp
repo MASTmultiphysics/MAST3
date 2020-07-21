@@ -16,6 +16,8 @@
 #include <mast/util/getpot_wrapper.hpp>
 #include <mast/mesh/libmesh/geometric_filter.hpp>
 #include <mast/optimization/design_parameter.hpp>
+#include <mast/optimization/solvers/gcmma_interface.hpp>
+#include <mast/optimization/utility/design_history.hpp>
 
 // topology optimization benchmark cases
 #include <mast/mesh/generation/bracket2d.hpp>
@@ -343,10 +345,42 @@ public:
     inline uint_t n_vars() const {return _dvs.size();}
     inline uint_t   n_eq() const {return 0;}
     inline uint_t n_ineq() const {return 1;}
-    virtual void init_dvar(std::vector<real_t>& x,
-                           std::vector<real_t>& xmin,
-                           std::vector<real_t>& xmax) {
+    virtual void init_dvar(std::vector<scalar_t>& x,
+                           std::vector<scalar_t>& xmin,
+                           std::vector<scalar_t>& xmax) {
+
+        Assert1(_dvs.size(), _dvs.size(), "Design variables must be initialized");
         
+        x.resize(_dvs.size());
+        xmin.resize(_dvs.size());
+        xmax.resize(_dvs.size());
+        
+        std::fill(xmin.begin(), xmin.end(),      0.);
+        std::fill(xmax.begin(), xmax.end(),    1.e0);
+
+        //
+        // now, check if the user asked to initialize dvs from a previous file
+        //
+        std::string
+        nm    =  _c.ex_init.input("restart_optimization_file",
+                                  "filename with optimization history for restart",
+                                  "");
+        
+        if (nm.length()) {
+            
+            unsigned int
+            iter = _c.ex_init.input("restart_optimization_iter",
+                                    "restart iteration number from file", 0);
+            MAST::Optimization::Utility::initialize_dv_from_output_file(*this,
+                                                                        nm,
+                                                                        iter,
+                                                                        x);
+        }
+        else {
+            
+            for (unsigned int i=0; i<_dvs.size(); i++)
+                x[i] = (*_dvs[i].second)();
+        }
     }
     
     
@@ -517,7 +551,6 @@ int main(int argc, char** argv) {
     using elem_ops_complex_t = MAST::Examples::Structural::Example5::ElemOps<traits_complex_t>;
     using func_eval_complex_t= MAST::Examples::Structural::Example5::FunctionEvaluation<traits_complex_t>;
 
-    
     traits_t::ex_init_t ex_init(init.comm(), input);
 
     traits_t::context_t  c(ex_init);
@@ -529,42 +562,13 @@ int main(int argc, char** argv) {
     func_eval_complex_t          f_eval_c(e_ops_c, c_cmplx);
 
     
-    typename traits_t::assembled_vector_t
-    sol,
-    dsol;
+    // create an optimizer, attach the function evaluation
+    MAST::Optimization::Solvers::GCMMAInterface<func_eval_t> optimizer;
+    optimizer.set_function_evaluation(f_eval);
     
-    typename traits_complex_t::assembled_vector_t
-    sol_c;
+    // optimize
+    optimizer.optimize();
     
-    // compute the solution
-    MAST::Examples::Structural::Example5::compute_sol<traits_t>(c, e_ops, sol);
-    
-    // write solution as first time-step
-    libMesh::ExodusII_IO writer(*ex_init.mesh);
-    {
-        for (uint_t i=0; i<sol.size(); i++) ex_init.sys->solution->set(i, sol(i));
-        writer.write_timestep("solution.exo", *ex_init.eq_sys, 1, 1.);
-    }
-    
-    // compute the solution sensitivity wrt E
-    (*e_ops_c.E)() += complex_t(0., ComplexStepDelta);
-    MAST::Examples::Structural::Example5::compute_sol<traits_complex_t>(c_cmplx,
-                                                                        e_ops_c,
-                                                                        sol_c);
-    (*e_ops_c.E)() -= complex_t(0., ComplexStepDelta);
-    MAST::Examples::Structural::Example5::compute_sol_sensitivity<traits_t>(c,
-                                                                            e_ops,
-                                                                            *e_ops.E,
-                                                                            sol,
-                                                                            dsol);
-    
-    // write solution as first time-step
-    {
-        for (uint_t i=0; i<sol.size(); i++) ex_init.sys->solution->set(i, dsol(i));
-        writer.write_timestep("solution.exo", *ex_init.eq_sys, 2, 2.);
-    }
-    dsol -= sol_c.imag()/ComplexStepDelta;
-    std::cout << dsol.norm() << std::endl;
     
     // END_TRANSLATE
     return 0;
