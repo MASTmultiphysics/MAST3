@@ -17,37 +17,110 @@ namespace MAST {
 namespace Numerics {
 namespace Utility {
 
+
 template <typename ValType>
-void
+inline void
 setZero(ValType& m) { m.setZero();}
 
-void
+
+inline void
 setZero(libMesh::NumericVector<real_t>& v) { v.zero();}
 
-void
+
+inline void
 setZero(libMesh::SparseMatrix<real_t>& m) { m.zero();}
 
+template <typename ScalarType>
+inline void
+setZero(std::vector<ScalarType>& v) { std::fill(v.begin(), v.end(), ScalarType());}
+
+
+template <typename ScalarType>
+inline void
+add(std::vector<ScalarType>& v, uint_t i, ScalarType s) {
+    v[i] += s;
+}
+
+
+inline void
+add(libMesh::NumericVector<real_t>& v, uint_t i, real_t s) {
+    v.add(i, s);
+}
+
+
+template <typename ScalarType>
+inline void
+add(Eigen::Matrix<ScalarType, Eigen::Dynamic, 1>& v,
+    uint_t i,
+    ScalarType s) {
+    v(i) += s;
+}
+
+
+template <typename ScalarType>
+inline void
+set(std::vector<ScalarType>& v, uint_t i, ScalarType s) {
+    v[i] = s;
+}
+
+
+inline void
+set(libMesh::NumericVector<real_t>& v, uint_t i, real_t s) {
+    v.set(i, s);
+}
+
+
+template <typename ScalarType>
+inline void
+set(Eigen::Matrix<ScalarType, Eigen::Dynamic, 1>& v,
+    uint_t i,
+    ScalarType s) {
+    v(i) = s;
+}
+
+
+template <typename ScalarType>
+inline ScalarType
+get(const std::vector<ScalarType>& v, uint_t i) {
+    return v[i];
+}
+
+
+inline real_t
+get(const libMesh::NumericVector<real_t>& v, uint_t i) {
+    return v.el(i);
+}
+
+
+template <typename ScalarType>
+inline ScalarType
+get(const Eigen::Matrix<ScalarType, Eigen::Dynamic, 1>& v, uint_t i) {
+    return v(i);
+}
+
+
 template <typename ValType>
-void
+inline void
 finalize(ValType& m) { }
 
 
-void
+inline void
 finalize(libMesh::NumericVector<real_t>& v) { v.close();}
 
 
-void
+inline void
 finalize(libMesh::SparseMatrix<real_t>& m) { m.close();}
 
 
 template <typename P1, int P2, typename P3>
-void
+inline void
 finalize(Eigen::SparseMatrix<P1, P2, P3>& m) { m.makeCompressed();}
 
 
 template <typename ScalarType, typename VecType>
-void copy(const VecType& v_from,
-          libMesh::DenseVector<ScalarType>& v_to) {
+inline void
+copy(const VecType& v_from,
+     libMesh::DenseVector<ScalarType>& v_to) {
     
     v_to.resize(v_from.size());
     
@@ -56,7 +129,8 @@ void copy(const VecType& v_from,
 }
 
 template <typename ScalarType, typename MatType>
-void copy(const MatType& m_from,
+inline void
+copy(const MatType& m_from,
           libMesh::DenseMatrix<ScalarType>& m_to) {
     
     m_to.resize(m_from.rows(), m_from.cols());

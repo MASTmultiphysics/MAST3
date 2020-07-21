@@ -7,10 +7,11 @@
 #include <mast/base/exceptions.hpp>
 
 namespace MAST {
-namespace Physics {
+namespace Optimization {
+namespace Topology {
 namespace SIMP {
 
-template <typename ScalarType, typename DensityFieldType, typename ContextType>
+template <typename ScalarType, typename DensityFieldType>
 class PenalizedDensity {
     
 public:
@@ -26,6 +27,7 @@ public:
     
     inline void set_penalty(const real_t p) { _p = p;}
     
+    template <typename ContextType>
     inline ScalarType value(const ContextType& c) {
         
         Assert0(_p, "Penalty value not initialized");
@@ -34,7 +36,7 @@ public:
         return std::pow(_d->value(c), _p);
     }
 
-    template <typename ScalarFieldType>
+    template <typename ContextType, typename ScalarFieldType>
     inline ScalarType derivative(const ContextType&     c,
                                  const ScalarFieldType& f) {
         
@@ -48,10 +50,11 @@ public:
 private:
     
     real_t                   _p;
-    const DensityFieldType&  _d;
+    const DensityFieldType  *_d;
 };
 } // namespace SIMP
-} // namespace Physics
+} // namespace Topology
+} // namespace Optimization
 } // namespace MAST
 
 #endif  // __mast_simp_penalized_density_h__

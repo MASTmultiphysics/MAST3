@@ -1,6 +1,6 @@
 
-#ifndef __mast_libmesh_residual_and_jacobian_h__
-#define __mast_libmesh_residual_and_jacobian_h__
+#ifndef __mast_optimization_topology_simp_libmesh_residual_and_jacobian_h__
+#define __mast_optimization_topology_simp_libmesh_residual_and_jacobian_h__
 
 // MAST includes
 #include <mast/base/mast_data_types.h>
@@ -14,8 +14,9 @@
 #include <libmesh/dof_map.h>
 
 namespace MAST {
-namespace Base {
-namespace Assembly {
+namespace Optimization {
+namespace Topology {
+namespace SIMP {
 namespace libMeshWrapper {
 
 template <typename ScalarType,
@@ -41,6 +42,7 @@ public:
     template <typename VecType, typename MatType, typename ContextType>
     inline void assemble(ContextType   &c,
                          const VecType &X,
+                         const VecType &density,
                          VecType       *R,
                          MatType       *J) {
         
@@ -52,12 +54,13 @@ public:
         // iterate over each element, initialize it and get the relevant
         // analysis quantities
         typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, VecType>
-        sol_accessor(*c.sys, X);
+        sol_accessor     (*c.sys, X),
+        density_accessor (*c.density_sys, density);
 
         using elem_vector_t = typename ElemOpsType::vector_t;
         using elem_matrix_t = typename ElemOpsType::matrix_t;
         
-        elem_vector_t res_e;
+        elem_vector_t res_e, density_e;
         elem_matrix_t jac_e;
         
         
@@ -71,12 +74,17 @@ public:
             c.elem = *el;
             
             sol_accessor.init(*c.elem);
+            density_accessor.init(*c.elem);
             
             res_e.setZero(sol_accessor.n_dofs());
             if (J) jac_e.setZero(sol_accessor.n_dofs(), sol_accessor.n_dofs());
             
             // perform the element level calculations
-            _e_ops->compute(c, sol_accessor, res_e, J?&jac_e:nullptr);
+            _e_ops->compute(c,
+                            sol_accessor,
+                            density_accessor,
+                            res_e,
+                            J?&jac_e:nullptr);
                         
             // constrain the quantities to account for hanging dofs,
             // Dirichlet constraints, etc.
@@ -106,8 +114,9 @@ private:
 };
 
 } // namespace libMeshWrapper
-} // namespace Assembly
-} // namespace Base
+} // namespace SIMP
+} // namespace Topology
+} // namespace Optimization
 } // namespace MAST
 
-#endif // __mast_libmesh_residual_and_jacobian_h__
+#endif // __mast_optimization_topology_simp_libmesh_residual_and_jacobian_h__

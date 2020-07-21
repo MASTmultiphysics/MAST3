@@ -60,7 +60,7 @@ private:
     std::vector<libMesh::dof_id_type>   _dof_ids;
 };
 
-} // namespace libMesh
+} // namespace libMeshWrapper
 } // namespace Assembly
 } // namespace Base
 } // namespace MAST

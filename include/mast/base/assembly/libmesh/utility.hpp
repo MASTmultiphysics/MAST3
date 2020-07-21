@@ -290,7 +290,7 @@ constrain_and_add_matrix(libMesh::SparseMatrix<real_t>     &m,
 }
 
 
-} // namespace libMesh
+} // namespace libMeshWrapper
 } // namespace Assembly
 } // namespace Base
 } // namespace MAST

@@ -25,6 +25,7 @@
 // MAST includes
 #include <mast/base/mast_data_types.h>
 #include <mast/base/exceptions.hpp>
+#include <mast/numerics/utility.hpp>
 
 // libMesh includes
 #include "libmesh/system.h"
@@ -47,23 +48,19 @@ namespace libMeshWrapper {
  *   Creates a geometric filter for the location-based design variables, for example density and
  *   level-set function parmaters in topology optimization.
  */
-class FilterBase {
+class GeometricFilter {
     
 public:
     
     /*!
      *   \param sys
      *   \param radius geometric filter radius
-     *   \param dv_dof_ids dof ids that are design variables. If a id is not in this set, then
-     *   the dof value assumes its value from the input
      */
-    FilterBase(libMesh::System         &sys,
-               const real_t            radius,
-               const std::set<uint_t>  &dv_dof_ids):
+    GeometricFilter(libMesh::System         &sys,
+                    const real_t            radius):
     _system            (sys),
     _radius            (radius),
-    _fe_size           (0.),
-    _dv_dof_ids        (dv_dof_ids) {
+    _fe_size           (0.) {
         
         Assert1(radius > 0., radius,
                 "geometric filter radius must be greater than 0.");
@@ -76,14 +73,19 @@ public:
     }
     
     
-    virtual ~FilterBase() { }
+    virtual ~GeometricFilter() { }
     
     /*!
      *   computes the filtered output from the provided input.
+     *     \p dvs is a container that provides the \p count() method to check if a given dof_id is
+     *     a design variable. If this method returns \p false for an id then the dof value assumes its
+     *     value from \p input, otherwise it is computed as a weighted sum from the filtered dvs.
      */
-    void compute_filtered_values(const libMesh::NumericVector<real_t>& input,
-                                 libMesh::NumericVector<real_t>& output,
-                                 bool close_vector = true) const {
+    template <typename ContainerType>
+    inline void compute_filtered_values(const ContainerType                  &dvs,
+                                        const libMesh::NumericVector<real_t> &input,
+                                        libMesh::NumericVector<real_t>       &output,
+                                        bool                                 close_vec) const {
         
         Assert2(input.size() == _filter_map.size(),
                 input.size(), _filter_map.size(),
@@ -111,7 +113,7 @@ public:
                 if (map_it->first >= input.first_local_index() &&
                     map_it->first <  input.last_local_index()) {
                     
-                    if (_dv_dof_ids.count(map_it->first))
+                    if (dvs.count(map_it->first))
                         output.add(map_it->first, input_vals[vec_it->first] * vec_it->second);
                     else
                         output.set(map_it->first, input_vals[map_it->first]);
@@ -119,7 +121,7 @@ public:
             }
         }
         
-        if (close_vector)
+        if (close_vec)
             output.close();
     }
     
@@ -130,9 +132,10 @@ public:
      *  If \p close_vector is \p true then \p output.close() will be called in this
      *  routines, otherwise not.
      */
-    template <typename ScalarType, typename VecType>
-    void compute_filtered_values(std::map<uint_t, ScalarType> &nonzero_vals,
-                                 VecType                      &output) const {
+    template <typename ScalarType, typename ContainerType, typename VecType>
+    void compute_filtered_values(const ContainerType                &dvs,
+                                 const std::map<uint_t, ScalarType> &nonzero_vals,
+                                 VecType                            &output) const {
         
         Assert2(output.size() == _filter_map.size(),
                 output.size(), _filter_map.size(),
@@ -141,7 +144,7 @@ public:
                 output.type(), libMesh::SERIAL,
                 "Incompatible vector");
         
-        output.zero();
+        MAST::Numerics::Utility::setZero(output);
         
         std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>::const_iterator
         map_it   = _filter_map.begin(),
@@ -156,19 +159,25 @@ public:
             for ( ; vec_it != vec_end; vec_it++) {
                 if (nonzero_vals.count(vec_it->first)) {
                     
-                    if (_dv_dof_ids.count(map_it->first))
-                        output.add(map_it->first, nonzero_vals[vec_it->first] * vec_it->second);
+                    if (dvs.count(map_it->first))
+                        MAST::Numerics::Utility::add
+                        (output, map_it->first, nonzero_vals[vec_it->first] * vec_it->second);
                     else
-                        output.set(map_it->first, nonzero_vals[map_it->first]);
+                        MAST::Numerics::Utility::set
+                        (output, map_it->first, nonzero_vals[map_it->first]);
                 }
             }
         }
     }
     
     
-    template <typename ScalarType>
-    void compute_filtered_values(const std::vector<ScalarType>  &input,
-                                 std::vector<ScalarType>        &output) const {
+    template <typename ScalarType,
+              typename ContainerType,
+              typename Vec1Type,
+              typename Vec2Type>
+    void compute_filtered_values(const ContainerType  &dvs,
+                                 const Vec1Type       &input,
+                                 Vec2Type             &output) const {
         
         Assert2(input.size() == _filter_map.size(),
                 input.size(), _filter_map.size(),
@@ -176,8 +185,8 @@ public:
         Assert2(output.size() == _filter_map.size(),
                 output.size(), _filter_map.size(),
                 "Incompatible vector sizes");
-
-        std::fill(output.begin(), output.end(), 0.);
+        
+        MAST::Numerics::Utility::setZero(output);
         
         std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>::const_iterator
         map_it   = _filter_map.begin(),
@@ -190,10 +199,14 @@ public:
             vec_end = map_it->second.end();
             
             for ( ; vec_it != vec_end; vec_it++) {
-                if (_dv_dof_ids.count(map_it->first))
-                    output[map_it->first] += input[vec_it->first] * vec_it->second;
+                if (dvs.count(map_it->first))
+                    MAST::Numerics::Utility::add
+                    (output, map_it->first,
+                     MAST::Numerics::Utility::get(input, vec_it->first) * vec_it->second);
                 else
-                    output[map_it->first] += input[map_it->first];
+                    MAST::Numerics::Utility::set
+                    (output, map_it->first,
+                     MAST::Numerics::Utility::get(input, vec_it->first));
             }
         }
     }
@@ -234,7 +247,9 @@ public:
     /*!
      *  prints the filter data.
      */
-    virtual void print(std::ostream& o) const {
+    template <typename ContainerType>
+    void print(const ContainerType  &dvs,
+               std::ostream         &o) const {
         
         o << "Filter radius: " << _radius << std::endl;
         
@@ -257,7 +272,7 @@ public:
             
             for ( ; vec_it != vec_end; vec_it++) {
                 
-                if (_dv_dof_ids.count(map_it->first))
+                if (dvs.count(map_it->first))
                     o
                     << " : " << std::setw(8) << vec_it->first
                     << " (" << std::setw(8) << vec_it->second << " )";
@@ -348,7 +363,7 @@ private:
     };
     
     inline void _init2() {
-                
+        
         libMesh::MeshBase& mesh = _system.get_mesh();
         
         // currently implemented for replicated mesh
@@ -502,7 +517,7 @@ private:
             }
             
             Assert1(sum > 0., sum, "Weight must be > 0.");
-
+            
             // with the coefficients computed for dof_1, divide each coefficient
             // with the sum
             std::vector<std::pair<uint_t, real_t>>& vec = _filter_map[dof_1];
@@ -543,12 +558,6 @@ private:
      *   largest element size in the level set mesh
      */
     real_t _fe_size;
-    
-    /*!
-     *   dof ids that are design variables. If a id is not in this set, then
-     *   the dof value assumes its value from the input
-     */
-    const std::set<uint_t>&   _dv_dof_ids;
     
     /*!
      *   Algebraic relation between filtered level set values and the
