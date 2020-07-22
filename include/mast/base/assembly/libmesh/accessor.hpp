@@ -5,6 +5,7 @@
 // MAST includes
 #include <mast/base/mast_data_types.h>
 #include <mast/base/exceptions.hpp>
+#include <mast/numerics/utility.hpp>
 
 // libMesh includes
 #include <libmesh/system.h>
@@ -51,6 +52,18 @@ public:
         
         _dof_ids.clear();
         _sys->get_dof_map().dof_indices (&e, _dof_ids);
+    }
+    
+    template <typename Vec2Type>
+    inline ScalarType dot(const Vec2Type& v) {
+        
+        Assert2(this->size() == v.size(),
+                this->size(), v.size(),
+                "Inconsistent dimensions");
+        ScalarType res = 0.;
+        
+        for (uint_t i = 0; i<this->size(); i++)
+            res += (*this)(i) * MAST::Numerics::Utility::get(v, i);
     }
     
 private:

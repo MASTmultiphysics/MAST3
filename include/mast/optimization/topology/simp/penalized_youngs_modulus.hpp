@@ -35,9 +35,8 @@ public:
     }
     
     template <typename ContextType>
-    inline ScalarType value(const ContextType& c) {
+    inline ScalarType value(const ContextType& c) const {
         
-        Assert0(_E0, "Modulus value not initialized");
         Assert0(_d,  "Density field not initialized");
         
         return _E_min + _E0 * _d->value(c);
@@ -45,7 +44,7 @@ public:
 
     template <typename ContextType, typename ScalarFieldType>
     inline ScalarType derivative(const ContextType&     c,
-                                 const ScalarFieldType& f) {
+                                 const ScalarFieldType& f) const {
         
         Assert0(_E0, "Modulus value not initialized");
         Assert0( _d, "Density field not initialized");

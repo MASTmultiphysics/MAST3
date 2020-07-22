@@ -123,6 +123,7 @@ public:
     mesh      (init.mesh),
     eq_sys    (init.eq_sys),
     sys       (init.sys),
+    rho_sys   (init.rho_sys),
     elem      (nullptr),
     qp        (-1)
     { }
@@ -141,10 +142,11 @@ public:
     { return ex_init.mesh->boundary_info->has_boundary_id(elem, s, ex_init.p_side_id);}
     
     
-    InitExample<model_t>            &ex_init;
+    InitExample<model_t>             &ex_init;
     libMesh::ReplicatedMesh          *mesh;
     libMesh::EquationSystems         *eq_sys;
     libMesh::NonlinearImplicitSystem *sys;
+    libMesh::ExplicitSystem          *rho_sys;
     const libMesh::Elem              *elem;
     uint_t                            qp;
 };
@@ -387,7 +389,7 @@ public:
         // store the vector of indices in a set to be used for
         // geometric filtering
         for (uint_t i=0; i<_dvs.size(); i++)
-            _active_dvs.insert(_dvs[i].first);
+            _active_dvs.insert(_dvs.template get_parameter_for_dv<int>(i, "dof_id"));
     }
     
     virtual ~FunctionEvaluation() {}
@@ -430,7 +432,7 @@ public:
         else {
             
             for (uint_t i=0; i<_dvs.size(); i++)
-                x[i] = (*_dvs[i].second)();
+                x[i] = _dvs[i]();
         }
     }
     
@@ -469,10 +471,13 @@ public:
         typename TraitsType::assembled_matrix_t
         jac;
         
-        for (uint_t i=0; i<_dvs.size(); i++)
-            if (_dvs[i].first >= first_local_rho &&
-                _dvs[i].first <  last_local_rho)
-                rho_base(_dvs[i].first) = x[i];
+        for (uint_t i=0; i<_dvs.size(); i++) {
+            
+            uint_t dof_id = _dvs.template get_parameter_for_dv<int>(i, "dof_id");
+            
+            if (dof_id >= first_local_rho && dof_id <  last_local_rho)
+                rho_base(dof_id) = x[i];
+        }
         //base_phi.close();
         _c.ex_init.filter->template compute_filtered_values
         <scalar_t,
@@ -519,7 +524,7 @@ public:
 
         scalar_t
         vol    = 0.,
-        comp   = 0.;
+        comp   = -sol.dot(res);
 
         // ask the system to update so that the localized solution is available for
         // further processing
@@ -546,10 +551,11 @@ public:
         //////////////////////////////////////////////////////////////////////
         if (eval_obj_grad) {
             
-            _evaluate_compliance_sensitivity(compliance,
+            /*_evaluate_compliance_sensitivity(compliance,
                                              nonlinear_elem_ops,
                                              nonlinear_assembly,
                                              obj_grad);
+             */
             
             for (uint_t i=0; i<obj_grad.size(); i++)
                 obj_grad[i] *= _obj_scaling;
@@ -611,11 +617,11 @@ public:
             _c.ex_init.rho_sys->comm().sum(*volume);
         }
         
-        
+        /*
         if (grad) {
             
             std::fill(grad->begin(), grad->end(), 0.);
-            ElementParameterDependence dep(*_c.ex_init.filter);
+           // ElementParameterDependence dep(*_c.ex_init.filter);
             
             for (uint_t i=0; i<_dvs.size(); i++) {
                 
@@ -650,6 +656,7 @@ public:
 
             this->comm().sum(*grad);
         }
+         */
     }
 
 
@@ -726,13 +733,13 @@ public:
     
 private:
     
-    ElemOps<TraitsType>   &_e_ops;
-    context_t             &_c;
-    std::vector<std::pair<uint_t, MAST::Optimization::DesignParameter<scalar_t>*>> _dvs;
-    std::set<uint_t>       _active_dvs;
-    real_t                 _volume;
-    real_t                 _obj_scaling;
-    real_t                 _vf;
+    ElemOps<TraitsType>                                 &_e_ops;
+    context_t                                           &_c;
+    MAST::Optimization::DesignParameterVector<scalar_t>  _dvs;
+    std::set<uint_t>                                     _active_dvs;
+    real_t                                               _volume;
+    real_t                                               _obj_scaling;
+    real_t                                               _vf;
 };
 } // namespace Example5
 } // namespace Structural

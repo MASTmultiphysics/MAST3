@@ -55,7 +55,7 @@ public:
         // analysis quantities
         typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, VecType>
         sol_accessor     (*c.sys, X),
-        density_accessor (*c.density_sys, density);
+        density_accessor (*c.rho_sys, density);
 
         using elem_vector_t = typename ElemOpsType::vector_t;
         using elem_matrix_t = typename ElemOpsType::matrix_t;

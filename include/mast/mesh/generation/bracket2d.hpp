@@ -22,8 +22,9 @@
 
 // MAST includes
 #include <mast/base/mast_data_types.h>
+#include <mast/base/parameter_data.hpp>
 #include <mast/util/getpot_wrapper.hpp>
-#include <mast/optimization/design_parameter.hpp>
+#include <mast/optimization/design_parameter_vector.hpp>
 
 // libMesh includes
 #include <libmesh/system.h>
@@ -297,8 +298,8 @@ struct Bracket2D {
     template <typename ScalarType, typename Context>
     inline void
     init_simp_dvs
-    (Context& c,
-     std::vector<std::pair<uint_t, MAST::Optimization::DesignParameter<ScalarType>*>> &dvs) {
+    (Context                                               &c,
+     MAST::Optimization::DesignParameterVector<ScalarType> &dvs) {
         
         //
         // this assumes that density variable has a constant value per element
@@ -321,8 +322,7 @@ struct Bracket2D {
         
         uint_t
         sys_num = c.rho_sys->number(),
-        dof_id  = 0,
-        n_vars  = 0;
+        dof_id  = 0;
         
         real_t
         val     = 0.;
@@ -346,7 +346,7 @@ struct Bracket2D {
         // maximum number of dvs is the number of nodes on the level set function
         // mesh. We will evaluate the actual number of dvs
         //
-        dvs.reserve(c.mesh->n_elem());
+        //dvs.reserve(c.mesh->n_elem());
         
         for ( ; it!=end; it++) {
             
@@ -367,8 +367,6 @@ struct Bracket2D {
             }
             else {
                 
-                std::ostringstream oss;
-                oss << "dv_" << n_vars;
                 val = local_phi[dof_id];
                 
                 //
@@ -386,14 +384,15 @@ struct Bracket2D {
                     val = rho_min;
                 }
                 
-                dvs.push_back(std::pair<uint_t, MAST::Optimization::DesignParameter<ScalarType>*>());
-                dvs[n_vars].first  = dof_id;
-                dvs[n_vars].second = new MAST::Optimization::DesignParameter<ScalarType>(val);
-                dvs[n_vars].second->set_point(n(0), n(1), n(2));
-                //c._dv_params[n_vars].second->set_as_topology_parameter(true);
-                //c._dv_dof_ids.insert(dof_id);
+                MAST::Optimization::DesignParameter<ScalarType>
+                *dv = new MAST::Optimization::DesignParameter<ScalarType>(val);
+                dv->set_point(n(0), n(1), n(2));
+
+                MAST::Base::ParameterData
+                &data = dvs.add_parameter(*dv);
                 
-                n_vars++;
+                data.add<uint>("dof_id") = dof_id;
+                //data.add<bool>("topology", true);
             }
         }
         
