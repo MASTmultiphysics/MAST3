@@ -22,6 +22,7 @@ public:
     T& add(const std::string& nm) {
         
         Error(false, "Parameter type not handled");
+        return T();
     }
         
     template <>
@@ -41,6 +42,7 @@ public:
     T get(const std::string& nm) const {
         
         Error(false, "Parameter type not handled");
+        return T();
     }
     
 

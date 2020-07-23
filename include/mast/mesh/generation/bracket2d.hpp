@@ -391,7 +391,7 @@ struct Bracket2D {
                 MAST::Base::ParameterData
                 &data = dvs.add_parameter(*dv);
                 
-                data.add<uint>("dof_id") = dof_id;
+                data.add<int>("dof_id") = dof_id;
                 //data.add<bool>("topology", true);
             }
         }

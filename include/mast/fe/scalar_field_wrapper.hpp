@@ -39,7 +39,7 @@ public:
     inline ScalarType value(const ContextType& c) const {
         
         Assert0(_fe, "Object not initialized");
-        _fe->u(c.qp, _comp);
+        return _fe->u(c.qp, _comp);
     }
 
     template <typename ContextType, typename ScalarFieldType>
@@ -47,7 +47,7 @@ public:
                                  const ScalarFieldType &f) const {
         
         Assert0(_fe_derivative, "Object not initialized");
-        _fe_derivative->u(c.qp, _comp_derivative);
+        return _fe_derivative->u(c.qp, _comp_derivative);
     }
 
     

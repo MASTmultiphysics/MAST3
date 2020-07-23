@@ -125,7 +125,8 @@ public:
     sys       (init.sys),
     rho_sys   (init.rho_sys),
     elem      (nullptr),
-    qp        (-1)
+    qp        (-1),
+    fe        (nullptr)
     { }
     
     virtual ~Context() { }
@@ -134,7 +135,7 @@ public:
     uint_t  elem_dim() const {return elem->dim();}
     uint_t  n_nodes() const {return elem->n_nodes();}
     real_t  nodal_coord(uint_t nd, uint_t c) const {return elem->point(nd)(c);}
-    real_t  qp_location(uint_t i) const {;}
+    real_t  qp_location(uint_t i) const { return fe->xyz(qp, i);}
     inline bool elem_is_quad() const {return (elem->type() == libMesh::QUAD4 ||
                                               elem->type() == libMesh::QUAD8 ||
                                               elem->type() == libMesh::QUAD9);}
@@ -142,13 +143,14 @@ public:
     { return ex_init.mesh->boundary_info->has_boundary_id(elem, s, ex_init.p_side_id);}
     
     
-    InitExample<model_t>             &ex_init;
-    libMesh::ReplicatedMesh          *mesh;
-    libMesh::EquationSystems         *eq_sys;
-    libMesh::NonlinearImplicitSystem *sys;
-    libMesh::ExplicitSystem          *rho_sys;
-    const libMesh::Elem              *elem;
-    uint_t                            qp;
+    InitExample<model_t>                &ex_init;
+    libMesh::ReplicatedMesh             *mesh;
+    libMesh::EquationSystems            *eq_sys;
+    libMesh::NonlinearImplicitSystem    *sys;
+    libMesh::ExplicitSystem             *rho_sys;
+    const libMesh::Elem                 *elem;
+    uint_t                               qp;
+    typename TraitsType::fe_shape_t     *fe;
 };
 
 
@@ -313,6 +315,7 @@ public:
         for (uint_t s=0; s<c.elem->n_sides(); s++)
             if (c.if_compute_pressure_load_on_side(s)) {
                 
+                c.fe = &_fe_side_data->fe_derivative();
                 _fe_side_data->reinit_for_side(c, s);
                 _fe_side_var->init(c, sol_v);
                 _p_load->compute(c, res, jac);
