@@ -39,12 +39,15 @@ public:
     
     inline void set_elem_ops(ElemOpsType& e_ops) { _e_ops = &e_ops; }
 
-    template <typename VecType, typename MatType, typename ContextType>
-    inline void assemble(ContextType   &c,
-                         const VecType &X,
-                         const VecType &density,
-                         VecType       *R,
-                         MatType       *J) {
+    template <typename Vec1Type,
+              typename Vec2Type,
+              typename MatType,
+              typename ContextType>
+    inline void assemble(ContextType    &c,
+                         const Vec1Type &X,
+                         const Vec2Type &density,
+                         Vec1Type       *R,
+                         MatType        *J) {
         
         Assert0( R || J, "Atleast one assembled quantity should be specified.");
         
@@ -53,7 +56,7 @@ public:
         
         // iterate over each element, initialize it and get the relevant
         // analysis quantities
-        typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, VecType>
+        typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, Vec1Type>
         sol_accessor     (*c.sys, X),
         density_accessor (*c.rho_sys, density);
 
@@ -90,11 +93,11 @@ public:
             // Dirichlet constraints, etc.
             if (R && J)
                 MAST::Base::Assembly::libMeshWrapper::constrain_and_add_matrix_and_vector
-                <ScalarType, VecType, MatType, elem_vector_t, elem_matrix_t>
+                <ScalarType, Vec1Type, MatType, elem_vector_t, elem_matrix_t>
                 (*R, *J, c.sys->get_dof_map(), sol_accessor.dof_indices(), res_e, jac_e);
             else if (R)
                 MAST::Base::Assembly::libMeshWrapper::constrain_and_add_vector
-                <ScalarType, VecType, elem_vector_t>
+                <ScalarType, Vec1Type, elem_vector_t>
                 (*R, c.sys->get_dof_map(), sol_accessor.dof_indices(), res_e);
             else
                 MAST::Base::Assembly::libMeshWrapper::constrain_and_add_matrix

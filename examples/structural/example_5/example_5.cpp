@@ -14,7 +14,7 @@
 #include <mast/optimization/topology/simp/penalized_density.hpp>
 #include <mast/optimization/topology/simp/penalized_youngs_modulus.hpp>
 #include <mast/optimization/topology/simp/libmesh/residual_and_jacobian.hpp>
-#include <mast/optimization/topology/simp/libmesh/residual_sensitivity.hpp>
+#include <mast/optimization/topology/simp/libmesh/assemble_output_sensitivity.hpp>
 #include <mast/numerics/libmesh/sparse_matrix_initialization.hpp>
 #include <mast/util/getpot_wrapper.hpp>
 #include <mast/mesh/libmesh/geometric_filter.hpp>
@@ -250,8 +250,10 @@ public:
         _fe_var->set_compute_du_dx(true);
         
         _density_fe_var->set_fe_shape_data(_fe_data->fe_derivative());
+        _density_sens_fe_var->set_fe_shape_data(_fe_data->fe_derivative());
         _density_field->set_fe_object_and_component(*_density_fe_var, 0);
-        
+        _density_field->set_derivative_fe_object_and_component(*_density_sens_fe_var, 0);
+
         // variables for physics
         density  = new typename TraitsType::density_t;
         E        = new typename TraitsType::modulus_t;
@@ -298,10 +300,12 @@ public:
     }
     
     
-    template <typename ContextType, typename AccessorType>
+    template <typename ContextType,
+              typename Accessor1Type,
+              typename Accessor2Type>
     inline void compute(ContextType                       &c,
-                        const AccessorType                &sol_v,
-                        const AccessorType                &density_v,
+                        const Accessor1Type               &sol_v,
+                        const Accessor2Type               &density_v,
                         typename TraitsType::element_vector_t &res,
                         typename TraitsType::element_matrix_t *jac) {
         
@@ -323,28 +327,44 @@ public:
     }
     
     
-    template <typename ContextType, typename AccessorType, typename ScalarFieldType>
+    template <typename ContextType,
+              typename Accessor1Type,
+              typename Accessor2Type,
+              typename Accessor3Type,
+              typename ScalarFieldType>
     inline void derivative(ContextType                       &c,
                            const ScalarFieldType             &f,
-                           const AccessorType                &sol_v,
-                           const AccessorType                &density_v,
+                           const Accessor1Type               &sol_v,
+                           const Accessor2Type               &density_v,
+                           const Accessor3Type               &density_sens,
                            typename TraitsType::element_vector_t &res,
                            typename TraitsType::element_matrix_t *jac) {
         
         _fe_data->reinit(c);
         _fe_var->init(c, sol_v);
         _density_fe_var->init(c, density_v);
-        
+        _density_sens_fe_var->init(c, density_v);
+
         _energy->derivative(c, f, res, jac);
-        
-        for (uint_t s=0; s<c.elem->n_sides(); s++)
-            if (c.if_compute_pressure_load_on_side(s)) {
-                
-                _fe_side_data->reinit_for_side(c, s);
-                _fe_side_var->init(c, sol_v);
-                _p_load->derivative(c, f, res, jac);
-            }
     }
+
+    
+    template <typename ContextType,
+              typename Accessor1Type,
+              typename Accessor2Type,
+              typename Accessor3Type,
+              typename ScalarFieldType>
+    inline scalar_t
+    derivative(ContextType                       &c,
+               const ScalarFieldType             &f,
+               const Accessor1Type               &sol_v,
+               const Accessor2Type               &density_v,
+               const Accessor3Type               &density_sens) {
+
+        // nothing to be done here since external work done due to pressure
+        // is independent of topology parameter
+    }
+
     
     // parameters
     typename TraitsType::density_t    *density;
@@ -361,6 +381,7 @@ private:
     typename TraitsType::fe_var_t          *_fe_var;
     typename TraitsType::fe_var_t          *_fe_side_var;
     typename TraitsType::density_fe_var_t  *_density_fe_var;
+    typename TraitsType::density_fe_var_t  *_density_sens_fe_var;
     typename TraitsType::density_field_t   *_density_field;
     typename TraitsType::prop_t            *_prop;
     typename TraitsType::energy_t          *_energy;
@@ -516,12 +537,13 @@ public:
         MAST::Numerics::libMeshWrapper::init_sparse_matrix(str_sys.get_dof_map(), jac);
         
         assembly.assemble(_c, sol, rho_filtered, &res, &jac);
+        res *= -1;
         
-        sol = Eigen::SparseLU<typename TraitsType::assembled_matrix_t>(jac).solve(-res);
+        sol = Eigen::SparseLU<typename TraitsType::assembled_matrix_t>(jac).solve(res);
 
         scalar_t
         vol    = 0.,
-        comp   = -sol.dot(res);
+        comp   = sol.dot(res);
 
         // ask the system to update so that the localized solution is available for
         // further processing
@@ -548,11 +570,19 @@ public:
         //////////////////////////////////////////////////////////////////////
         if (eval_obj_grad) {
             
-            /*_evaluate_compliance_sensitivity(compliance,
-                                             nonlinear_elem_ops,
-                                             nonlinear_assembly,
-                                             obj_grad);
-             */
+            MAST::Optimization::Topology::SIMP::libMeshWrapper::AssembleOutputSensitivity
+            <scalar_t, ElemOps<TraitsType>, ElemOps<TraitsType>>
+            compliance_sens;
+            
+            compliance_sens.set_elem_ops(_e_ops, _e_ops);
+            
+            compliance_sens.assemble(_c,
+                                     sol,
+                                     rho_filtered,
+                                     res,
+                                     *_c.ex_init.filter,
+                                     _dvs,
+                                     obj_grad);
             
             for (uint_t i=0; i<obj_grad.size(); i++)
                 obj_grad[i] *= _obj_scaling;
@@ -564,6 +594,11 @@ public:
         //////////////////////////////////////////////////////////////////////
         if (if_grad_sens) {
             
+            //////////////////////////////////////////////////////////////////
+            // indices used by GCMMA follow this rule:
+            // grad_k = dfi/dxj  ,  where k = j*NFunc + i
+            //////////////////////////////////////////////////////////////////
+
             _evaluate_volume(rho_filtered, nullptr, &grads);
             for (uint_t i=0; i<grads.size(); i++)
                 grads[i] /= _volume;
@@ -611,7 +646,7 @@ public:
                 *volume  +=  e.volume() * rho;
             }
             
-            _c.ex_init.rho_sys->comm().sum(*volume);
+            //_c.ex_init.rho_sys->comm().sum(*volume);
         }
         
         /*
@@ -655,72 +690,8 @@ public:
         }
          */
     }
-
-
-    /*void
-    _evaluate_compliance_sensitivity
-    (MAST::ComplianceOutput&                  compliance,
-     MAST::AssemblyElemOperations&            nonlinear_elem_ops,
-     MAST::NonlinearImplicitAssembly&         nonlinear_assembly,
-     std::vector<scalar_t>& grads) {
-        
-        // Adjoint solution for compliance = - X
-        
-        ElementParameterDependence dep(*_filter);
-        nonlinear_assembly.attach_elem_parameter_dependence_object(dep);
-
-        //////////////////////////////////////////////////////////////////
-        // indices used by GCMMA follow this rule:
-        // grad_k = dfi/dxj  ,  where k = j*NFunc + i
-        //////////////////////////////////////////////////////////////////
-        // first compute the sensitivity contribution from dot product of adjoint vector
-        // and residual sensitivity
-        std::vector<Real>
-        g1(_dvs.size(), 0.),
-        g2(_dvs.size(), 0.);
-        std::vector<const MAST::FunctionBase*>
-        p_vec(_dvs.size(), nullptr);
-        for (uint_t i=0; i<_dvs.size(); i++)
-            p_vec[i] = _dvs[i].second;
-        
-        //////////////////////////////////////////////////////////////////////
-        // compliance sensitivity
-        //////////////////////////////////////////////////////////////////////
-        // set the elasticity penalty for solution, which is needed for
-        // computation of the residual sensitivity
-        nonlinear_assembly.calculate_output_adjoint_sensitivity_multiple_parameters_no_direct
-        (*_sys->current_local_solution,
-         false,
-         *_sys->current_local_solution,
-         p_vec,
-         nonlinear_elem_ops,
-         compliance,
-         g1);
-
-        compliance.set_skip_comm_sum(true);
-        for (uint_t i=0; i<_dvs.size(); i++) {
-            
-            nonlinear_assembly.calculate_output_direct_sensitivity(*_sys->current_local_solution,
-                                                                   false,
-                                                                   nullptr,
-                                                                   false,
-                                                                   *_dvs[i].second,
-                                                                   compliance);
-            g2[i] = compliance.output_sensitivity_total(*_dvs[i].second);
-        }
-        
-        compliance.set_skip_comm_sum(false);
-        
-        // now sum the values across processors to sum the partial derivatives for
-        // each parameter
-        _sys->comm().sum(g2);
-
-        for (uint_t i=0; i<_dvs.size(); i++)
-            grads[i] = -(g1[i] + g2[i]);
-
-        nonlinear_assembly.clear_elem_parameter_dependence_object();
-    }*/
-
+    
+    
     inline void output(const uint_t                iter,
                        const std::vector<real_t>  &dvars,
                        real_t                     &o,

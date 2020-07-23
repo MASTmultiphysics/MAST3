@@ -8,6 +8,7 @@
 #include <mast/base/assembly/libmesh/utility.hpp>
 #include <mast/base/assembly/libmesh/accessor.hpp>
 #include <mast/numerics/utility.hpp>
+#include <mast/optimization/design_parameter_vector.hpp>
 
 // libMesh includes
 #include <libmesh/nonlinear_implicit_system.h>
@@ -27,9 +28,14 @@ class AssembleOutputSensitivity {
     
 public:
 
-    static_assert(std::is_same<ScalarType, typename ElemOpsType::scalar_t>::value,
+    static_assert(std::is_same<ScalarType,
+                  typename ResidualElemOpsType::scalar_t>::value,
+                  "Scalar type of assembly and element operations must be same");
+    static_assert(std::is_same<ScalarType,
+                  typename OutputElemOpsType::scalar_t>::value,
                   "Scalar type of assembly and element operations must be same");
 
+    
     AssembleOutputSensitivity():
     _e_ops        (nullptr),
     _output_e_ops (nullptr)
@@ -48,36 +54,43 @@ public:
      *  output derivative is defined as a
      * \f[ \frac{dQ}{d\alpha} = \frac{\partial Q}{\partial \alpha} + \lambda^T \frac{\partial R}{\partial \alpha} \f]
      */
-    template <typename VecType,
+    template <typename Vec1Type,
+              typename Vec2Type,
               typename ContextType,
-              typename ScalarFieldType,
-              typename DVType,
               typename FilterType>
     inline void assemble(ContextType               &c,
-                         const ScalarFieldType     &f,
-                         const VecType             &X,
-                         const VecType             &X_adj,
+                         const Vec1Type            &X,
+                         const Vec2Type            &density,
+                         const Vec1Type            &X_adj,
                          const FilterType          &filter,
-                         const std::vector<DVType> &dvs,
+                         const MAST::Optimization::DesignParameterVector<ScalarType> &dvs,
                          std::vector<ScalarType>   &sens) {
                 
         Assert0(_e_ops && _output_e_ops, "Elem Operation objects not initialized");
         Assert2(dvs.size() == sens.size(),
                 dvs.size(), sens.size(),
                 "DV and sensitivity vectors must have same size");
-        
+                
         MAST::Numerics::Utility::setZero(sens);
+        std::vector<ScalarType> v(sens.size(), ScalarType());
         
         // iterate over each element, initialize it and get the relevant
         // analysis quantities
-        typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, VecType>
-        sol_accessor(*c.sys, X),
-        adj_accessor(*c.sys, X_adj);
-
-        using elem_vector_t = typename ElemOpsType::vector_t;
-        using elem_matrix_t = typename ElemOpsType::matrix_t;
+        typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, Vec1Type>
+        sol_accessor     (*c.sys, X),
+        adj_accessor     (*c.sys, X_adj);
         
-        elem_vector_t  dres_e;
+        typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, Vec2Type>
+        density_accessor (*c.rho_sys, density);
+
+        using elem_vector_t = typename ResidualElemOpsType::vector_t;
+        using elem_matrix_t = typename ResidualElemOpsType::matrix_t;
+        
+        elem_vector_t
+        dres_e,
+        drho;
+        
+        std::set<uint_t> density_dofs;
         
         libMesh::MeshBase::const_element_iterator
         el     = c.mesh->active_local_elements_begin(),
@@ -92,23 +105,59 @@ public:
             c.elem = *el;
             
             sol_accessor.init(*c.elem);
+            density_accessor.init(*c.elem);
             adj_accessor.init(*c.elem);
-
+            
+            density_accessor.init_dof_id_set(density_dofs);
+            
             dres_e.setZero(sol_accessor.n_dofs());
 
             for (uint_t i=0; i<dvs.size(); i++) {
                 
-                // perform the element level calculations
-                _e_ops->derivative(c, *dvs[i], sol_accessor, dres_e, nullptr);
-                sens[i]  = _output_e_ops->derivative(c, *dvs[i], sol_accessor);
-                sens[i] += adj_accessor.dot(dres_e);
+                // this assumes that if the DV (which is associated with a node)
+                // is connected to this element, then the dof_indices for this
+                // element will contain this index. If not, then the contribution
+                // of this element to the sensitivity is zero.
+                const uint_t
+                param_dof_id =
+                dvs.get_data_for_parameter(dvs[i]).template get<int>("dv_id");
+                
+                if (density_dofs.count(param_dof_id)) {
+                
+                    const std::vector<libMesh::dof_id_type>
+                    &density_dof_ids = density_accessor.dof_indices();
+                    
+                    // set a unit value of density sensitivity
+                    // for this dof
+                    drho.setZero(density_dof_ids.size());
+                    for (uint_t i=0; i<density_dof_ids.size(); i++) {
+                        
+                        if (density_dof_ids[i] == param_dof_id) {
+                            drho(i) = 1;
+                            break;
+                        }
+                    }
+                    
+                    // perform the element level calculations
+                    _e_ops->derivative(c,
+                                       dvs[i],
+                                       sol_accessor,
+                                       density_accessor,
+                                       drho,
+                                       dres_e,
+                                       nullptr);
+                    sens[i]  = _output_e_ops->derivative(c,
+                                                         dvs[i],
+                                                         sol_accessor,
+                                                         density_accessor,
+                                                         drho);
+                    sens[i] += adj_accessor.dot(dres_e);
+                }
             }
         }
         
         // Now, combine the sensitivty with the filtering data
-        filter.compute_filtered_values
-        <ScalarType, >
-();
+        filter.compute_filtered_values(dvs, v, sens);
     }
 
 private:

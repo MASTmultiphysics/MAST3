@@ -53,6 +53,14 @@ public:
         _dof_ids.clear();
         _sys->get_dof_map().dof_indices (&e, _dof_ids);
     }
+
+    inline void init_dof_id_set(std::set<uint_t>& dofs) {
+        
+        dofs.clear();
+        
+        for (uint_t i=0; i<_dof_ids.size(); i++)
+            dofs.insert(_dof_ids[i]);
+    }
     
     template <typename Vec2Type>
     inline ScalarType dot(const Vec2Type& v) {

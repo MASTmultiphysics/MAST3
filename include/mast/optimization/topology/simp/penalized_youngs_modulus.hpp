@@ -46,7 +46,6 @@ public:
     inline ScalarType derivative(const ContextType&     c,
                                  const ScalarFieldType& f) const {
         
-        Assert0(_E0, "Modulus value not initialized");
         Assert0( _d, "Density field not initialized");
         
         return _E0 * _d->derivative(c, f);
