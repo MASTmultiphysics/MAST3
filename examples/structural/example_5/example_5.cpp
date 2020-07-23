@@ -370,6 +370,7 @@ public:
 
         // nothing to be done here since external work done due to pressure
         // is independent of topology parameter
+        return 0.;
     }
 
     

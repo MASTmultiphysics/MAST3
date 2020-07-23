@@ -72,6 +72,8 @@ public:
         
         for (uint_t i = 0; i<this->size(); i++)
             res += (*this)(i) * MAST::Numerics::Utility::get(v, i);
+        
+        return res;
     }
     
 private:
