@@ -26,6 +26,7 @@
 #include <mast/base/mast_data_types.h>
 #include <mast/base/exceptions.hpp>
 #include <mast/numerics/utility.hpp>
+#include <mast/optimization/design_parameter_vector.hpp>
 
 // libMesh includes
 #include "libmesh/system.h"
@@ -77,15 +78,13 @@ public:
     
     /*!
      *   computes the filtered output from the provided input.
-     *     \p dvs is a container that provides the \p count() method to check if a given dof_id is
-     *     a design variable. If this method returns \p false for an id then the dof value assumes its
-     *     value from \p input, otherwise it is computed as a weighted sum from the filtered dvs.
      */
-    template <typename ContainerType>
-    inline void compute_filtered_values(const ContainerType                  &dvs,
-                                        const libMesh::NumericVector<real_t> &input,
-                                        libMesh::NumericVector<real_t>       &output,
-                                        bool                                 close_vec) const {
+    inline void
+    compute_filtered_values
+    (const MAST::Optimization::DesignParameterVector<real_t> &dvs,
+     const libMesh::NumericVector<real_t>            &input,
+     libMesh::NumericVector<real_t>                  &output,
+     bool                                            close_vec) const {
         
         Assert2(input.size() == _filter_map.size(),
                 input.size(), _filter_map.size(),
@@ -113,7 +112,7 @@ public:
                 if (map_it->first >= input.first_local_index() &&
                     map_it->first <  input.last_local_index()) {
                     
-                    if (dvs.count(map_it->first))
+                    if (dvs.is_design_parameter_index(map_it->first))
                         output.add(map_it->first, input_vals[vec_it->first] * vec_it->second);
                     else
                         output.set(map_it->first, input_vals[map_it->first]);
@@ -132,10 +131,12 @@ public:
      *  If \p close_vector is \p true then \p output.close() will be called in this
      *  routines, otherwise not.
      */
-    template <typename ScalarType, typename ContainerType, typename VecType>
-    void compute_filtered_values(const ContainerType                &dvs,
-                                 const std::map<uint_t, ScalarType> &nonzero_vals,
-                                 VecType                            &output) const {
+    template <typename ScalarType, typename VecType>
+    inline void
+    compute_filtered_values
+    (const MAST::Optimization::DesignParameterVector<ScalarType> &dvs,
+     const std::map<uint_t, ScalarType>              &nonzero_vals,
+     VecType                                         &output) const {
         
         Assert2(output.size() == _filter_map.size(),
                 output.size(), _filter_map.size(),
@@ -159,7 +160,7 @@ public:
             for ( ; vec_it != vec_end; vec_it++) {
                 if (nonzero_vals.count(vec_it->first)) {
                     
-                    if (dvs.count(map_it->first))
+                    if (dvs.is_design_parameter(map_it->first))
                         MAST::Numerics::Utility::add
                         (output, map_it->first, nonzero_vals[vec_it->first] * vec_it->second);
                     else
@@ -172,12 +173,13 @@ public:
     
     
     template <typename ScalarType,
-              typename ContainerType,
               typename Vec1Type,
               typename Vec2Type>
-    void compute_filtered_values(const ContainerType  &dvs,
-                                 const Vec1Type       &input,
-                                 Vec2Type             &output) const {
+    inline void
+    compute_filtered_values
+    (const MAST::Optimization::DesignParameterVector<ScalarType> &dvs,
+     const Vec1Type       &input,
+     Vec2Type             &output) const {
         
         Assert2(input.size() == _filter_map.size(),
                 input.size(), _filter_map.size(),
@@ -199,7 +201,7 @@ public:
             vec_end = map_it->second.end();
             
             for ( ; vec_it != vec_end; vec_it++) {
-                if (dvs.count(map_it->first))
+                if (dvs.is_design_parameter_index(map_it->first))
                     MAST::Numerics::Utility::add
                     (output, map_it->first,
                      MAST::Numerics::Utility::get(input, vec_it->first) * vec_it->second);
@@ -247,9 +249,10 @@ public:
     /*!
      *  prints the filter data.
      */
-    template <typename ContainerType>
-    void print(const ContainerType  &dvs,
-               std::ostream         &o) const {
+    template <typename ScalarType>
+    inline void
+    print(const MAST::Optimization::DesignParameterVector<ScalarType> &dvs,
+          std::ostream         &o) const {
         
         o << "Filter radius: " << _radius << std::endl;
         
@@ -272,7 +275,7 @@ public:
             
             for ( ; vec_it != vec_end; vec_it++) {
                 
-                if (dvs.count(map_it->first))
+                if (dvs.is_design_parameter(map_it->first))
                     o
                     << " : " << std::setw(8) << vec_it->first
                     << " (" << std::setw(8) << vec_it->second << " )";

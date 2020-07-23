@@ -388,11 +388,6 @@ public:
         
         // initialize the design variable vector
         _c.ex_init.model->init_simp_dvs(_c.ex_init, _dvs);
-        
-        // store the vector of indices in a set to be used for
-        // geometric filtering
-        for (uint_t i=0; i<_dvs.size(); i++)
-            _active_dvs.insert(_dvs.template get_parameter_for_dv<int>(i, "dof_id"));
     }
     
     virtual ~FunctionEvaluation() {}
@@ -484,10 +479,9 @@ public:
         //base_phi.close();
         _c.ex_init.filter->template compute_filtered_values
         <scalar_t,
-        std::set<uint_t>,
         typename TraitsType::assembled_vector_t,
         typename TraitsType::assembled_vector_t>
-        (_active_dvs, rho_base, rho_filtered);
+        (_dvs, rho_base, rho_filtered);
 
         // this will create a localized vector in _level_set_sys->curret_local_solution
         //_density_sys->update();
@@ -739,7 +733,6 @@ private:
     ElemOps<TraitsType>                                 &_e_ops;
     context_t                                           &_c;
     MAST::Optimization::DesignParameterVector<scalar_t>  _dvs;
-    std::set<uint_t>                                     _active_dvs;
     real_t                                               _volume;
     real_t                                               _obj_scaling;
     real_t                                               _vf;

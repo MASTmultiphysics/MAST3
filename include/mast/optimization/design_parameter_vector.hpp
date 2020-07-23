@@ -41,6 +41,14 @@ public:
         return *_parameters[i];
     }
 
+    
+    inline bool
+    is_design_parameter_index(const uint_t i) const {
+        
+        return _dv_index.count(i);
+    }
+    
+    
     inline const MAST::Optimization::DesignParameter<ScalarType>&
     operator[](uint_t i) const {
         
@@ -73,6 +81,33 @@ public:
         
         MAST::Base::ParameterData* d = new MAST::Base::ParameterData;
         _data[&p] = d;
+        
+        return *d;
+    }
+
+
+    /*!
+     * \param id is the location of the coefficient in the global vector that stores the scalar field (density or level-set)
+     *  used to define the topology.
+     */
+    inline MAST::Base::ParameterData&
+    add_topology_parameter(MAST::Optimization::DesignParameter<ScalarType>& p,
+                           const uint_t id) {
+
+        // make sure this does not exist
+        typename std::map<const MAST::Optimization::DesignParameter<ScalarType>*,
+                          MAST::Base::ParameterData*>::iterator
+        it   = _data.find(&p);
+        
+        Assert0(it->first == &p, "Parameter already exists");
+        
+        _parameters.push_back(&p);
+        
+        MAST::Base::ParameterData* d = new MAST::Base::ParameterData;
+        _data[&p] = d;
+
+        d->add<int>("dof_id") = id;
+        _dv_index.insert(id);
         
         return *d;
     }
@@ -111,6 +146,7 @@ private:
     std::vector<MAST::Optimization::DesignParameter<ScalarType>*>    _parameters;
     std::map<const MAST::Optimization::DesignParameter<ScalarType>*,
              MAST::Base::ParameterData*> _data;
+    std::set<uint_t>                     _dv_index;
 };
 
 } // namespace Optimization
