@@ -15,6 +15,7 @@
 #include <mast/optimization/topology/simp/penalized_youngs_modulus.hpp>
 #include <mast/optimization/topology/simp/libmesh/residual_and_jacobian.hpp>
 #include <mast/optimization/topology/simp/libmesh/assemble_output_sensitivity.hpp>
+#include <mast/optimization/topology/simp/libmesh/volume.hpp>
 #include <mast/numerics/libmesh/sparse_matrix_initialization.hpp>
 #include <mast/util/getpot_wrapper.hpp>
 #include <mast/mesh/libmesh/geometric_filter.hpp>
@@ -63,7 +64,8 @@ public:
     sys       (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("structural")),
     rho_sys   (&eq_sys->add_system<libMesh::ExplicitSystem>("density")),
     filter    (nullptr),
-    p_side_id (-1) {
+    p_side_id (-1),
+    penalty   (0.) {
         
         model->init_analysis_mesh(*this, *mesh);
 
@@ -85,6 +87,9 @@ public:
         
         mesh->print_info(std::cout);
         eq_sys->print_info(std::cout);
+        
+        penalty  = input("rho_penalty",
+                         "SIMP modulus of elasticity penalty", 3.);
     }
     
     virtual ~InitExample() {
@@ -108,6 +113,7 @@ public:
     libMesh::ExplicitSystem                     *rho_sys;
     MAST::Mesh::libMeshWrapper::GeometricFilter *filter;
     uint_t                                       p_side_id;
+    real_t                                       penalty;
 };
 
 
@@ -200,7 +206,6 @@ public:
     using vector_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using matrix_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     
-    
     ElemOps(context_t  &c):
     density         (nullptr),
     E               (nullptr),
@@ -230,8 +235,9 @@ public:
         _fe_var        = new typename TraitsType::fe_var_t;
         _fe_side_var   = new typename TraitsType::fe_var_t;
         
-        _density_fe_var= new typename TraitsType::density_fe_var_t;
-        _density_field = new typename TraitsType::density_field_t;
+        _density_fe_var      = new typename TraitsType::density_fe_var_t;
+        _density_sens_fe_var = new typename TraitsType::density_fe_var_t;
+        _density_field       = new typename TraitsType::density_field_t;
         
         // associate variables with the shape functions
         _fe_var->set_fe_shape_data(_fe_data->fe_derivative());
@@ -262,6 +268,7 @@ public:
         area     = new typename TraitsType::area_t(1.0);
         _prop    = new typename TraitsType::prop_t;
         
+        density->set_penalty(c.ex_init.penalty);
         density->set_density_field(*_density_field);
         E->set_density(*density);
         E->set_modulus(72.e9, 72.e2);
@@ -523,9 +530,6 @@ public:
         
         std::cout << "Static Solve" << std::endl;
 
-        real_t
-        penalty          = _c.ex_init.input("rho_penalty",
-                                            "SIMP modulus of elasticity penalty", 4.);
         // set the elasticity penalty for solution
         //_Ef->set_penalty_val(penalty);
 
@@ -554,7 +558,10 @@ public:
         //////////////////////////////////////////////////////////////////////
         
         // evaluate the volume for used in the problem setup
-        _evaluate_volume(rho_filtered, &vol, nullptr);
+        MAST::Optimization::Topology::SIMP::libMeshWrapper::Volume<scalar_t>
+        volume;
+        
+        vol = volume.compute(_c, rho_filtered);
         std::cout << "volume: " << vol << std::endl;
         
         // evaluate the output based on specified problem type
@@ -599,7 +606,11 @@ public:
             // grad_k = dfi/dxj  ,  where k = j*NFunc + i
             //////////////////////////////////////////////////////////////////
 
-            _evaluate_volume(rho_filtered, nullptr, &grads);
+            volume.derivative(_c,
+                              rho_filtered,
+                              *_c.ex_init.filter,
+                              _dvs,
+                              grads);
             for (uint_t i=0; i<grads.size(); i++)
                 grads[i] /= _volume;
         }
@@ -610,87 +621,6 @@ public:
         //_Ef->set_penalty_val(stress_penalty);
         //stress_assembly.update_stress_strain_data(stress, *_sys->solution);
     }
-    
-    void _evaluate_volume(const typename TraitsType::assembled_vector_t& sol,
-                          scalar_t                                       *volume,
-                          std::vector<scalar_t>                          *grad) {
-        
-        uint_t
-        sys_num = _c.ex_init.rho_sys->number();
-        
-        if (volume) {
-
-            *volume = 0.;
-            
-            libMesh::MeshBase::element_iterator
-            it    =  _c.ex_init.mesh->active_local_elements_begin(),
-            end   =  _c.ex_init.mesh->active_local_elements_end();
-            
-            scalar_t
-            rho = 0.;
-            
-            for ( ; it != end; it++) {
-                
-                const libMesh::Elem& e = **it;
-                
-                // compute the average element density value
-                rho = 0.;
-                for (uint_t i=0; i<e.n_nodes(); i++) {
-                    const libMesh::Node& n = *e.node_ptr(i);
-                    rho +=
-                    MAST::Numerics::Utility::get(sol, n.dof_number(sys_num, 0, 0));
-                }
-                rho /= (1. * e.n_nodes());
-
-                // use this density value to compute the volume
-                *volume  +=  e.volume() * rho;
-            }
-            
-            //_c.ex_init.rho_sys->comm().sum(*volume);
-        }
-        
-        /*
-        if (grad) {
-            
-            std::fill(grad->begin(), grad->end(), 0.);
-           // ElementParameterDependence dep(*_c.ex_init.filter);
-            
-            for (uint_t i=0; i<_dvs.size(); i++) {
-                
-                libMesh::MeshBase::element_iterator
-                it    =  _c.ex_init.mesh->active_local_elements_begin(),
-                end   =  _c.ex_init.mesh->active_local_elements_end();
-                
-                real_t
-                drho = 0.;
-                
-                for ( ; it != end; it++) {
-                    
-                    const libMesh::Elem& e = **it;
-                    
-                    // do not compute if the element is not in the domain
-                    // of influence of the parameter
-                    if (!dep.if_elem_depends_on_parameter(e, *_dvs[i].second))
-                        continue;
-                    
-                    // compute the average element density value
-                    drho = 0.;
-                    for (uint_t j=0; j<e.n_nodes(); j++) {
-                        const libMesh::Node& n = *e.node_ptr(j);
-                        drho += dsol_vecs[i]->el(n.dof_number(sys_num, 0, 0));
-                    }
-                    drho /= (1. * e.n_nodes());
-                    
-                    // use this density value to compute the volume
-                    (*grad)[i]  +=  e.volume() * drho;
-                }
-            }
-
-            this->comm().sum(*grad);
-        }
-         */
-    }
-    
     
     inline void output(const uint_t                iter,
                        const std::vector<real_t>  &dvars,

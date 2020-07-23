@@ -75,7 +75,7 @@ public:
                           MAST::Base::ParameterData*>::iterator
         it   = _data.find(&p);
         
-        Assert0(it->first == &p, "Parameter already exists");
+        Assert0(it == _data.end(), "Parameter already exists");
         
         _parameters.push_back(&p);
         
@@ -99,7 +99,7 @@ public:
                           MAST::Base::ParameterData*>::iterator
         it   = _data.find(&p);
         
-        Assert0(it->first == &p, "Parameter already exists");
+        Assert0(it == _data.end(), "Parameter already exists");
         
         _parameters.push_back(&p);
         
@@ -121,7 +121,7 @@ public:
                           MAST::Base::ParameterData*>::const_iterator
         it   = _data.find(&p);
         
-        Assert0(it->first != &p, "Parameter does not exists in vector");
+        Assert0(it != _data.end(), "Parameter does not exists in vector");
         
         return *it->second;
     }
@@ -135,7 +135,7 @@ public:
                           MAST::Base::ParameterData*>::iterator
         it   = _data.find(&p);
         
-        Assert0(it->first != &p, "Parameter does not exists in vector");
+        Assert0(it != _data.end(), "Parameter does not exists in vector");
         
         return *it->second;
     }

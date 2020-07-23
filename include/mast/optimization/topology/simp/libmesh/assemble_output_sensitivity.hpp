@@ -90,6 +90,13 @@ public:
         dres_e,
         drho;
         
+        std::vector<uint_t>
+        param_dof_ids(dvs.size());
+        
+        // cache values for later use
+        for (uint_t i=0; i<dvs.size(); i++)
+            param_dof_ids[i] = dvs.get_data_for_parameter(dvs[i]).template get<int>("dv_id");
+        
         std::set<uint_t> density_dofs;
         
         libMesh::MeshBase::const_element_iterator
@@ -118,11 +125,7 @@ public:
                 // is connected to this element, then the dof_indices for this
                 // element will contain this index. If not, then the contribution
                 // of this element to the sensitivity is zero.
-                const uint_t
-                param_dof_id =
-                dvs.get_data_for_parameter(dvs[i]).template get<int>("dv_id");
-                
-                if (density_dofs.count(param_dof_id)) {
+                if (density_dofs.count(param_dof_ids[i])) {
                 
                     const std::vector<libMesh::dof_id_type>
                     &density_dof_ids = density_accessor.dof_indices();
@@ -132,8 +135,8 @@ public:
                     drho.setZero(density_dof_ids.size());
                     for (uint_t i=0; i<density_dof_ids.size(); i++) {
                         
-                        if (density_dof_ids[i] == param_dof_id) {
-                            drho(i) = 1;
+                        if (density_dof_ids[i] == param_dof_ids[i]) {
+                            drho(i) = 1.;
                             break;
                         }
                     }
@@ -146,7 +149,7 @@ public:
                                        drho,
                                        dres_e,
                                        nullptr);
-                    sens[i]  = _output_e_ops->derivative(c,
+                    sens[i] += _output_e_ops->derivative(c,
                                                          dvs[i],
                                                          sol_accessor,
                                                          density_accessor,

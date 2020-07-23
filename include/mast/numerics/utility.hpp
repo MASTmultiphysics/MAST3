@@ -141,6 +141,60 @@ copy(const MatType& m_from,
 }
 
 
+inline void
+comm_sum(const libMesh::Parallel::Communicator& comm,
+         real_t& v) {
+    comm.sum(v);
+}
+
+
+inline void
+comm_sum(const libMesh::Parallel::Communicator& comm,
+         complex_t& v) {
+    real_t
+    v_re = v.real(),
+    v_im = v.imag();
+    
+    comm.sum(v_re);
+    comm.sum(v_im);
+    
+    v.real(v_re);
+    v.imag(v_im);
+}
+
+
+inline void
+comm_sum(const libMesh::Parallel::Communicator& comm,
+         std::vector<real_t>& v) {
+    comm.sum(v);
+}
+
+
+inline void
+comm_sum(const libMesh::Parallel::Communicator& comm,
+         std::vector<complex_t>& v) {
+    
+    std::vector<real_t>
+    v_re(v.size()),
+    v_im(v.size());
+    
+    for (uint_t i=0; i<v.size(); i++) {
+        
+        v_re[i] = v[i].real();
+        v_im[i] = v[i].imag();
+    }
+    
+    comm.sum(v_re);
+    comm.sum(v_im);
+    
+    for (uint_t i=0; i<v.size(); i++) {
+        
+        v[i].real(v_re[i]);
+        v[i].imag(v_im[i]);
+    }
+}
+
+
 } // namespace Utility
 } // namespace Numerics
 } // namespace MAST
