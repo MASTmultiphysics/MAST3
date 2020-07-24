@@ -47,7 +47,7 @@ public:
         Assert0(_material && _th, "Material and thickness not provided");
 
         _material->value(c, m);
-        m *= std::pow(_th->value(c), 3)/12.;
+        m *= pow(_th->value(c), 3)/12.;
      }
     
     
@@ -64,8 +64,8 @@ public:
         _material->value(c, m);
         _material->derivative(c, f, dm);
         
-        dm *= std::pow(_th->value(c), 3)/12.;
-        m  *= std::pow(_th->value(c), 2)/4.*_th->derivative(c, f);
+        dm *= pow(_th->value(c), 3)/12.;
+        m  *= pow(_th->value(c), 2)/4.*_th->derivative(c, f);
         m  += dm;
     }
 

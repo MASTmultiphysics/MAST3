@@ -33,7 +33,7 @@ public:
         Assert0(_p, "Penalty value not initialized");
         Assert0(_d, "Density field not initialized");
         
-        return std::pow(_d->value(c), _p);
+        return pow(_d->value(c), _p);
     }
 
     template <typename ContextType, typename ScalarFieldType>
@@ -43,7 +43,7 @@ public:
         Assert0(_p, "Penalty value not initialized");
         Assert0(_d, "Density field not initialized");
         
-        return _p * std::pow(_d->value(c), _p-1.) * _d->derivative(c, f);
+        return _p * pow(_d->value(c), _p-1.) * _d->derivative(c, f);
     }
 
     
