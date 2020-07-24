@@ -12,6 +12,7 @@
 // libMesh includes
 #include <libmesh/numeric_vector.h>
 #include <libmesh/sparse_matrix.h>
+#include <libmesh/parallel.h>
 
 namespace MAST {
 namespace Numerics {
