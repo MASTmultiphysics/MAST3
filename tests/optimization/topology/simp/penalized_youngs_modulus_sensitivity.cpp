@@ -39,14 +39,8 @@ struct DensityField {
 inline void test_penalized_youngs_modulus_sensitivity()  {
 
     using density_r_t  = MAST::Optimization::Topology::SIMP::PenalizedDensity<real_t, DensityField<real_t>>;
-    using density_cs_t = MAST::Optimization::Topology::SIMP::PenalizedDensity<complex_t, DensityField<complex_t>>;
-    using density_ad_t = MAST::Optimization::Topology::SIMP::PenalizedDensity<adouble_tl_t, DensityField<adouble_tl_t>>;
-
     using youngs_mod_r_t  = MAST::Optimization::Topology::SIMP::PenalizedYoungsModulus<real_t, density_r_t>;
-    using youngs_mod_cs_t = MAST::Optimization::Topology::SIMP::PenalizedYoungsModulus<complex_t, density_cs_t>;
-    using youngs_mod_ad_t = MAST::Optimization::Topology::SIMP::PenalizedYoungsModulus<adouble_tl_t, density_ad_t>;
 
-    
     Context c;
     DensityField<real_t> field;
 
@@ -66,6 +60,10 @@ inline void test_penalized_youngs_modulus_sensitivity()  {
     
     // complex step sensitivity
     {
+        using density_cs_t = MAST::Optimization::Topology::SIMP::PenalizedDensity<complex_t, DensityField<complex_t>>;
+
+        using youngs_mod_cs_t = MAST::Optimization::Topology::SIMP::PenalizedYoungsModulus<complex_t, density_cs_t>;
+        
         DensityField<complex_t> field_cs;
         field_cs.v += complex_t(0., ComplexStepDelta);
         
@@ -86,6 +84,9 @@ inline void test_penalized_youngs_modulus_sensitivity()  {
 #if MAST_ENABLE_ADOLC == 1
     // automatic differentiation
     {
+        using density_ad_t = MAST::Optimization::Topology::SIMP::PenalizedDensity<adouble_tl_t, DensityField<adouble_tl_t>>;
+        using youngs_mod_ad_t = MAST::Optimization::Topology::SIMP::PenalizedYoungsModulus<adouble_tl_t, density_ad_t>;
+
         DensityField<adouble_tl_t> field_ad;
         field_ad.v.setADValue(&field_ad.dv);
         
