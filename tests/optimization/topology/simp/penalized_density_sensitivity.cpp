@@ -19,7 +19,7 @@ struct Context {};
 template <typename ScalarType>
 struct DensityField {
     
-    DensityField(): v(2.5), dv(1.) {}
+    DensityField(): v(0.5), dv(0.75) {}
     
     inline ScalarType
     value(const Context& c) const { return v;}
@@ -68,7 +68,7 @@ inline void test_penalized_density_sensitivity()  {
         complex_t
         rho_cs  = density_cs.value(c);
 
-        drho_cs = rho_cs.imag()/ComplexStepDelta;
+        drho_cs = field_cs.dv * rho_cs.imag()/ComplexStepDelta;
     }
 
 
