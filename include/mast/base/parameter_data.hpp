@@ -16,50 +16,57 @@ public:
     
     ParameterData() { }
     
+    
     virtual ~ParameterData() { }
     
+    
     template <typename T>
-    T& add(const std::string& nm) {
+    inline T&
+    add(const std::string& nm) {
         
-        Error(false, "Parameter type not handled");
-        return T();
+        return _add_to_map<T>(nm, _get_map(T()));
     }
-        
-    template <>
-    int& add<int>(const std::string& nm) {
-        
-        return _add_to_map<int>(nm, _int_data);
-    }
-
-    template <>
-    real_t& add<real_t>(const std::string& nm) {
-        
-        return _add_to_map<real_t>(nm, _real_data);
-    }
+    
 
     
     template <typename T>
-    T get(const std::string& nm) const {
+    inline T get(const std::string& nm) const {
         
-        Error(false, "Parameter type not handled");
-        return T();
+        return _get_from_map<T>(nm, _get_map(T()));
     }
     
-
-    template <>
-    int get<int>(const std::string& nm) const {
-        
-        return _get_from_map<int>(nm, _int_data);
-    }
-    
-    
-    template <>
-    real_t get<real_t>(const std::string& nm) const {
-        
-        return _get_from_map<real_t>(nm, _real_data);
-    }
 
 private:
+
+    
+    inline std::map<const std::string, int_t>&
+    _get_map(int v) {
+        
+        return _int_data;
+    }
+    
+    
+    inline std::map<const std::string, real_t>&
+    _get_map(real_t v) {
+        
+        return _real_data;
+    }
+
+
+    inline const std::map<const std::string, int_t>&
+    _get_map(int v) const {
+        
+        return _int_data;
+    }
+    
+    
+    inline const std::map<const std::string, real_t>&
+    _get_map(real_t v) const {
+        
+        return _real_data;
+    }
+    
+
     
     template <typename T>
     inline T& _add_to_map(const std::string               &nm,
