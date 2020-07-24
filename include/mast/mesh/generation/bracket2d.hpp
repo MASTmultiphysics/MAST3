@@ -318,7 +318,9 @@ struct Bracket2D {
         y_lim         = height * (1.-h_frac),
         frac          = c.input("loadlength_fraction", "fraction of boundary length on which pressure will act", 0.125),
         filter_radius = c.input("filter_radius", "radius of geometric filter for level set field", 0.015),
-        rho_min       = c.input("rho_min", "lower limit on density variable", 0.);
+        rho_min       = c.input("rho_min", "lower limit on density variable", 0.),
+        vf            = c.input("volume_fraction",
+                                "upper limit for the volume fraction", 0.2);
         
         uint_t
         sys_num = c.rho_sys->number(),
@@ -333,10 +335,7 @@ struct Bracket2D {
         //
         Assert0(c.mesh->is_replicated(),
                 "Function currently assumes replicated mesh");
-        
-        std::vector<real_t> local_phi(c.rho_sys->solution->size());
-        c.rho_sys->solution->localize(local_phi);
-        
+                
         // iterate over all the element values
         libMesh::MeshBase::const_node_iterator
         it  = c.mesh->nodes_begin(),
@@ -367,7 +366,7 @@ struct Bracket2D {
             }
             else {
                 
-                val = local_phi[dof_id];
+                val = vf;
                 
                 //
                 // on the boundary, set everything to be zero, so that there

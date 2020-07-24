@@ -67,12 +67,20 @@ public:
                          std::vector<ScalarType>   &sens) {
                 
         Assert0(_e_ops && _output_e_ops, "Elem Operation objects not initialized");
+        Assert2(density.size() == c.rho_sys->n_dofs(),
+                density.size(), c.rho_sys->n_dofs(),
+                "Density coefficients must be provided for whole mesh");
         Assert2(dvs.size() == sens.size(),
                 dvs.size(), sens.size(),
                 "DV and sensitivity vectors must have same size");
-                
+           
+        const uint_t
+        n_density_dofs = c.rho_sys->n_dofs();
+        
         MAST::Numerics::Utility::setZero(sens);
-        std::vector<ScalarType> v(sens.size(), ScalarType());
+        std::vector<ScalarType>
+        v (n_density_dofs, ScalarType()),
+        v_filtered (n_density_dofs, ScalarType());
         
         // iterate over each element, initialize it and get the relevant
         // analysis quantities
@@ -95,7 +103,7 @@ public:
         
         // cache values for later use
         for (uint_t i=0; i<dvs.size(); i++)
-            param_dof_ids[i] = dvs.get_data_for_parameter(dvs[i]).template get<int>("dv_id");
+            param_dof_ids[i] = dvs.get_data_for_parameter(dvs[i]).template get<int>("dof_id");
         
         std::set<uint_t> density_dofs;
         
@@ -149,18 +157,24 @@ public:
                                        drho,
                                        dres_e,
                                        nullptr);
-                    sens[i] += _output_e_ops->derivative(c,
-                                                         dvs[i],
-                                                         sol_accessor,
-                                                         density_accessor,
-                                                         drho);
-                    sens[i] += adj_accessor.dot(dres_e);
+                    v[param_dof_ids[i]] += _output_e_ops->derivative(c,
+                                                                        dvs[i],
+                                                                        sol_accessor,
+                                                                        density_accessor,
+                                                                        drho);
+                    v[param_dof_ids[i]] += adj_accessor.dot(dres_e);
                 }
             }
         }
         
         // Now, combine the sensitivty with the filtering data
-        filter.compute_filtered_values(dvs, v, sens);
+        filter.compute_filtered_values(dvs, v, v_filtered);
+        
+        // copy the results back to sense
+        for (uint_t i=0; i<param_dof_ids[i]; i++)
+            sens[i] = v_filtered[param_dof_ids[i]];
+        
+        MAST::Numerics::Utility::comm_sum(c.rho_sys->comm(), sens);
     }
 
 private:

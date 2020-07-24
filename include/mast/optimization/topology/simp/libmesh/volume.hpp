@@ -85,10 +85,15 @@ public:
         Assert2(dvs.size() == sens.size(),
                 dvs.size(), sens.size(),
                 "DV and sensitivity vectors must have same size");
-                
+
+        const uint_t
+        n_density_dofs = c.rho_sys->n_dofs();
+
         MAST::Numerics::Utility::setZero(sens);
-        std::vector<ScalarType> v(sens.size(), ScalarType());
-        
+        std::vector<ScalarType>
+        v (n_density_dofs, ScalarType()),
+        v_filtered (n_density_dofs, ScalarType());
+
         // iterate over each element, initialize it and get the relevant
         // analysis quantities
         typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, VecType>
@@ -99,7 +104,7 @@ public:
         
         // cache values for later use
         for (uint_t i=0; i<dvs.size(); i++)
-            param_dof_ids[i] = dvs.get_data_for_parameter(dvs[i]).template get<int>("dv_id");
+            param_dof_ids[i] = dvs.get_data_for_parameter(dvs[i]).template get<int>("dof_id");
         
         std::set<uint_t> density_dofs;
         
@@ -130,13 +135,17 @@ public:
                     // for each element. So, if the dof was found for this
                     // element, then we will simply set the element sensitivity
                     // to be the averaged value
-                    sens[i]  +=  c.elem->volume()/(1. * c.elem->n_nodes());
+                    v[param_dof_ids[i]]  +=  c.elem->volume()/(1. * c.elem->n_nodes());
                 }
             }
         }
         
         // Now, combine the sensitivty with the filtering data
-        filter.compute_filtered_values(dvs, v, sens);
+        filter.compute_filtered_values(dvs, v, v_filtered);
+
+        // copy the results back to sense
+        for (uint_t i=0; i<param_dof_ids[i]; i++)
+            sens[i] = v_filtered[param_dof_ids[i]];
 
         MAST::Numerics::Utility::comm_sum(c.rho_sys->comm(), sens);
     }
