@@ -69,9 +69,11 @@ inline void test_penalized_density_sensitivity()  {
         rho_cs  = density_cs.value(c);
 
         drho_cs = field_cs.dv * rho_cs.imag()/ComplexStepDelta;
+
+        CHECK(drho == Catch::Detail::Approx(drho_cs));
     }
 
-
+#if MAST_ENABLE_ADOLC == 1
     // automatic differentiation
     {
         DensityField<adouble_tl_t> field_ad;
@@ -88,10 +90,10 @@ inline void test_penalized_density_sensitivity()  {
         rho_ad  = density_ad.value(c);
 
         drho_ad = *rho_ad.getADValue();
+
+        CHECK(drho == Catch::Detail::Approx(drho_ad));
     }
-    
-    CHECK(drho == Catch::Detail::Approx(drho_cs));
-    CHECK(drho == Catch::Detail::Approx(drho_ad));
+#endif
 }
 
 

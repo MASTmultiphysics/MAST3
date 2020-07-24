@@ -78,9 +78,12 @@ inline void test_penalized_youngs_modulus_sensitivity()  {
         modulus_cs.set_modulus(72.e9, 72.e2);
 
         dE_cs = field_cs.dv * modulus_cs.value(c).imag()/ComplexStepDelta;
+
+        CHECK(dE == Catch::Detail::Approx(dE_cs));
     }
 
 
+#if MAST_ENABLE_ADOLC == 1
     // automatic differentiation
     {
         DensityField<adouble_tl_t> field_ad;
@@ -95,10 +98,10 @@ inline void test_penalized_youngs_modulus_sensitivity()  {
         modulus_ad.set_modulus(72.e9, 72.e2);
 
         dE_ad = *modulus_ad.value(c).getADValue();
+
+        CHECK(dE == Catch::Detail::Approx(dE_ad));
     }
-    
-    CHECK(dE == Catch::Detail::Approx(dE_cs));
-    CHECK(dE == Catch::Detail::Approx(dE_ad));
+#endif
 }
 
 
