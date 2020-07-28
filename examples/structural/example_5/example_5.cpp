@@ -57,7 +57,7 @@ public:
     model     (new ModelType),
     q_type    (libMesh::QGAUSS),
     q_order   (libMesh::FOURTH),
-    fe_order  (libMesh::SECOND),
+    fe_order  (libMesh::FIRST),
     fe_family (libMesh::LAGRANGE),
     mesh      (new libMesh::ReplicatedMesh(comm)),
     eq_sys    (new libMesh::EquationSystems(*mesh)),
@@ -317,6 +317,7 @@ public:
                         typename TraitsType::element_matrix_t *jac) {
         
 
+        c.fe = &_fe_data->fe_derivative();
         _fe_data->reinit(c);
         _fe_var->init(c, sol_v);
         _density_fe_var->init(c, density_v);
@@ -347,6 +348,7 @@ public:
                            typename TraitsType::element_vector_t &res,
                            typename TraitsType::element_matrix_t *jac) {
         
+        c.fe = &_fe_data->fe_derivative();
         _fe_data->reinit(c);
         _fe_var->init(c, sol_v);
         _density_fe_var->init(c, density_v);
@@ -486,11 +488,11 @@ public:
         n_dofs          = str_sys.n_dofs(),
         n_rho_vals      = rho_sys.n_dofs(),
         first_local_rho = rho_sys.get_dof_map().first_dof(rho_sys.comm().rank()),
-        last_local_rho  = rho_sys.get_dof_map().last_dof(rho_sys.comm().rank());
+        last_local_rho  = rho_sys.get_dof_map().end_dof(rho_sys.comm().rank());
         
         
         typename TraitsType::assembled_vector_t
-        rho_base     = TraitsType::assembled_vector_t::Zero(n_rho_vals),
+        rho_base     = TraitsType::assembled_vector_t::Ones(n_rho_vals),
         rho_filtered = TraitsType::assembled_vector_t::Zero(n_rho_vals),
         res          = TraitsType::assembled_vector_t::Zero(n_dofs),
         sol          = TraitsType::assembled_vector_t::Zero(n_dofs);
@@ -541,9 +543,12 @@ public:
         
         MAST::Numerics::libMeshWrapper::init_sparse_matrix(str_sys.get_dof_map(), jac);
         
+        // the residual is assembled as \f$ R(x) = K x - f \f$. Since \f$ x= 0 \f$ we have
+        // \f$ R(x) = - f \f$.
         assembly.assemble(_c, sol, rho_filtered, &res, &jac);
+        // We multiply with -1 before solving for \f$ x \f$.
         res *= -1;
-        
+        // This solves for \f$ x\f$ from the system of equations \f$ K x = f \f$.
         sol = Eigen::SparseLU<typename TraitsType::assembled_matrix_t>(jac).solve(res);
 
         scalar_t
@@ -583,12 +588,25 @@ public:
             compliance_sens;
             
             compliance_sens.set_elem_ops(_e_ops, _e_ops);
+
+            // the adjoint solution for compliance is the negative of displacement. We copy the
+            // negative of solution in vector \p res.
+            res = -sol;
             
+            // This solves for the sensitivity of compliance, \f$ c=x^T f \f$, with respect to
+            // a parameter \f$ \alpha \f$.
+            // \f{eqnarray*}{ \frac{dc}{d\alpha}
+            //    & = & \frac{\partial c}{\partial \alpha} + \frac{\partial c}{\partial x}
+            //     \frac{dx}{d\alpha} \\
+            //    & = & \frac{\partial c}{\partial \alpha} +
+            //     \lambda^T \frac{\partial R(x)}{\partial \alpha}
+            // \f}
+            // Note that the adjoint solution for compliance is \f$ \lambda = -x \f$.
             compliance_sens.assemble(_c,
-                                     sol,
-                                     rho_filtered,
-                                     sol,
-                                     *_c.ex_init.filter,
+                                     sol,                 // solution
+                                     rho_filtered,        // filtered density
+                                     res,                 // adjoint solution
+                                     *_c.ex_init.filter,  // geometric filter
                                      _dvs,
                                      obj_grad);
             
