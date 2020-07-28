@@ -62,6 +62,15 @@ struct DeducedScalarType<real_t, std::complex<real_t>> { using type = std::compl
 template <>
 struct DeducedScalarType<std::complex<real_t>, std::complex<real_t>> { using type = std::complex<real_t>;};
 
+template <>
+struct DeducedScalarType<adouble_tl_t, real_t> { using type = adouble_tl_t;};
+
+template <>
+struct DeducedScalarType<real_t, adouble_tl_t> { using type = adouble_tl_t;};
+
+template <>
+struct DeducedScalarType<adouble_tl_t, adouble_tl_t> { using type = adouble_tl_t;};
+
 }
 
 #endif // __mast__data_types__

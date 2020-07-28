@@ -144,7 +144,7 @@ public:
         filter.compute_filtered_values(dvs, v, v_filtered);
 
         // copy the results back to sense
-        for (uint_t i=0; i<param_dof_ids[i]; i++)
+        for (uint_t i=0; i<param_dof_ids.size(); i++)
             sens[i] = v_filtered[param_dof_ids[i]];
 
         MAST::Numerics::Utility::comm_sum(c.rho_sys->comm(), sens);

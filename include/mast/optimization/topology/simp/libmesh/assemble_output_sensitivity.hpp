@@ -158,10 +158,10 @@ public:
                                        dres_e,
                                        nullptr);
                     v[param_dof_ids[i]] += _output_e_ops->derivative(c,
-                                                                        dvs[i],
-                                                                        sol_accessor,
-                                                                        density_accessor,
-                                                                        drho);
+                                                                     dvs[i],
+                                                                     sol_accessor,
+                                                                     density_accessor,
+                                                                     drho);
                     v[param_dof_ids[i]] += adj_accessor.dot(dres_e);
                 }
             }
@@ -171,7 +171,7 @@ public:
         filter.compute_filtered_values(dvs, v, v_filtered);
         
         // copy the results back to sense
-        for (uint_t i=0; i<param_dof_ids[i]; i++)
+        for (uint_t i=0; i<param_dof_ids.size(); i++)
             sens[i] = v_filtered[param_dof_ids[i]];
         
         MAST::Numerics::Utility::comm_sum(c.rho_sys->comm(), sens);
