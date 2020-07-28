@@ -168,7 +168,7 @@ public:
         }
         
         // Now, combine the sensitivty with the filtering data
-        filter.compute_filtered_values(dvs, v, v_filtered);
+        filter.compute_reverse_filtered_values(dvs, v, v_filtered);
         
         // copy the results back to sense
         for (uint_t i=0; i<param_dof_ids.size(); i++)

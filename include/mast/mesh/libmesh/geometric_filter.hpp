@@ -213,6 +213,51 @@ public:
         }
     }
     
+    /*!
+     *  Applies the reverse map, which is used for sensitivity analysis by first computing the sensitivty wrt filtered coefficients
+     *  and then using the columns of the filter coefficient mattix to compute the sensitivity of unfiltered coefficients.
+     */
+    template <typename ScalarType,
+              typename Vec1Type,
+              typename Vec2Type>
+    inline void
+    compute_reverse_filtered_values
+    (const MAST::Optimization::DesignParameterVector<ScalarType> &dvs,
+     const Vec1Type       &input,
+     Vec2Type             &output) const {
+        
+        Assert2(input.size() == _filter_map.size(),
+                input.size(), _filter_map.size(),
+                "Incompatible vector sizes");
+        Assert2(output.size() == _filter_map.size(),
+                output.size(), _filter_map.size(),
+                "Incompatible vector sizes");
+        
+        MAST::Numerics::Utility::setZero(output);
+        
+        std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>::const_iterator
+        map_it   = _reverse_map.begin(),
+        map_end  = _reverse_map.end();
+        
+        for ( ; map_it != map_end; map_it++) {
+            
+            std::vector<std::pair<uint_t, real_t>>::const_iterator
+            vec_it  = map_it->second.begin(),
+            vec_end = map_it->second.end();
+            
+            for ( ; vec_it != vec_end; vec_it++) {
+                if (dvs.is_design_parameter_index(map_it->first))
+                    MAST::Numerics::Utility::add
+                    (output, map_it->first,
+                     MAST::Numerics::Utility::get(input, vec_it->first) * vec_it->second);
+                else
+                    MAST::Numerics::Utility::set
+                    (output, map_it->first,
+                     MAST::Numerics::Utility::get(input, vec_it->first));
+            }
+        }
+    }
+
     
     /*!
      *   function identifies if the given element is within the domain of
@@ -221,8 +266,8 @@ public:
      *   element nodes from the specified level set design variable location
      *   and the element sizes.
      */
-    bool if_elem_in_domain_of_influence(const libMesh::Elem& elem,
-                                        const libMesh::Node& node) const {
+    inline bool if_elem_in_domain_of_influence(const libMesh::Elem& elem,
+                                               const libMesh::Node& node) const {
         
         real_t
         d    = 1.e12; // arbitrarily large value to initialize the search
@@ -362,7 +407,7 @@ private:
          * (e.g. 2 or 3 for point clouds)
          */
         template <class BBOX>
-        bool kdtree_get_bbox(BBOX & /* bb */) const { return false; }
+        inline bool kdtree_get_bbox(BBOX & /* bb */) const { return false; }
     };
     
     inline void _init2() {
@@ -450,6 +495,9 @@ private:
                         "Normalized weight must be <= 1.");
             }
         }
+
+        // now prepare the reverse map
+        _init_reverse_map(_filter_map, _reverse_map);
         
         // compute the largest element size
         libMesh::MeshBase::const_element_iterator
@@ -470,7 +518,7 @@ private:
     /*!
      *   initializes the algebraic data structures
      */
-    void _init() {
+    inline void _init() {
         
         Assert0(!_filter_map.size(), "Filter already initialized");
         
@@ -532,6 +580,9 @@ private:
             }
         }
         
+        // now prepare the reverse map
+        _init_reverse_map(_filter_map, _reverse_map);
+
         // compute the largest element size
         libMesh::MeshBase::const_element_iterator
         e_it          = mesh.elements_begin(),
@@ -546,6 +597,27 @@ private:
         }
         
     }
+    
+    
+    inline void
+    _init_reverse_map(const std::map<uint_t, std::vector<std::pair<uint_t, real_t>>> &forward_map,
+                      std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>       &reverse_map) {
+        
+        // now prepare the reverse map
+        std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>::const_iterator
+        it   =  forward_map.begin(),
+        end  =  forward_map.end();
+        
+        for ( ; it!=end; it++) {
+            
+            const std::vector<std::pair<uint_t, real_t>>
+            &vec = it->second;
+            
+            for (uint_t i=0; i<vec.size(); i++)
+                reverse_map[vec[i].first].push_back(std::pair<uint_t, real_t>(it->first, vec[i].second));
+        }
+    }
+    
     /*!
      *   system on which the level set discrete function is defined
      */
@@ -567,6 +639,11 @@ private:
      *   design variables \f$ \tilde{\phi}_i = B_{ij} \phi_j \f$
      */
     std::map<uint_t, std::vector<std::pair<uint_t, real_t>>> _filter_map;
+    
+    /*!
+     * this map stores the columns of the matrix, which is required for sensitivity analysis
+     */
+    std::map<uint_t, std::vector<std::pair<uint_t, real_t>>> _reverse_map;
 };
 
 
