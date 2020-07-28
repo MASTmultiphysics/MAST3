@@ -587,7 +587,7 @@ public:
             compliance_sens.assemble(_c,
                                      sol,
                                      rho_filtered,
-                                     res,
+                                     sol,
                                      *_c.ex_init.filter,
                                      _dvs,
                                      obj_grad);
