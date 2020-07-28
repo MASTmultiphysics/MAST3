@@ -56,7 +56,7 @@ public:
     input     (inp),
     model     (new ModelType),
     q_type    (libMesh::QGAUSS),
-    q_order   (libMesh::FOURTH),
+    q_order   (libMesh::SECOND),
     fe_order  (libMesh::FIRST),
     fe_family (libMesh::LAGRANGE),
     mesh      (new libMesh::ReplicatedMesh(comm)),
@@ -695,7 +695,7 @@ int main(int argc, char** argv) {
     traits_t::context_t  c(ex_init);
     elem_ops_t           e_ops(c);
     func_eval_t          f_eval(e_ops, c);
-    /*
+    
     traits_complex_t::context_t  c_cmplx(ex_init);
     elem_ops_complex_t           e_ops_c(c_cmplx);
     func_eval_complex_t          f_eval_c(e_ops_c, c_cmplx);
@@ -750,7 +750,7 @@ int main(int argc, char** argv) {
         << std::setw(20) << g_cs[i]
         << std::setw(20) << std::fabs(g_sens[i]-g_cs[i]) << std::endl;
     }
-     */
+     
     
     // create an optimizer, attach the function evaluation
     MAST::Optimization::Solvers::GCMMAInterface<func_eval_t> optimizer;
