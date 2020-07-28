@@ -350,7 +350,7 @@ public:
         _fe_data->reinit(c);
         _fe_var->init(c, sol_v);
         _density_fe_var->init(c, density_v);
-        _density_sens_fe_var->init(c, density_v);
+        _density_sens_fe_var->init(c, density_sens);
 
         _energy->derivative(c, f, res, jac);
     }
@@ -671,13 +671,64 @@ int main(int argc, char** argv) {
     elem_ops_complex_t           e_ops_c(c_cmplx);
     func_eval_complex_t          f_eval_c(e_ops_c, c_cmplx);
 
+    std::vector<real_t>
+    dvs (f_eval_c.n_vars(), 0.),
+    xlow (f_eval_c.n_vars(), 0.),
+    xup  (f_eval_c.n_vars(), 0.),
+    g    (1, 0.),
+    o_sens(f_eval_c.n_vars(), 0.),
+    g_sens(f_eval_c.n_vars(), 0.),
+    o_cs(f_eval_c.n_vars(), 0.),
+    g_cs(f_eval_c.n_vars(), 0.);
+
+    std::vector<complex_t>
+    dvs_c (f_eval_c.n_vars(), 0.),
+    xlow_c (f_eval_c.n_vars(), 0.),
+    xup_c  (f_eval_c.n_vars(), 0.),
+    g_c    (1, 0.),
+    d_c;
+    
+    real_t
+    obj;
+    
+    complex_t
+    obj_c;
+    
+    std::vector<bool> b_vec(1, true);
+    
+    f_eval.init_dvar(dvs, xlow, xup);
+    f_eval.evaluate(dvs, obj, true, o_sens, g, b_vec, g_sens);
+
+    b_vec[0] = false;
+    f_eval_c.init_dvar(dvs_c, xlow_c, xup_c);
+    
+    std::cout << "obj: " << obj << std::endl;
+    
+    for (uint_t i=0; i<f_eval.n_vars(); i++) {
+        
+        dvs_c[i] += complex_t(0., ComplexStepDelta);
+        f_eval_c.evaluate(dvs_c, obj_c, false, d_c, g_c, b_vec, d_c);
+        dvs_c[i] -= complex_t(0., ComplexStepDelta);
+        o_cs[i] = obj_c.imag() /ComplexStepDelta;
+        g_cs[i] = g_c[0].imag()/ComplexStepDelta;
+        
+        std::cout
+        << std::setw(5) << i
+        << std::setw(20) << o_sens[i]
+        << std::setw(20) << o_cs[i]
+        << std::setw(20) << std::fabs(o_sens[i]-o_cs[i])
+        << std::setw(20) << g_sens[i]
+        << std::setw(20) << g_cs[i]
+        << std::setw(20) << std::fabs(g_sens[i]-g_cs[i]) << std::endl;
+    }
+
     
     // create an optimizer, attach the function evaluation
-    MAST::Optimization::Solvers::GCMMAInterface<func_eval_t> optimizer;
-    optimizer.set_function_evaluation(f_eval);
+    //MAST::Optimization::Solvers::GCMMAInterface<func_eval_t> optimizer;
+    //optimizer.set_function_evaluation(f_eval);
     
     // optimize
-    optimizer.optimize();
+    //optimizer.optimize();
     
     
     // END_TRANSLATE
