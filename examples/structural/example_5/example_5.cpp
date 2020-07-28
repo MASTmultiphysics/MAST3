@@ -413,7 +413,6 @@ public:
     _e_ops        (e_ops),
     _c            (c),
     _volume       (_c.ex_init.model->reference_volume(_c.ex_init)),
-    _obj_scaling  (1./_volume),
     _vf           (_c.ex_init.input("volume_fraction",
                                     "upper limit for the volume fraction", 0.2)) {
         
@@ -551,6 +550,22 @@ public:
         // This solves for \f$ x\f$ from the system of equations \f$ K x = f \f$.
         sol = Eigen::SparseLU<typename TraitsType::assembled_matrix_t>(jac).solve(res);
 
+        {
+            libMesh::ExodusII_IO writer(*_c.mesh);
+            Eigen::Matrix<real_t, Eigen::Dynamic, 1> sol_r = sol.real();
+            for (uint_t i=0; i<sol.size(); i++) _c.sys->solution->set(i, sol_r(i));
+
+            sol_r = rho_base.real();
+            for (uint_t i=0; i<rho_filtered.size(); i++) _c.rho_sys->solution->set(i, sol_r(i));
+
+            writer.write_timestep("solution.exo", *_c.eq_sys, 1, 1.);
+
+            sol_r = rho_filtered.real();
+            for (uint_t i=0; i<rho_filtered.size(); i++) _c.rho_sys->solution->set(i, sol_r(i));
+            writer.write_timestep("solution.exo", *_c.eq_sys, 2, 2.);
+        }
+
+        // compliance is defined using the external work done \f$ c = x^T f \f$
         scalar_t
         vol    = 0.,
         comp   = sol.dot(res);
@@ -573,7 +588,7 @@ public:
         // evaluate the output based on specified problem type
         //nonlinear_assembly.calculate_output(*_sys->current_local_solution, false, compliance);
         //comp      = compliance.output_total();
-        obj       = _obj_scaling * comp;
+        obj       = comp;
         fvals[0]  = vol/_volume - _vf; // vol/vol0 - a <=
         std::cout << "compliance: " << comp << std::endl;
         
@@ -609,9 +624,6 @@ public:
                                      *_c.ex_init.filter,  // geometric filter
                                      _dvs,
                                      obj_grad);
-            
-            for (uint_t i=0; i<obj_grad.size(); i++)
-                obj_grad[i] *= _obj_scaling;
         }
         
         
@@ -654,7 +666,6 @@ private:
     context_t                                           &_c;
     MAST::Optimization::DesignParameterVector<scalar_t>  _dvs;
     real_t                                               _volume;
-    real_t                                               _obj_scaling;
     real_t                                               _vf;
 };
 } // namespace Example5
@@ -684,7 +695,7 @@ int main(int argc, char** argv) {
     traits_t::context_t  c(ex_init);
     elem_ops_t           e_ops(c);
     func_eval_t          f_eval(e_ops, c);
-    
+    /*
     traits_complex_t::context_t  c_cmplx(ex_init);
     elem_ops_complex_t           e_ops_c(c_cmplx);
     func_eval_complex_t          f_eval_c(e_ops_c, c_cmplx);
@@ -739,14 +750,16 @@ int main(int argc, char** argv) {
         << std::setw(20) << g_cs[i]
         << std::setw(20) << std::fabs(g_sens[i]-g_cs[i]) << std::endl;
     }
-
+     */
     
     // create an optimizer, attach the function evaluation
-    //MAST::Optimization::Solvers::GCMMAInterface<func_eval_t> optimizer;
-    //optimizer.set_function_evaluation(f_eval);
+    MAST::Optimization::Solvers::GCMMAInterface<func_eval_t> optimizer;
+    optimizer.max_inner_iters = 6;
+    optimizer.constr_penalty  = 1.e5;
+    optimizer.set_function_evaluation(f_eval);
     
     // optimize
-    //optimizer.optimize();
+    optimizer.optimize();
     
     
     // END_TRANSLATE
