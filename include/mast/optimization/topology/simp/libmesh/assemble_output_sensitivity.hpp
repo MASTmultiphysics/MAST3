@@ -149,7 +149,8 @@ public:
                         }
                     }
                     
-                    // perform the element level calculations
+                    // first we compute the partial derivative of the
+                    // residual wrt the parameter.
                     _e_ops->derivative(c,
                                        dvs[i],
                                        sol_accessor,
@@ -157,11 +158,16 @@ public:
                                        drho,
                                        dres_e,
                                        nullptr);
+                    
+                    // next, we compute the partial derivative derivative of
+                    // the output functional and add it to the sensitivity result
                     v[param_dof_ids[i]] += _output_e_ops->derivative(c,
                                                                      dvs[i],
                                                                      sol_accessor,
                                                                      density_accessor,
                                                                      drho);
+                    // finally, the adjoint vector is combined with the
+                    // residual sensitivity to compute the result. 
                     v[param_dof_ids[i]] += adj_accessor.dot(dres_e);
                 }
             }
