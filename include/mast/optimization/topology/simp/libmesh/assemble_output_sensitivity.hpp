@@ -141,10 +141,10 @@ public:
                     // set a unit value of density sensitivity
                     // for this dof
                     drho.setZero(density_dof_ids.size());
-                    for (uint_t i=0; i<density_dof_ids.size(); i++) {
+                    for (uint_t j=0; j<density_dof_ids.size(); j++) {
                         
-                        if (density_dof_ids[i] == param_dof_ids[i]) {
-                            drho(i) = 1.;
+                        if (density_dof_ids[j] == param_dof_ids[i]) {
+                            drho(j) = 1.;
                             break;
                         }
                     }
@@ -167,7 +167,7 @@ public:
                                                                      density_accessor,
                                                                      drho);
                     // finally, the adjoint vector is combined with the
-                    // residual sensitivity to compute the result. 
+                    // residual sensitivity to compute the result.
                     v[param_dof_ids[i]] += adj_accessor.dot(dres_e);
                 }
             }

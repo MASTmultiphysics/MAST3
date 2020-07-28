@@ -357,8 +357,7 @@ struct Bracket2D {
                 (n(0)+filter_radius) >= length*(1.-frac)) {
                 
                 //
-                // set value at the constrained points to a small positive number
-                // material here
+                // set value at the constrained points to be solid material
                 //
                 if (dof_id >= c.rho_sys->solution->first_local_index() &&
                     dof_id <  c.rho_sys->solution->last_local_index())
@@ -366,25 +365,8 @@ struct Bracket2D {
             }
             else {
                 
-                val = vf;
-                
-                //
-                // on the boundary, set everything to be zero, so that there
-                // is always a boundary there that the optimizer can move
-                //
-                if (n(0) < tol                     ||  // left boundary
-                    std::fabs(n(0) - length) < tol ||  // right boundary
-                    std::fabs(n(1) - height) < tol ||  // top boundary
-                    (n(0) >= x_lim && n(1) <= y_lim)) {
-                    
-                    if (dof_id >= c.rho_sys->solution->first_local_index() &&
-                        dof_id <  c.rho_sys->solution->last_local_index())
-                        c.rho_sys->solution->set(dof_id, rho_min);
-                    val = rho_min;
-                }
-                
                 MAST::Optimization::DesignParameter<ScalarType>
-                *dv = new MAST::Optimization::DesignParameter<ScalarType>(val);
+                *dv = new MAST::Optimization::DesignParameter<ScalarType>(vf);
                 dv->set_point(n(0), n(1), n(2));
 
                 MAST::Base::ParameterData
