@@ -13,6 +13,7 @@
 #include <libmesh/nonlinear_implicit_system.h>
 #include <libmesh/dof_map.h>
 
+
 namespace MAST {
 namespace Base {
 namespace Assembly {
@@ -103,7 +104,7 @@ private:
     ElemOpsType  *_e_ops;
 };
 
-} // namespace libMesh
+} // namespace libMeshWrapper
 } // namespace Assembly
 } // namespace Base
 } // namespace MAST

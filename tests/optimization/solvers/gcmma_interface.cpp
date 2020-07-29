@@ -26,7 +26,7 @@ struct RosenbrockFunction {
     inline uint_t n_ineq() const {return 0;}
     virtual void init_dvar(std::vector<real_t>& x,
                            std::vector<real_t>& xmin,
-                           std::vector<real_t>& xmax){
+                           std::vector<real_t>& xmax) {
         
         x    = {  5.,  -5.};
         xmin = {-10., -10.};
@@ -54,8 +54,8 @@ struct RosenbrockFunction {
     inline void output(const uint_t                iter,
                        const std::vector<real_t>  &dvars,
                        real_t                     &o,
-                       std::vector<real_t>        &fvals)
-    {
+                       std::vector<real_t>        &fvals) {
+        
         obj = o;
         x   = dvars;
     }

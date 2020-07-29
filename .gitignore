@@ -13,3 +13,5 @@ build2
 
 # Visual Studio Code settings.
 .vscode/
+
+include/mast/base/mast_config.h

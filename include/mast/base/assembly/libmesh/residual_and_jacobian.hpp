@@ -105,7 +105,7 @@ private:
     ElemOpsType  *_e_ops;
 };
 
-} // namespace libMesh
+} // namespace libMeshWrapper
 } // namespace Assembly
 } // namespace Base
 } // namespace MAST
