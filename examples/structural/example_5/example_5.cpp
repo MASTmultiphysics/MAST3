@@ -506,17 +506,12 @@ public:
             if (dof_id >= first_local_rho && dof_id <  last_local_rho)
                 rho_base(dof_id) = x[i];
         }
-        //base_phi.close();
+
         _c.ex_init.filter->template compute_filtered_values
         <scalar_t,
         typename TraitsType::assembled_vector_t,
         typename TraitsType::assembled_vector_t>
         (_dvs, rho_base, rho_filtered);
-
-        // this will create a localized vector in _level_set_sys->curret_local_solution
-        //_density_sys->update();
-        
-        //_sys.solution->zero();
         
         //////////////////////////////////////////////////////////////////////
         // check to see if the sensitivity of constraint is requested
@@ -531,10 +526,7 @@ public:
         //*********************************************************************
         
         std::cout << "Static Solve" << std::endl;
-
-        // set the elasticity penalty for solution
-        //_Ef->set_penalty_val(penalty);
-
+        
         MAST::Optimization::Topology::SIMP::libMeshWrapper::ResidualAndJacobian<scalar_t, ElemOps<TraitsType>>
         assembly;
         
@@ -570,10 +562,6 @@ public:
         vol    = 0.,
         comp   = sol.dot(res);
 
-        // ask the system to update so that the localized solution is available for
-        // further processing
-        //_sys->update();
-
         //////////////////////////////////////////////////////////////////////
         // evaluate the functions
         //////////////////////////////////////////////////////////////////////
@@ -586,8 +574,6 @@ public:
         std::cout << "volume: " << vol << std::endl;
         
         // evaluate the output based on specified problem type
-        //nonlinear_assembly.calculate_output(*_sys->current_local_solution, false, compliance);
-        //comp      = compliance.output_total();
         obj       = comp;
         fvals[0]  = vol/_volume - _vf; // vol/vol0 - a <=
         std::cout << "compliance: " << comp << std::endl;
@@ -645,12 +631,6 @@ public:
             for (uint_t i=0; i<grads.size(); i++)
                 grads[i] /= _volume;
         }
-        
-        //
-        // also the stress data for plotting
-        //
-        //_Ef->set_penalty_val(stress_penalty);
-        //stress_assembly.update_stress_strain_data(stress, *_sys->solution);
     }
     
     inline void output(const uint_t                iter,
