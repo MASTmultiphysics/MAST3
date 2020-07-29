@@ -686,16 +686,16 @@ int main(int argc, char** argv) {
     using elem_ops_t         = MAST::Examples::Structural::Example5::ElemOps<traits_t>;
     using func_eval_t        = MAST::Examples::Structural::Example5::FunctionEvaluation<traits_t>;
 
-    using traits_complex_t   = MAST::Examples::Structural::Example5::Traits<real_t, real_t, complex_t, model_t>;
-    using elem_ops_complex_t = MAST::Examples::Structural::Example5::ElemOps<traits_complex_t>;
-    using func_eval_complex_t= MAST::Examples::Structural::Example5::FunctionEvaluation<traits_complex_t>;
-
     traits_t::ex_init_t ex_init(init.comm(), input);
 
     traits_t::context_t  c(ex_init);
     elem_ops_t           e_ops(c);
     func_eval_t          f_eval(e_ops, c);
     
+    /*using traits_complex_t   = MAST::Examples::Structural::Example5::Traits<real_t, real_t, complex_t, model_t>;
+    using elem_ops_complex_t = MAST::Examples::Structural::Example5::ElemOps<traits_complex_t>;
+    using func_eval_complex_t= MAST::Examples::Structural::Example5::FunctionEvaluation<traits_complex_t>;
+
     traits_complex_t::context_t  c_cmplx(ex_init);
     elem_ops_complex_t           e_ops_c(c_cmplx);
     func_eval_complex_t          f_eval_c(e_ops_c, c_cmplx);
@@ -749,8 +749,8 @@ int main(int argc, char** argv) {
         << std::setw(20) << g_sens[i]
         << std::setw(20) << g_cs[i]
         << std::setw(20) << std::fabs(g_sens[i]-g_cs[i]) << std::endl;
-    }
-     
+    }*/
+
     
     // create an optimizer, attach the function evaluation
     MAST::Optimization::Solvers::GCMMAInterface<func_eval_t> optimizer;
