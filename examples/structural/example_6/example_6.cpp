@@ -33,9 +33,8 @@
 #include <libmesh/equation_systems.h>
 #include <libmesh/boundary_info.h>
 #include <libmesh/exodusII_io.h>
+#include <libmesh/linear_solver.h>
 
-// Eigen includes
-#include <Eigen/SparseLU>
 
 // BEGIN_TRANSLATE SIMP Minimum Compliance Topology Optimization with MPI based solvers
 
@@ -190,8 +189,8 @@ struct Traits {
     using press_load_t      = typename MAST::Physics::Elasticity::SurfacePressureLoad<fe_var_t, press_t, area_t, dim, context_t>;
     using element_vector_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using element_matrix_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
-    using assembled_vector_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
-    using assembled_matrix_t = Eigen::SparseMatrix<scalar_t>;
+    using assembled_vector_t = libMesh::NumericVector<scalar_t>;
+    using assembled_matrix_t = libMesh::SparseMatrix<scalar_t>;
 };
 
 
@@ -490,34 +489,33 @@ public:
         last_local_rho  = rho_sys.get_dof_map().end_dof(rho_sys.comm().rank());
         
         
-        typename TraitsType::assembled_vector_t
-        rho_base     = TraitsType::assembled_vector_t::Ones(n_rho_vals),
-        rho_filtered = TraitsType::assembled_vector_t::Zero(n_rho_vals),
-        res          = TraitsType::assembled_vector_t::Zero(n_dofs),
-        sol          = TraitsType::assembled_vector_t::Zero(n_dofs);
-        
-        typename TraitsType::assembled_matrix_t
-        jac;
+        std::unique_ptr<typename TraitsType::assembled_vector_t>
+        rho_base(_c.rho_sys->solution->clone().release()),
+        res(_c.sys->solution->clone().release());
+
+        // set a unit value for density. Values provided by design parameters
+        // will be overwritten in \p rho_base.
+        *rho_base = 1.;
         
         for (uint_t i=0; i<_dvs.size(); i++) {
             
             uint_t dof_id = _dvs.template get_parameter_for_dv<int>(i, "dof_id");
             
             if (dof_id >= first_local_rho && dof_id <  last_local_rho)
-                rho_base(dof_id) = x[i];
+                rho_base->set(dof_id, x[i]);
         }
-        //base_phi.close();
+        rho_base->close();
+        
         _c.ex_init.filter->template compute_filtered_values
         <scalar_t,
         typename TraitsType::assembled_vector_t,
         typename TraitsType::assembled_vector_t>
-        (_dvs, rho_base, rho_filtered);
+        (_dvs, *rho_base, *_c.rho_sys->solution);
+        _c.rho_sys->solution->close();
+        
+        // this will copy the solution to libMesh::System::current_local_soluiton
+        _c.rho_sys->update();
 
-        // this will create a localized vector in _level_set_sys->curret_local_solution
-        //_density_sys->update();
-        
-        //_sys.solution->zero();
-        
         //////////////////////////////////////////////////////////////////////
         // check to see if the sensitivity of constraint is requested
         //////////////////////////////////////////////////////////////////////
@@ -532,43 +530,47 @@ public:
         
         std::cout << "Static Solve" << std::endl;
 
-        // set the elasticity penalty for solution
-        //_Ef->set_penalty_val(penalty);
-
         MAST::Optimization::Topology::SIMP::libMeshWrapper::ResidualAndJacobian<scalar_t, ElemOps<TraitsType>>
         assembly;
         
         assembly.set_elem_ops(_e_ops);
+        _c.sys->solution->zero();
         
-        MAST::Numerics::libMeshWrapper::init_sparse_matrix(str_sys.get_dof_map(), jac);
+        // this will copy the solution to libMesh::System::current_local_soluiton
+        _c.sys->update();
         
         // the residual is assembled as \f$ R(x) = K x - f \f$. Since \f$ x= 0 \f$ we have
         // \f$ R(x) = - f \f$.
-        assembly.assemble(_c, sol, rho_filtered, &res, &jac);
+        assembly.assemble(_c,
+                          *_c.sys->current_local_solution,
+                          *_c.rho_sys->current_local_solution,
+                          res.get(),
+                          _c.sys->matrix);
         // We multiply with -1 before solving for \f$ x \f$.
-        res *= -1;
+        res->scale(-1);
         // This solves for \f$ x\f$ from the system of equations \f$ K x = f \f$.
-        sol = Eigen::SparseLU<typename TraitsType::assembled_matrix_t>(jac).solve(res);
+        libMesh::SparseMatrix<real_t>
+        *pc  = _c.sys->request_matrix("Preconditioner");
+
+        std::pair<unsigned int, real_t>
+        solver_params = _c.sys->get_linear_solve_parameters();
+
+        _c.sys->get_linear_solver()->solve(*_c.sys->matrix, pc,
+                                           *res, *_c.sys->solution,
+                                           solver_params.second,
+                                           solver_params.first);
+
+        _c.sys->update();
 
         {
             libMesh::ExodusII_IO writer(*_c.mesh);
-            Eigen::Matrix<real_t, Eigen::Dynamic, 1> sol_r = sol.real();
-            for (uint_t i=0; i<sol.size(); i++) _c.sys->solution->set(i, sol_r(i));
-
-            sol_r = rho_base.real();
-            for (uint_t i=0; i<rho_filtered.size(); i++) _c.rho_sys->solution->set(i, sol_r(i));
-
             writer.write_timestep("solution.exo", *_c.eq_sys, 1, 1.);
-
-            sol_r = rho_filtered.real();
-            for (uint_t i=0; i<rho_filtered.size(); i++) _c.rho_sys->solution->set(i, sol_r(i));
-            writer.write_timestep("solution.exo", *_c.eq_sys, 2, 2.);
         }
 
         // compliance is defined using the external work done \f$ c = x^T f \f$
         scalar_t
         vol    = 0.,
-        comp   = sol.dot(res);
+        comp   = _c.sys->solution->dot(*res);
 
         // ask the system to update so that the localized solution is available for
         // further processing
@@ -582,7 +584,7 @@ public:
         MAST::Optimization::Topology::SIMP::libMeshWrapper::Volume<scalar_t>
         volume;
         
-        vol = volume.compute(_c, rho_filtered);
+        vol = volume.compute(_c, *_c.rho_sys->current_local_solution);
         std::cout << "volume: " << vol << std::endl;
         
         // evaluate the output based on specified problem type
@@ -606,7 +608,8 @@ public:
 
             // the adjoint solution for compliance is the negative of displacement. We copy the
             // negative of solution in vector \p res.
-            res = -sol;
+            res.reset(_c.sys->current_local_solution->clone().release());
+            res->scale(-1.);
             
             // This solves for the sensitivity of compliance, \f$ c=x^T f \f$, with respect to
             // a parameter \f$ \alpha \f$.
@@ -618,10 +621,10 @@ public:
             // \f}
             // Note that the adjoint solution for compliance is \f$ \lambda = -x \f$.
             compliance_sens.assemble(_c,
-                                     sol,                 // solution
-                                     rho_filtered,        // filtered density
-                                     res,                 // adjoint solution
-                                     *_c.ex_init.filter,  // geometric filter
+                                     *_c.sys->current_local_solution,      // solution
+                                     *_c.rho_sys->current_local_solution,  // filtered density
+                                     *res,                                 // adjoint solution
+                                     *_c.ex_init.filter,                   // geometric filter
                                      _dvs,
                                      obj_grad);
         }
@@ -638,7 +641,7 @@ public:
             //////////////////////////////////////////////////////////////////
 
             volume.derivative(_c,
-                              rho_filtered,
+                              *_c.rho_sys->current_local_solution,
                               *_c.ex_init.filter,
                               _dvs,
                               grads);
