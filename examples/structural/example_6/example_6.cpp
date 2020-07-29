@@ -83,6 +83,7 @@ public:
         filter_r = input("filter_radius",
                          "radius of geometric filter for level set field", 0.015);
         filter = new MAST::Mesh::libMeshWrapper::GeometricFilter(*rho_sys, filter_r);
+        eq_sys->reinit();
         
         mesh->print_info(std::cout);
         eq_sys->print_info(std::cout);
@@ -490,7 +491,7 @@ public:
         
         
         std::unique_ptr<typename TraitsType::assembled_vector_t>
-        rho_base(_c.rho_sys->solution->clone().release()),
+        rho_base(_c.rho_sys->current_local_solution->clone().release()),
         res(_c.sys->solution->clone().release());
 
         // set a unit value for density. Values provided by design parameters
