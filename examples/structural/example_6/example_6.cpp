@@ -555,10 +555,15 @@ public:
         std::pair<unsigned int, real_t>
         solver_params = _c.sys->get_linear_solve_parameters();
 
-        _c.sys->get_linear_solver()->solve(*_c.sys->matrix, pc,
-                                           *res, *_c.sys->solution,
-                                           solver_params.second,
-                                           solver_params.first);
+        std::unique_ptr<libMesh::LinearSolver<real_t>>
+        linear_solver(libMesh::LinearSolver<real_t>::build(_c.eq_sys->comm()).release());
+        linear_solver->init();
+        linear_solver->init_names(*_c.sys);
+
+        linear_solver->solve(*_c.sys->matrix, pc,
+                             *_c.sys->solution, *res,
+                             solver_params.second,
+                             solver_params.first);
 
         _c.sys->update();
 
@@ -571,11 +576,7 @@ public:
         scalar_t
         vol    = 0.,
         comp   = _c.sys->solution->dot(*res);
-
-        // ask the system to update so that the localized solution is available for
-        // further processing
-        //_sys->update();
-
+        
         //////////////////////////////////////////////////////////////////////
         // evaluate the functions
         //////////////////////////////////////////////////////////////////////
