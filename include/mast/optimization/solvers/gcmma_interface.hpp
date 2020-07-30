@@ -28,7 +28,7 @@
 #include <mast/base/mast_data_types.h>
 #include <mast/base/exceptions.hpp>
 
-// TIMPI includes
+// libMesh includes
 #include <libmesh/parallel.h>
 
 
@@ -85,7 +85,7 @@ class GCMMAInterface {
     
 public:
     
-    GCMMAInterface(TIMPI::Communicator &comm):
+    GCMMAInterface(libMesh::Parallel::Communicator &comm):
     _comm                         (comm),
     constr_penalty                (5.e1),
     initial_rel_step              (1.e-2),
@@ -408,7 +408,7 @@ public:
     
 private:
     
-    TIMPI::Communicator  &_comm;
+    libMesh::Parallel::Communicator  &_comm;
     
     inline void _output_iteration_data(uint_t i,
                                        const std::vector<real_t>& XVAL,
