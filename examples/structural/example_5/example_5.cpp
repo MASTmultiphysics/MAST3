@@ -733,7 +733,7 @@ int main(int argc, char** argv) {
 
     
     // create an optimizer, attach the function evaluation
-    MAST::Optimization::Solvers::GCMMAInterface<func_eval_t> optimizer;
+    MAST::Optimization::Solvers::GCMMAInterface<func_eval_t> optimizer(init.comm());
     optimizer.max_inner_iters = 6;
     optimizer.constr_penalty  = 1.e5;
     optimizer.set_function_evaluation(f_eval);

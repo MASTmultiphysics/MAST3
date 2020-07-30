@@ -8,6 +8,11 @@
 // Test includes
 #include <test_helpers.h>
 
+// libMesh includes
+#include <libmesh/libmesh.h>
+
+extern libMesh::LibMeshInit *p_global_init;
+
 namespace MAST {
 namespace Test {
 namespace Optimization {
@@ -70,7 +75,7 @@ TEST_CASE("gcmma_interface",
 #if MAST_ENABLE_GCMMA == 1
 
     MAST::Optimization::Solvers::GCMMAInterface<RosenbrockFunction>
-    opt;
+    opt(p_global_init->comm());
     opt.set_function_evaluation(f);
     
     opt.optimize();

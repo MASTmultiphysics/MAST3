@@ -30,6 +30,7 @@
 
 // TIMPI includes
 #include <timpi/communicator.h>
+#include <timpi/parallel_implementation.h>
 
 
 extern "C" {
