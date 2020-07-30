@@ -27,6 +27,7 @@
 #include <mast/base/exceptions.hpp>
 #include <mast/numerics/utility.hpp>
 #include <mast/optimization/design_parameter_vector.hpp>
+#include <mast/mesh/libmesh/geometric_filter_augment_send_list.hpp>
 
 // libMesh includes
 #include "libmesh/system.h"
@@ -61,7 +62,8 @@ public:
                     const real_t            radius):
     _system            (sys),
     _radius            (radius),
-    _fe_size           (0.) {
+    _fe_size           (0.),
+    _augment_send_list (nullptr) {
         
         Assert1(radius > 0., radius,
                 "geometric filter radius must be greater than 0.");
@@ -71,10 +73,19 @@ public:
 #else
         _init(); // linear filter search
 #endif
+        
+        // now initialize and attach sendlist to the dofmap
+        _augment_send_list =
+        new MAST::Mesh::libMeshWrapper::GeometricFilterAugmentSendList(_forward_send_list);
+        
+        _system.get_dof_map().attach_extra_send_list_object(*_augment_send_list);
     }
     
     
-    virtual ~GeometricFilter() { }
+    virtual ~GeometricFilter() {
+        
+        if (_augment_send_list) delete _augment_send_list;
+    }
     
     /*!
      *   computes the filtered output from the provided input.
@@ -86,36 +97,44 @@ public:
      libMesh::NumericVector<real_t>                  &output,
      bool                                            close_vec) const {
         
-        Assert2(input.size() == _filter_map.size(),
-                input.size(), _filter_map.size(),
+        Assert2(input.size() == _system.n_dofs(),
+                input.size(), _system.n_dofs(),
                 "Incompatible vector sizes");
-        Assert2(output.size() == _filter_map.size(),
-                output.size(), _filter_map.size(),
+        Assert2(output.size() == _system.n_dofs(),
+                output.size(), _system.n_dofs(),
                 "Incompatible vector sizes");
         
         output.zero();
         
         std::vector<real_t> input_vals(input.size(), 0.);
         input.localize(input_vals);
-        
+
+        const uint_t
+        first_local_dof = _system.get_dof_map().first_dof(_system.comm().rank()),
+        last_local_dof  = _system.get_dof_map().end_dof(_system.comm().rank());
+
         std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>::const_iterator
         map_it   = _filter_map.begin(),
         map_end  = _filter_map.end();
         
         for ( ; map_it != map_end; map_it++) {
             
-            std::vector<std::pair<uint_t, real_t>>::const_iterator
-            vec_it  = map_it->second.begin(),
-            vec_end = map_it->second.end();
-            
-            for ( ; vec_it != vec_end; vec_it++) {
-                if (map_it->first >= input.first_local_index() &&
-                    map_it->first <  input.last_local_index()) {
-                    
-                    if (dvs.is_design_parameter_index(map_it->first))
-                        output.add(map_it->first, input_vals[vec_it->first] * vec_it->second);
-                    else
-                        output.set(map_it->first, input_vals[map_it->first]);
+            if (map_it->first >= first_local_dof &&
+                map_it->first <  last_local_dof) {
+                
+                std::vector<std::pair<uint_t, real_t>>::const_iterator
+                vec_it  = map_it->second.begin(),
+                vec_end = map_it->second.end();
+                
+                for ( ; vec_it != vec_end; vec_it++) {
+                    if (map_it->first >= input.first_local_index() &&
+                        map_it->first <  input.last_local_index()) {
+                        
+                        if (dvs.is_design_parameter_index(map_it->first))
+                            output.add(map_it->first, input_vals[vec_it->first] * vec_it->second);
+                        else
+                            output.set(map_it->first, input_vals[map_it->first]);
+                    }
                 }
             }
         }
@@ -138,8 +157,8 @@ public:
      const std::map<uint_t, ScalarType>              &nonzero_vals,
      VecType                                         &output) const {
         
-        Assert2(output.size() == _filter_map.size(),
-                output.size(), _filter_map.size(),
+        Assert2(output.size() == _system.n_dofs(),
+                output.size(), _system.n_dofs(),
                 "Incompatible vector sizes");
         Assert2(output.type() == libMesh::SERIAL,
                 output.type(), libMesh::SERIAL,
@@ -147,25 +166,33 @@ public:
         
         MAST::Numerics::Utility::setZero(output);
         
+        const uint_t
+        first_local_dof = _system.get_dof_map().first_dof(_system.comm().rank()),
+        last_local_dof  = _system.get_dof_map().end_dof(_system.comm().rank());
+
         std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>::const_iterator
         map_it   = _filter_map.begin(),
         map_end  = _filter_map.end();
         
         for ( ; map_it != map_end; map_it++) {
             
-            std::vector<std::pair<uint_t, real_t>>::const_iterator
-            vec_it  = map_it->second.begin(),
-            vec_end = map_it->second.end();
-            
-            for ( ; vec_it != vec_end; vec_it++) {
-                if (nonzero_vals.count(vec_it->first)) {
-                    
-                    if (dvs.is_design_parameter(map_it->first))
-                        MAST::Numerics::Utility::add
-                        (output, map_it->first, nonzero_vals[vec_it->first] * vec_it->second);
-                    else
-                        MAST::Numerics::Utility::set
-                        (output, map_it->first, nonzero_vals[map_it->first]);
+            if (map_it->first >= first_local_dof &&
+                map_it->first <  last_local_dof) {
+                
+                std::vector<std::pair<uint_t, real_t>>::const_iterator
+                vec_it  = map_it->second.begin(),
+                vec_end = map_it->second.end();
+                
+                for ( ; vec_it != vec_end; vec_it++) {
+                    if (nonzero_vals.count(vec_it->first)) {
+                        
+                        if (dvs.is_design_parameter(map_it->first))
+                            MAST::Numerics::Utility::add
+                            (output, map_it->first, nonzero_vals[vec_it->first] * vec_it->second);
+                        else
+                            MAST::Numerics::Utility::set
+                            (output, map_it->first, nonzero_vals[map_it->first]);
+                    }
                 }
             }
         }
@@ -181,34 +208,43 @@ public:
      const Vec1Type       &input,
      Vec2Type             &output) const {
         
-        Assert2(input.size() == _filter_map.size(),
-                input.size(), _filter_map.size(),
+        Assert2(input.size() == _system.n_dofs(),
+                input.size(), _system.n_dofs(),
                 "Incompatible vector sizes");
-        Assert2(output.size() == _filter_map.size(),
-                output.size(), _filter_map.size(),
+        Assert2(output.size() == _system.n_dofs(),
+                output.size(), _system.n_dofs(),
                 "Incompatible vector sizes");
         
         MAST::Numerics::Utility::setZero(output);
         
+        const uint_t
+        first_local_dof = _system.get_dof_map().first_dof(_system.comm().rank()),
+        last_local_dof  = _system.get_dof_map().end_dof(_system.comm().rank());
+
         std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>::const_iterator
         map_it   = _filter_map.begin(),
         map_end  = _filter_map.end();
         
         for ( ; map_it != map_end; map_it++) {
             
-            std::vector<std::pair<uint_t, real_t>>::const_iterator
-            vec_it  = map_it->second.begin(),
-            vec_end = map_it->second.end();
-            
-            for ( ; vec_it != vec_end; vec_it++) {
-                if (dvs.is_design_parameter_index(map_it->first))
-                    MAST::Numerics::Utility::add
-                    (output, map_it->first,
-                     MAST::Numerics::Utility::get(input, vec_it->first) * vec_it->second);
-                else
-                    MAST::Numerics::Utility::set
-                    (output, map_it->first,
-                     MAST::Numerics::Utility::get(input, vec_it->first));
+            // The forward map only processes the local dofs.
+            if (map_it->first >= first_local_dof &&
+                map_it->first <  last_local_dof) {
+                
+                std::vector<std::pair<uint_t, real_t>>::const_iterator
+                vec_it  = map_it->second.begin(),
+                vec_end = map_it->second.end();
+                
+                for ( ; vec_it != vec_end; vec_it++) {
+                    if (dvs.is_design_parameter_index(map_it->first))
+                        MAST::Numerics::Utility::add
+                        (output, map_it->first,
+                         MAST::Numerics::Utility::get(input, vec_it->first) * vec_it->second);
+                    else
+                        MAST::Numerics::Utility::set
+                        (output, map_it->first,
+                         MAST::Numerics::Utility::get(input, vec_it->first));
+                }
             }
         }
     }
@@ -226,14 +262,21 @@ public:
      const Vec1Type       &input,
      Vec2Type             &output) const {
         
-        Assert2(input.size() == _filter_map.size(),
-                input.size(), _filter_map.size(),
+        Assert2(input.size() == _system.n_dofs(),
+                input.size(), _system.n_dofs(),
                 "Incompatible vector sizes");
-        Assert2(output.size() == _filter_map.size(),
-                output.size(), _filter_map.size(),
+        Assert2(output.size() == _system.n_dofs(),
+                output.size(), _system.n_dofs(),
                 "Incompatible vector sizes");
         
         MAST::Numerics::Utility::setZero(output);
+        
+        const libMesh::DofMap
+        &dof_map = _system.get_dof_map();
+
+        const uint_t
+        first_local_dof = _system.get_dof_map().first_dof(_system.comm().rank()),
+        last_local_dof  = _system.get_dof_map().end_dof(_system.comm().rank());
         
         std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>::const_iterator
         map_it   = _reverse_map.begin(),
@@ -241,19 +284,24 @@ public:
         
         for ( ; map_it != map_end; map_it++) {
             
-            std::vector<std::pair<uint_t, real_t>>::const_iterator
-            vec_it  = map_it->second.begin(),
-            vec_end = map_it->second.end();
-            
-            for ( ; vec_it != vec_end; vec_it++) {
-                if (dvs.is_design_parameter_index(map_it->first))
-                    MAST::Numerics::Utility::add
-                    (output, map_it->first,
-                     MAST::Numerics::Utility::get(input, vec_it->first) * vec_it->second);
-                else
-                    MAST::Numerics::Utility::set
-                    (output, map_it->first,
-                     MAST::Numerics::Utility::get(input, vec_it->first));
+            // The reverse map requires processing of dofs that are local and in the send
+            // list. Hence, we use dof_map to check if the dof falls in this category.
+            if (dof_map.semilocal_index(map_it->first)) {
+                
+                std::vector<std::pair<uint_t, real_t>>::const_iterator
+                vec_it  = map_it->second.begin(),
+                vec_end = map_it->second.end();
+                
+                for ( ; vec_it != vec_end; vec_it++) {
+                    if (dvs.is_design_parameter_index(map_it->first))
+                        MAST::Numerics::Utility::add
+                        (output, map_it->first,
+                         MAST::Numerics::Utility::get(input, vec_it->first) * vec_it->second);
+                    else
+                        MAST::Numerics::Utility::set
+                        (output, map_it->first,
+                         MAST::Numerics::Utility::get(input, vec_it->first));
+                }
             }
         }
     }
@@ -439,7 +487,16 @@ private:
         real_t
         d_12 = 0.,
         sum  = 0.;
+
+        std::set<uint_t> send_list;
         
+        const libMesh::DofMap
+        &dof_map = _system.get_dof_map();
+
+        const uint_t
+        first_local_dof = _system.get_dof_map().first_dof(_system.comm().rank()),
+        last_local_dof  = _system.get_dof_map().end_dof(_system.comm().rank());
+
         uint_t
         dof_1,
         dof_2;
@@ -456,47 +513,65 @@ private:
             const libMesh::Node* node = *node_it;
             
             dof_1 = node->dof_number(_system.number(), 0, 0);
-            
-            real_t query_pt[3] = {(*node)(0), (*node)(1), (*node)(2)};
-            
-            std::vector<std::pair<size_t, real_t>>
-            indices_dists;
-            nanoflann::RadiusResultSet<real_t, size_t>
-            resultSet(_radius*_radius, indices_dists);
-            
-            kd_tree.findNeighbors(resultSet, query_pt, nanoflann::SearchParams());
-            
-            sum       = 0.;
-            
-            for (unsigned r=0; r<indices_dists.size(); ++r) {
+
+            // only local dofs are processed.
+            if (/*dof_1 >= first_local_dof &&
+                dof_1 <  last_local_dof*/
+                dof_map.semilocal_index(dof_1)) {
                 
-                d_12 = std::sqrt(indices_dists[r].second);
+                real_t query_pt[3] = {(*node)(0), (*node)(1), (*node)(2)};
                 
-                // the distance of this node should be less than or equal to the
-                // specified search radius
-                Assert2(d_12 <= _radius, d_12, _radius,
-                        "Node distance must be <= search radius");
+                std::vector<std::pair<size_t, real_t>>
+                indices_dists;
+                nanoflann::RadiusResultSet<real_t, size_t>
+                resultSet(_radius*_radius, indices_dists);
                 
-                sum  += _radius - d_12;
-                dof_2 = mesh.node_ptr(indices_dists[r].first)->dof_number(_system.number(), 0, 0);
+                kd_tree.findNeighbors(resultSet, query_pt, nanoflann::SearchParams());
                 
-                _filter_map[dof_1].push_back(std::pair<uint_t, real_t>(dof_2, _radius - d_12));
-            }
-            
-            Assert1(sum > 0., sum, "Weight must be > 0.");
-            
-            // with the coefficients computed for dof_1, divide each coefficient
-            // with the sum
-            std::vector<std::pair<uint_t, real_t>>& vec = _filter_map[dof_1];
-            for (uint_t i=0; i<vec.size(); i++) {
+                sum       = 0.;
                 
-                vec[i].second /= sum;
-                Assert1(vec[i].second <= 1., vec[i].second,
-                        "Normalized weight must be <= 1.");
+                for (unsigned r=0; r<indices_dists.size(); ++r) {
+                    
+                    d_12 = std::sqrt(indices_dists[r].second);
+                    
+                    // the distance of this node should be less than or equal to the
+                    // specified search radius
+                    Assert2(d_12 <= _radius, d_12, _radius,
+                            "Node distance must be <= search radius");
+                    
+                    sum  += _radius - d_12;
+                    dof_2 = mesh.node_ptr(indices_dists[r].first)->dof_number(_system.number(), 0, 0);
+                    
+                    _filter_map[dof_1].push_back(std::pair<uint_t, real_t>(dof_2, _radius - d_12));
+
+                    // add this dof to the local send list
+                    if (dof_2 < first_local_dof ||
+                        dof_2 >= last_local_dof)
+                        send_list.insert(dof_2);
+                }
+                
+                Assert1(sum > 0., sum, "Weight must be > 0.");
+                
+                // with the coefficients computed for dof_1, divide each coefficient
+                // with the sum
+                std::vector<std::pair<uint_t, real_t>>& vec = _filter_map[dof_1];
+                for (uint_t i=0; i<vec.size(); i++) {
+                    
+                    vec[i].second /= sum;
+                    Assert1(vec[i].second <= 1., vec[i].second,
+                            "Normalized weight must be <= 1.");
+                }
             }
         }
 
-        // now prepare the reverse map
+        // now prepare the reverse map. The send list is sorted for later use.
+        std::set<uint_t>::const_iterator
+        s_it  = send_list.begin(),
+        s_end = send_list.end();
+        
+        _forward_send_list.reserve(send_list.size());
+        for ( ; s_it != s_end; s_it++) _forward_send_list.push_back(*s_it);
+        
         _init_reverse_map(_filter_map, _reverse_map);
         
         // compute the largest element size
@@ -540,6 +615,15 @@ private:
         d_12 = 0.,
         sum  = 0.;
         
+        std::set<uint_t> send_list;
+        
+        const libMesh::DofMap
+        &dof_map = _system.get_dof_map();
+
+        const uint_t
+        first_local_dof = _system.get_dof_map().first_dof(_system.comm().rank()),
+        last_local_dof  = _system.get_dof_map().end_dof(_system.comm().rank());
+
         uint_t
         dof_1,
         dof_2;
@@ -547,40 +631,58 @@ private:
         for ( ; node_it_1 != node_end; node_it_1++) {
             
             dof_1 = (*node_it_1)->dof_number(_system.number(), 0, 0);
-            
-            node_it_2 = mesh.nodes_begin();
-            sum       = 0.;
-            
-            for ( ; node_it_2 != node_end; node_it_2++) {
+
+            // only local dofs are processed.
+            if (/*dof_1 >= first_local_dof &&
+                dof_1 <  last_local_dof*/
+                dof_map.semilocal_index(dof_1)) {
                 
-                // compute the distance between the two nodes
-                d    = (**node_it_1) - (**node_it_2);
-                d_12 = d.norm();
+                node_it_2 = mesh.nodes_begin();
+                sum       = 0.;
                 
-                // if the nodes is within the filter radius, add it to the map
-                if (d_12 <= _radius) {
+                for ( ; node_it_2 != node_end; node_it_2++) {
                     
-                    sum  += _radius - d_12;
-                    dof_2 = (*node_it_2)->dof_number(_system.number(), 0, 0);
+                    // compute the distance between the two nodes
+                    d    = (**node_it_1) - (**node_it_2);
+                    d_12 = d.norm();
                     
-                    _filter_map[dof_1].push_back(std::pair<uint_t, real_t>(dof_2, _radius - d_12));
+                    // if the nodes is within the filter radius, add it to the map
+                    if (d_12 <= _radius) {
+                        
+                        sum  += _radius - d_12;
+                        dof_2 = (*node_it_2)->dof_number(_system.number(), 0, 0);
+                        
+                        _filter_map[dof_1].push_back(std::pair<uint_t, real_t>(dof_2, _radius - d_12));
+                        
+                        // add this dof to the local send list if it is not a local dof
+                        if (dof_2 < first_local_dof ||
+                            dof_2 >= last_local_dof)
+                            send_list.insert(dof_2);
+                    }
                 }
-            }
-            
-            Assert1(sum > 0., sum, "Weight must be > 0.");
-            
-            // with the coefficients computed for dof_1, divide each coefficient
-            // with the sum
-            std::vector<std::pair<uint_t, real_t>>& vec = _filter_map[dof_1];
-            for (uint_t i=0; i<vec.size(); i++) {
                 
-                vec[i].second /= sum;
-                Assert1(vec[i].second <= 1., vec[i].second,
-                        "Normalized weight must be <= 1.");
+                Assert1(sum > 0., sum, "Weight must be > 0.");
+                
+                // with the coefficients computed for dof_1, divide each coefficient
+                // with the sum
+                std::vector<std::pair<uint_t, real_t>>& vec = _filter_map[dof_1];
+                for (uint_t i=0; i<vec.size(); i++) {
+                    
+                    vec[i].second /= sum;
+                    Assert1(vec[i].second <= 1., vec[i].second,
+                            "Normalized weight must be <= 1.");
+                }
             }
         }
         
-        // now prepare the reverse map
+        // now prepare the reverse map. The send list is sorted for later use.
+        std::set<uint_t>::const_iterator
+        s_it  = send_list.begin(),
+        s_end = send_list.end();
+        
+        _forward_send_list.reserve(send_list.size());
+        for ( ; s_it != s_end; s_it++) _forward_send_list.push_back(*s_it);
+        
         _init_reverse_map(_filter_map, _reverse_map);
 
         // compute the largest element size
@@ -635,6 +737,12 @@ private:
     real_t _fe_size;
     
     /*!
+     *  pointer to an object that appends the sendlist for dofmap to localize the dofs needed for local
+     *  computations.
+     */
+    MAST::Mesh::libMeshWrapper::GeometricFilterAugmentSendList *_augment_send_list;
+
+    /*!
      *   Algebraic relation between filtered level set values and the
      *   design variables \f$ \tilde{\phi}_i = B_{ij} \phi_j \f$
      */
@@ -644,6 +752,12 @@ private:
      * this map stores the columns of the matrix, which is required for sensitivity analysis
      */
     std::map<uint_t, std::vector<std::pair<uint_t, real_t>>> _reverse_map;
+    
+    /*!
+     *   vector of dof ids that the current processor depends on.
+     */
+    std::vector<uint_t> _forward_send_list;
+    
 };
 
 

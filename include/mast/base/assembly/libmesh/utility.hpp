@@ -38,11 +38,33 @@ namespace Assembly {
 namespace libMeshWrapper {
 
 
+template <typename ScalarType, typename VecType>
+inline void
+add_to_vector(VecType& v, const uint_t i, const ScalarType& s) {
+    
+    v(i) += s;
+}
+
+
+inline void
+add_to_vector(libMesh::NumericVector<real_t>& v, const uint_t i, const real_t& s) {
+    
+    v.add(i, s);
+}
+
+
 template <typename ScalarType, typename MatType>
 inline void
 add_to_matrix(MatType& m, const uint_t i, const uint_t j, const ScalarType& v) {
     
     m(i, j) += v;
+}
+
+
+inline void
+add_to_matrix(libMesh::SparseMatrix<real_t>& m, const uint_t i, const uint_t j, const real_t& v) {
+    
+    m.add(i, j, v);
 }
 
 
@@ -77,7 +99,7 @@ constrain_and_add_matrix_and_vector(VecType                           &v,
     dof_map.constrain_element_matrix_and_vector(m1, v1, dof_indices);
     
     for (uint_t i=0; i<dof_indices.size(); i++)
-        v(dof_indices[i]) += v1(i);
+        add_to_vector(v, dof_indices[i], v1(i));
     
     for (uint_t i=0; i<dof_indices.size(); i++)
         for (uint_t j=0; j<dof_indices.size(); j++)
@@ -99,7 +121,7 @@ constrain_and_add_vector(VecType                           &v,
     dof_map.constrain_element_vector(v1, dof_indices);
 
     for (uint_t i=0; i<dof_indices.size(); i++)
-        v(dof_indices[i]) += v1(i);
+        add_to_vector(v, dof_indices[i], v1(i));
 }
 
 
