@@ -478,9 +478,9 @@ private:
                       std::vector<real_t>       &grads) {
         
         // rank 0 will broadcase the DV values to all ranks
-        _comm.broadcast(x, 0, true);
+        _comm.broadcast(x, 0/*, true*/);
         _comm.broadcast(eval_obj_grad, 0);
-        _comm.broadcast(eval_grads, 0, true);
+        _comm.broadcast(eval_grads, 0/*, true*/);
         
         _feval->evaluate(x,
                          obj,
