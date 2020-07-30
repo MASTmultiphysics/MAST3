@@ -1,5 +1,5 @@
 target_sources(mast_catch_tests
-               PRIVATE
+               PUBLIC
                ${CMAKE_CURRENT_LIST_DIR}/gcmma_interface.cpp)
 
 #GCMMA interface

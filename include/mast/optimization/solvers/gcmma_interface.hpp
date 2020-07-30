@@ -28,6 +28,9 @@
 #include <mast/base/mast_data_types.h>
 #include <mast/base/exceptions.hpp>
 
+// libMesh includes
+#include <libmesh/parallel.h>
+
 
 extern "C" {
 extern void raasta_(int *M, int *N,
@@ -82,7 +85,8 @@ class GCMMAInterface {
     
 public:
     
-    GCMMAInterface():
+    GCMMAInterface(libMesh::Parallel::Communicator &comm):
+    _comm                         (comm),
     constr_penalty                (5.e1),
     initial_rel_step              (1.e-2),
     asymptote_reduction           (0.7),
@@ -394,7 +398,8 @@ public:
                 << std::endl;
                 terminate = true;
             }
-            
+            // tell all processors about the decision here
+            _comm.broadcast(terminate, 0);
         }
         
 #endif //MAST_ENABLE_GCMMA == 1
@@ -402,6 +407,8 @@ public:
     
     
 private:
+    
+    libMesh::Parallel::Communicator  &_comm;
     
     inline void _output_iteration_data(uint_t i,
                                        const std::vector<real_t>& XVAL,
@@ -459,6 +466,40 @@ private:
             << std::setw(20) << BETA[j]
             << std::setw(20) << XUPP[j]
             << std::setw(20) << XMAX[j] << std::endl;
+    }
+    
+    inline void
+    _evaluate_wrapper(const std::vector<real_t> &x,
+                      real_t                    &obj,
+                      bool                      eval_obj_grad,
+                      std::vector<real_t>       &obj_grad,
+                      std::vector<real_t>       &fvals,
+                      std::vector<bool>         &eval_grads,
+                      std::vector<real_t>       &grads) {
+        
+        // rank 0 will broadcase the DV values to all ranks
+        _comm.broadcast(x, 0/*, true*/);
+        _comm.broadcast(eval_obj_grad, 0);
+        _comm.broadcast(eval_grads, 0/*, true*/);
+        
+        _feval->evaluate(x,
+                         obj,
+                         eval_obj_grad,
+                         obj_grad,
+                         fvals,
+                         eval_grads,
+                         grads);
+        
+        // make sure that all data returned is consistent across
+        // processors
+        Assert0(_comm.verify(obj),
+                "Objective function has different values on ranks");
+        Assert0(_comm.verify(obj_grad),
+                "Objective function gradient has different values on ranks");
+        Assert0(_comm.verify(fvals),
+                "Constraint functions has different values on ranks");
+        Assert0(_comm.verify(grads),
+                "Constraint function gradient has different values on ranks");
     }
     
     FunctionEvaluationType *_feval;
