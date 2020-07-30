@@ -29,8 +29,7 @@
 #include <mast/base/exceptions.hpp>
 
 // TIMPI includes
-#include <timpi/communicator.h>
-#include <timpi/parallel_implementation.h>
+#include <libmesh/parallel.h>
 
 
 extern "C" {
