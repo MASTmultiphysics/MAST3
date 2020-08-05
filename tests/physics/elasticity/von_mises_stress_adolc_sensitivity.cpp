@@ -33,13 +33,6 @@ namespace Elasticity {
 namespace vonMisesStress {
 namespace AdolC {
 
-template <typename ScalarType, uint_t Dim>
-using stress_vec_t = MAST::Physics::Elasticity::LinearContinuum::stress_vec_t<ScalarType, Dim>;
-
-template <typename ScalarType, uint_t Dim>
-using stress_adjoint_mat_t = MAST::Physics::Elasticity::LinearContinuum::stress_adjoint_mat_t<ScalarType, Dim>;
-
-
 
 template <uint_t   Dim>
 inline void test_von_mises_stress_sensitivity()  {
@@ -49,29 +42,30 @@ inline void test_von_mises_stress_sensitivity()  {
     n_strain = MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<Dim>::value;
     
     
-    stress_vec_t<real_t, Dim>
-    stress   = stress_vec_t<real_t, Dim>::Random(),
-    dstress  = stress_vec_t<real_t, Dim>::Random();
+    Eigen::Matrix<real_t, n_strain, 1>
+    stress   = Eigen::Matrix<real_t, n_strain, 1>::Random(),
+    dstress  = Eigen::Matrix<real_t, n_strain, 1>::Random();
     
-    stress_adjoint_mat_t<real_t, Dim>
-    stress_adj_mat = stress_adjoint_mat_t<real_t, Dim>::Random(n_strain, n_basis);
+    Eigen::Matrix<real_t, n_strain, Eigen::Dynamic>
+    stress_adj_mat = Eigen::Matrix<real_t, n_strain, Eigen::Dynamic>::Random(n_strain, n_basis);
 
     Eigen::Matrix<real_t, Eigen::Dynamic, 1>
     vm_adj    = Eigen::Matrix<real_t, Eigen::Dynamic, 1>::Zero(n_basis),
     vm_adj_cs = Eigen::Matrix<real_t, Eigen::Dynamic, 1>::Zero(n_basis);
     
     real_t
-    vm  = MAST::Physics::Elasticity::LinearContinuum::vonMises_stress<real_t, Dim>(stress),
-    dvm = MAST::Physics::Elasticity::LinearContinuum::vonMises_stress_derivative<real_t, Dim>(stress, dstress),
+    vm  = MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<real_t, Dim>::
+    value(stress),
+    dvm = MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<real_t, Dim>::
+    derivative_sens(stress, dstress),
     dvm_cs = 0.;
-    
-    MAST::Physics::Elasticity::LinearContinuum::vonMises_stress_dX<real_t, Dim>(stress,
-                                                                                stress_adj_mat,
-                                                                                vm_adj);
+
+    MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<real_t, Dim>::
+    stress_dX(stress, stress_adj_mat, vm_adj);
     
     {
         // the number of directions for which we compute the sensitivity is = n_strain
-        stress_vec_t<adouble_tl_t, Dim>
+        Eigen::Matrix<adouble_tl_t, n_strain, 1>
         stress_ad;
         
         for (uint_t i=0; i<n_strain; i++) {
@@ -81,7 +75,8 @@ inline void test_von_mises_stress_sensitivity()  {
         }
         
         adouble_tl_t
-        vm_ad = MAST::Physics::Elasticity::LinearContinuum::vonMises_stress<adouble_tl_t, Dim>(stress_ad);
+        vm_ad = MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<adouble_tl_t, Dim>::
+        value(stress_ad);
 
         dvm_cs = *vm_ad.getADValue();
     }
@@ -90,7 +85,7 @@ inline void test_von_mises_stress_sensitivity()  {
     {
         adtl::setNumDir(n_basis);
 
-        stress_vec_t<adouble_tl_t, Dim>
+        Eigen::Matrix<adouble_tl_t, n_strain, 1>
         stress_ad;
 
         // the adjoint can be computed in adol-c traceless vector mode
@@ -106,7 +101,8 @@ inline void test_von_mises_stress_sensitivity()  {
         }
         
         adouble_tl_t
-        vm_ad = MAST::Physics::Elasticity::LinearContinuum::vonMises_stress<adouble_tl_t, Dim>(stress_ad);
+        vm_ad = MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<adouble_tl_t, Dim>::
+        value(stress_ad);
         
         for (uint_t j=0; j<n_basis; j++)
             vm_adj_cs(j) = vm_ad.getADValue(j);
