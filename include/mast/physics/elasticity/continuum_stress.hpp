@@ -31,8 +31,7 @@ namespace LinearContinuum {
 
 template <typename FEVarType,
           typename MaterialPropertyType,
-          uint_t Dim,
-          typename ContextType>
+          uint_t Dim>
 class Stress {
 
 public:
@@ -72,7 +71,7 @@ public:
     }
     
 
-    template <typename AccessorType>
+    template <typename ContextType, typename AccessorType>
     inline void
     compute(ContextType      &c,
             AccessorType     &stress) const {
@@ -112,7 +111,7 @@ public:
     }
     
     
-    template <typename AccessorType, typename ScalarFieldType>
+    template <typename ContextType, typename AccessorType, typename ScalarFieldType>
     inline void derivative(ContextType            &c,
                            const ScalarFieldType  &f,
                            AccessorType           &dstress) const {
@@ -152,7 +151,7 @@ public:
     }
 
     
-    template <typename AccessorType>
+    template <typename ContextType, typename AccessorType>
     inline void adjoint_derivative(ContextType      &c,
                                    AccessorType     &stress_adj) const {
         

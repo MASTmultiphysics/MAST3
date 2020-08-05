@@ -30,8 +30,7 @@ namespace MindlinPlate {
 
 
 template <typename FEVarType,
-          typename SectionPropertyType,
-          typename ContextType>
+          typename SectionPropertyType>
 class StrainEnergy {
     
 public:
@@ -78,6 +77,7 @@ public:
         return 3*_bending_fe_var_data->get_fe_shape_data().n_basis();
     }
     
+    template <typename ContextType>
     inline void compute(ContextType& c,
                         vector_t& res,
                         matrix_t* jac = nullptr) const {
@@ -175,7 +175,7 @@ public:
         }
     }
 
-    template <typename ScalarFieldType>
+    template <typename ContextType, typename ScalarFieldType>
     inline void derivative(ContextType& c,
                            const ScalarFieldType& f,
                            vector_t& res,

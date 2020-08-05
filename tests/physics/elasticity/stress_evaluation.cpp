@@ -68,8 +68,8 @@ struct Traits {
     using fe_var_t          = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, Dim, Dim, Context, fe_shape_t>;
     using modulus_t         = typename MAST::Base::ScalarConstant<SolScalarType>;
     using nu_t              = typename MAST::Base::ScalarConstant<SolScalarType>;
-    using prop_t            = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<SolScalarType, Dim, modulus_t, nu_t, Context>;
-    using stress_t          = typename MAST::Physics::Elasticity::LinearContinuum::Stress<fe_var_t, prop_t, Dim, Context>;
+    using prop_t            = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<SolScalarType, Dim, modulus_t, nu_t>;
+    using stress_t          = typename MAST::Physics::Elasticity::LinearContinuum::Stress<fe_var_t, prop_t, Dim>;
     using stress_vec_t      = typename Eigen::Matrix<scalar_t, stress_t::n_strain, 1>;
     using stress_adj_mat_t  = typename Eigen::Matrix<scalar_t, stress_t::n_strain, Eigen::Dynamic>;
     using stress_storage_t  = typename Eigen::Matrix<scalar_t, stress_t::n_strain, Eigen::Dynamic>;

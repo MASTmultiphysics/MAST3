@@ -30,8 +30,7 @@ namespace Elasticity {
 
 template <typename ScalarType,
           typename MaterialType,
-          typename ThicknessType,
-          typename ContextType>
+          typename ThicknessType>
 class PlateBendingSectionProperty {
 public:
     
@@ -59,6 +58,7 @@ public:
     
     inline const ThicknessType& get_thickness() const {return *_th;}
     
+    template <typename ContextType>
     inline void inplane_value(ContextType     &c,
                               inplane_value_t &m) const {
 
@@ -69,7 +69,7 @@ public:
      }
     
     
-    template <typename ScalarFieldType>
+    template <typename ContextType, typename ScalarFieldType>
     inline void inplane_derivative(ContextType           &c,
                                    const ScalarFieldType &f,
                                    inplane_value_t       &m) const {
@@ -87,6 +87,7 @@ public:
         m  += dm;
     }
 
+    template <typename ContextType>
     inline void shear_value(ContextType& c,
                             shear_value_t &m) const {
 
@@ -97,7 +98,7 @@ public:
      }
     
     
-    template <typename ScalarFieldType>
+    template <typename ContextType, typename ScalarFieldType>
     inline void shear_derivative(ContextType           &c,
                                  const ScalarFieldType &f,
                                  shear_value_t         &m) const {

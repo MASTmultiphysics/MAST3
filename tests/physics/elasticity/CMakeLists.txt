@@ -7,7 +7,8 @@ target_sources(mast_catch_tests
                ${CMAKE_CURRENT_LIST_DIR}/plate_bending_section_property_complex_step_sensitivity.cpp
                ${CMAKE_CURRENT_LIST_DIR}/pressure_load.cpp
                ${CMAKE_CURRENT_LIST_DIR}/stress_evaluation.cpp
-               ${CMAKE_CURRENT_LIST_DIR}/von_mises_stress_complex_step_sensitivity.cpp)
+               ${CMAKE_CURRENT_LIST_DIR}/von_mises_stress_complex_step_sensitivity.cpp
+               ${CMAKE_CURRENT_LIST_DIR}/von_mises_yield_criterion.cpp)
 
 #Linear elasticity kernel
 add_test(NAME LinearElasticStrainEnergy
@@ -82,6 +83,15 @@ set_tests_properties(vonMisesStressComplexStep
         PROPERTIES
         LABELS "SEQ"
         FIXTURES_SETUP     vonMisesStressComplexStep)
+
+
+#von Mises yield criterion
+add_test(NAME vonMisesYieldCriterion
+         COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "von_mises_yield_criterion")
+set_tests_properties(vonMisesYieldCriterion
+        PROPERTIES
+        LABELS "SEQ"
+        FIXTURES_SETUP     vonMisesYieldCriterion)
 
 
 #von Mises stress: adol-c sensitivity

@@ -69,7 +69,7 @@ struct Traits {
     using fe_data_t    = typename MAST::FEBasis::libMeshWrapper::FEData<Dim, fe_basis_t, fe_shape_t>;
     using fe_var_t     = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, 1, Dim, Context, fe_shape_t>;
     using pressure_t   = typename MAST::Base::ScalarConstant<SolScalarType>;
-    using press_load_t = typename MAST::Physics::Elasticity::ShellFacePressureLoad<fe_var_t, pressure_t, Context>;
+    using press_load_t = typename MAST::Physics::Elasticity::ShellFacePressureLoad<fe_var_t, pressure_t>;
 };
 
 

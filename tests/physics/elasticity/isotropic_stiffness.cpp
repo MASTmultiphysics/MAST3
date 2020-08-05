@@ -43,7 +43,7 @@ struct Traits {
     using scalar_t          = ScalarType;
     using modulus_t         = typename MAST::Base::ScalarConstant<ScalarType>;
     using nu_t              = typename MAST::Base::ScalarConstant<ScalarType>;
-    using prop_t            = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<ScalarType, Dim, modulus_t, nu_t, Context>;
+    using prop_t            = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<ScalarType, Dim, modulus_t, nu_t>;
 };
 
 

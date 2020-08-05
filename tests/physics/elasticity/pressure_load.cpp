@@ -71,7 +71,7 @@ struct Traits {
     using fe_var_t     = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, Dim, Dim, Context, fe_shape_t>;
     using pressure_t   = typename MAST::Base::ScalarConstant<SolScalarType>;
     using area_t       = typename MAST::Base::ScalarConstant<SolScalarType>;
-    using press_load_t = typename MAST::Physics::Elasticity::SurfacePressureLoad<fe_var_t, pressure_t, area_t, Dim, Context>;
+    using press_load_t = typename MAST::Physics::Elasticity::SurfacePressureLoad<fe_var_t, pressure_t, area_t, Dim>;
 };
 
 

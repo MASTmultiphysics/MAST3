@@ -71,9 +71,9 @@ struct Traits {
     using modulus_t         = typename MAST::Base::ScalarConstant<scalar_t>;
     using nu_t              = typename MAST::Base::ScalarConstant<scalar_t>;
     using thickness_t       = typename MAST::Base::ScalarConstant<scalar_t>;
-    using material_t        = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<scalar_t, 2, modulus_t, nu_t, Context>;
-    using section_t         = typename MAST::Physics::Elasticity::PlateBendingSectionProperty<scalar_t, material_t, thickness_t, Context>;
-    using energy_t          = typename MAST::Physics::Elasticity::MindlinPlate::StrainEnergy<fe_var_t, section_t, Context>;
+    using material_t        = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<scalar_t, 2, modulus_t, nu_t>;
+    using section_t         = typename MAST::Physics::Elasticity::PlateBendingSectionProperty<scalar_t, material_t, thickness_t>;
+    using energy_t          = typename MAST::Physics::Elasticity::MindlinPlate::StrainEnergy<fe_var_t, section_t>;
 };
 
 

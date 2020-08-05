@@ -39,13 +39,15 @@ shear_modulus_derivative(ScalarType  E, ScalarType nu,
 { return dE/2./(1.+nu) - E/2./pow(1.+nu,2) * dnu;}
 
 
-template <typename ScalarType, uint_t Dim, typename ModulusType, typename PoissonType, typename ContextType>
+template <typename ScalarType, uint_t Dim, typename ModulusType, typename PoissonType>
 class IsotropicMaterialStiffness;
 
-template <typename ScalarType, typename ModulusType, typename PoissonType, typename ContextType>
-class IsotropicMaterialStiffness<ScalarType, 2, ModulusType, PoissonType, ContextType> {
+template <typename ScalarType, typename ModulusType, typename PoissonType>
+class IsotropicMaterialStiffness<ScalarType, 2, ModulusType, PoissonType> {
 public:
     
+    static const
+    uint_t dim        = 2;
     using E_scalar_t  = typename ModulusType::scalar_t;
     using nu_scalar_t = typename PoissonType::scalar_t;
     using scalar_t    = typename MAST::DeducedScalarType<typename MAST::DeducedScalarType<E_scalar_t, nu_scalar_t>::type, ScalarType>::type;
@@ -68,12 +70,13 @@ public:
     
     inline const PoissonType& get_nu() const {return *_nu;}
     
+    template <typename ContextType>
     inline scalar_t G(ContextType& c) const {
         
         return shear_modulus<scalar_t>(_E->value(c), _nu->value(c));
     }
     
-    template <typename ScalarFieldType>
+    template <typename ContextType, typename ScalarFieldType>
     inline scalar_t G_derivative(ContextType& c, const ScalarFieldType& f) const {
         
         return shear_modulus_derivative<scalar_t>(_E->value(c),
@@ -82,6 +85,7 @@ public:
                                                   _nu->derivative(c, f));
     }
     
+    template <typename ContextType>
     inline void value(ContextType& c, value_t& m) const {
                 
         Assert0(_E && _nu, "Material values not provided");
@@ -99,7 +103,7 @@ public:
     }
     
     
-    template <typename ScalarFieldType>
+    template <typename ContextType, typename ScalarFieldType>
     inline void derivative(ContextType&           c,
                            const ScalarFieldType& f,
                            value_t&               m) const {
@@ -133,10 +137,12 @@ private:
 
 
 
-template <typename ScalarType, typename ModulusType, typename PoissonType, typename ContextType>
-class IsotropicMaterialStiffness<ScalarType, 3, ModulusType, PoissonType, ContextType> {
+template <typename ScalarType, typename ModulusType, typename PoissonType>
+class IsotropicMaterialStiffness<ScalarType, 3, ModulusType, PoissonType> {
 public:
     
+    static const
+    uint_t dim        = 3;
     using E_scalar_t  = typename ModulusType::scalar_t;
     using nu_scalar_t = typename PoissonType::scalar_t;
     using scalar_t    = typename MAST::DeducedScalarType<typename MAST::DeducedScalarType<E_scalar_t, nu_scalar_t>::type, ScalarType>::type;
@@ -154,6 +160,7 @@ public:
         _nu = &nu;
     }
 
+    template <typename ContextType>
     inline void value(const ContextType& c, value_t& m) const {
                 
         Assert0(_E && _nu, "Material values not provided");
@@ -171,7 +178,7 @@ public:
     }
     
     
-    template <typename ScalarFieldType>
+    template <typename ContextType, typename ScalarFieldType>
     inline void derivative(const ContextType&     c,
                            const ScalarFieldType& f,
                            value_t&               m) const {

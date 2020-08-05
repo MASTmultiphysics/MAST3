@@ -45,7 +45,7 @@ public:
     Volume() {}
     virtual ~Volume() {}
     
-    template <typename VecType, typename ContextType>
+    template <typename ContextType, typename VecType>
     inline ScalarType compute(ContextType& c,
                               const VecType &density) const {
         

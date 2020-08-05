@@ -72,9 +72,9 @@ public:
      *  output derivative is defined as a
      * \f[ \frac{dQ}{d\alpha} = \frac{\partial Q}{\partial \alpha} + \lambda^T \frac{\partial R}{\partial \alpha} \f]
      */
-    template <typename Vec1Type,
+    template <typename ContextType,
+              typename Vec1Type,
               typename Vec2Type,
-              typename ContextType,
               typename FilterType>
     inline void assemble(ContextType               &c,
                          const Vec1Type            &X,

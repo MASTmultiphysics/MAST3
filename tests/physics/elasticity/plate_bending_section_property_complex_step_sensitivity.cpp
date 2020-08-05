@@ -44,8 +44,8 @@ struct Traits {
     using modulus_t         = typename MAST::Base::ScalarConstant<ScalarType>;
     using nu_t              = typename MAST::Base::ScalarConstant<ScalarType>;
     using thickness_t       = typename MAST::Base::ScalarConstant<ScalarType>;
-    using material_t        = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<ScalarType, 2, modulus_t, nu_t, Context>;
-    using section_t         = typename MAST::Physics::Elasticity::PlateBendingSectionProperty<ScalarType, material_t, thickness_t, Context>;
+    using material_t        = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<ScalarType, 2, modulus_t, nu_t>;
+    using section_t         = typename MAST::Physics::Elasticity::PlateBendingSectionProperty<ScalarType, material_t, thickness_t>;
 
 };
 
