@@ -44,29 +44,46 @@ inline void test_von_mises_stress_sensitivity()  {
     
     Eigen::Matrix<real_t, n_strain, 1>
     stress   = Eigen::Matrix<real_t, n_strain, 1>::Random(),
-    dstress  = Eigen::Matrix<real_t, n_strain, 1>::Random();
+    dstress  = Eigen::Matrix<real_t, n_strain, 1>::Random(),
+    dsvm     = Eigen::Matrix<real_t, n_strain, 1>::Zero(),
+    dsvm_ad  = Eigen::Matrix<real_t, n_strain, 1>::Zero();
     
+
+    Eigen::Matrix<real_t, n_strain, n_strain>
+    d2stress       = Eigen::Matrix<real_t, n_strain, n_strain>::Zero(),
+    d2stress_ad    = Eigen::Matrix<real_t, n_strain, n_strain>::Zero();
+
     Eigen::Matrix<real_t, n_strain, Eigen::Dynamic>
     stress_adj_mat = Eigen::Matrix<real_t, n_strain, Eigen::Dynamic>::Random(n_strain, n_basis);
 
     Eigen::Matrix<real_t, Eigen::Dynamic, 1>
     vm_adj    = Eigen::Matrix<real_t, Eigen::Dynamic, 1>::Zero(n_basis),
-    vm_adj_cs = Eigen::Matrix<real_t, Eigen::Dynamic, 1>::Zero(n_basis);
+    vm_adj_ad = Eigen::Matrix<real_t, Eigen::Dynamic, 1>::Zero(n_basis);
     
     real_t
     vm  = MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<real_t, Dim>::
     value(stress),
     dvm = MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<real_t, Dim>::
     derivative_sens(stress, dstress),
-    dvm_cs = 0.;
+    dvm_ad = 0.;
 
+    // stress adjoint
     MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<real_t, Dim>::
     stress_dX(stress, stress_adj_mat, vm_adj);
+    
+    // dsigma_vm/dsigma
+    MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<real_t, Dim>::
+    derivative(stress, dsvm);
+
+    // d2sigma_vm/dsigma2
+    MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<real_t, Dim>::
+    second_derivative(stress, d2stress);
     
     {
         // the number of directions for which we compute the sensitivity is = n_strain
         Eigen::Matrix<adouble_tl_t, n_strain, 1>
-        stress_ad;
+        stress_ad,
+        ds_ad;
         
         for (uint_t i=0; i<n_strain; i++) {
             
@@ -78,8 +95,39 @@ inline void test_von_mises_stress_sensitivity()  {
         vm_ad = MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<adouble_tl_t, Dim>::
         value(stress_ad);
 
-        dvm_cs = *vm_ad.getADValue();
+        dvm_ad = *vm_ad.getADValue();
     }
+
+    
+    // first and second derivative of sigma_vm wrt stress vector
+    for (uint_t i=0; i<n_strain; i++) {
+        
+        // the number of directions for which we compute the sensitivity is = n_strain
+        Eigen::Matrix<adouble_tl_t, n_strain, 1>
+        stress_ad,
+        ds_ad;
+        
+        real_t
+        v = 1.;
+        
+        for (uint_t j=0; j<n_strain; j++) stress_ad(j) = stress(j);
+        
+        // derivative wrt ith sigma value
+        stress_ad(i).setADValue(&v);
+
+        adouble_tl_t
+        vm_ad = MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<adouble_tl_t, Dim>::
+        value(stress_ad);
+
+        MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<adouble_tl_t, Dim>::
+        derivative(stress_ad, ds_ad);
+        
+        dsvm_ad(i) = *vm_ad.getADValue();
+
+        for (uint_t j=0; j<n_strain; j++)
+            d2stress_ad(j,i) = *ds_ad(j).getADValue();
+    }
+    
     
     // adjoint
     {
@@ -105,13 +153,19 @@ inline void test_von_mises_stress_sensitivity()  {
         value(stress_ad);
         
         for (uint_t j=0; j<n_basis; j++)
-            vm_adj_cs(j) = vm_ad.getADValue(j);
+            vm_adj_ad(j) = vm_ad.getADValue(j);
     }
     
-    CHECK(dvm == Catch::Detail::Approx(dvm_cs));
+    CHECK(dvm == Catch::Detail::Approx(dvm_ad));
 
     CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(vm_adj),
-               Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(vm_adj_cs)));
+               Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(vm_adj_ad)));
+
+    CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(dsvm),
+               Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(dsvm_ad)));
+
+    CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(d2stress),
+               Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(d2stress_ad)));
 }
 
 

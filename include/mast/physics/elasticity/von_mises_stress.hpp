@@ -124,7 +124,8 @@ vonMisesStress<ScalarType, 2> {
         0.5 * (pow(stress(0)-stress(1),2) +    //((sigma_xx - sigma_yy)^2    +
                pow(stress(1),2) +               // (sigma_yy)^2    +
                pow(stress(0),2)) +              // (sigma_xx)^2)/2 +
-        3.0 * (pow(stress(2), 2));              //  3.0 * tau_xy^2)
+        3.0 * (pow(stress(2), 2)),              //  3.0 * tau_xy^2)
+        sqrtp_2 = .5 * pow(p, -0.5);
         
         dstress.setZero();
         
@@ -138,15 +139,15 @@ vonMisesStress<ScalarType, 2> {
             ds(1) = - (stress(0) - stress(1)) + stress(1);
             ds(2) = 6. * stress(2);
             
-            dstress  = -.25 / pow(p, -1.5) * ds * ds.transpose();
+            dstress  = -.25 / pow(p, 1.5) * ds * ds.transpose();
             
-            dstress(0, 0) +=  2. * 0.5 * pow(p, -0.5);
-            dstress(0, 1) += -1. * 0.5 * pow(p, -0.5);
+            dstress(0, 0) +=  2. * sqrtp_2;
+            dstress(0, 1) += -1. * sqrtp_2;
             
-            dstress(1, 0) += -1. * 0.5 * pow(p, -0.5);
-            dstress(1, 1) +=  2. * 0.5 * pow(p, -0.5);
+            dstress(1, 0) += -1. * sqrtp_2;
+            dstress(1, 1) +=  2. * sqrtp_2;
 
-            dstress(2, 2) +=  6. * 0.5 * pow(p, -0.5);
+            dstress(2, 2) +=  6. * sqrtp_2;
         }
     }
 
@@ -311,7 +312,7 @@ vonMisesStress<ScalarType, 3> {
         
         using scalar_t = typename Eigen::internal::traits<VecType>::Scalar;
         const uint_t
-        ns = MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<2>::value;
+        ns = MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<3>::value;
 
         static_assert(std::is_same<ScalarType, typename Eigen::internal::traits<VecType>::Scalar>::value,
                       "Scalar type must be same");
@@ -334,8 +335,9 @@ vonMisesStress<ScalarType, 3> {
                pow(stress(2)-stress(0),2)) +   // (sigma_zz - sigma_xx)^2)/2 +
         3.0 * (pow(stress(3), 2) +              // 3* (tau_xy^2 +
                pow(stress(4), 2) +              //     tau_yz^2 +
-               pow(stress(5), 2));              //     tau_zx^2)
-        
+               pow(stress(5), 2)),              //     tau_zx^2)
+        sqrtp_2 = .5 * pow(p, -0.5);
+
         // if p == 0, then the sensitivity returns nan
         // Hence, we are avoiding this by setting it to zero whenever p = 0.
         if (fabs(p) > 0.) {
@@ -349,23 +351,23 @@ vonMisesStress<ScalarType, 3> {
             ds(4) = 6. * stress(4);
             ds(5) = 6. * stress(5);
 
-            dstress  = -.25 / pow(p, -1.5) * ds * ds.transpose();
+            dstress  = -.25 / pow(p, 1.5) * ds * ds.transpose();
             
-            dstress(0, 0) +=   2. * 0.5 * pow(p, -0.5);
-            dstress(0, 1) +=  -1. * 0.5 * pow(p, -0.5);
-            dstress(0, 2) +=  -1. * 0.5 * pow(p, -0.5);
+            dstress(0, 0) +=   2. * sqrtp_2;
+            dstress(0, 1) +=  -1. * sqrtp_2;
+            dstress(0, 2) +=  -1. * sqrtp_2;
 
-            dstress(1, 0) +=  -1. * 0.5 * pow(p, -0.5);
-            dstress(1, 1) +=   2. * 0.5 * pow(p, -0.5);
-            dstress(1, 2) +=  -1. * 0.5 * pow(p, -0.5);
+            dstress(1, 0) +=  -1. * sqrtp_2;
+            dstress(1, 1) +=   2. * sqrtp_2;
+            dstress(1, 2) +=  -1. * sqrtp_2;
 
-            dstress(2, 0) +=  -1. * 0.5 * pow(p, -0.5);
-            dstress(2, 1) +=  -1. * 0.5 * pow(p, -0.5);
-            dstress(2, 2) +=   2. * 0.5 * pow(p, -0.5);
+            dstress(2, 0) +=  -1. * sqrtp_2;
+            dstress(2, 1) +=  -1. * sqrtp_2;
+            dstress(2, 2) +=   2. * sqrtp_2;
 
-            dstress(3, 3) += 6. * 0.5 * pow(p, -0.5);
-            dstress(4, 4) += 6. * 0.5 * pow(p, -0.5);
-            dstress(5, 5) += 6. * 0.5 * pow(p, -0.5);
+            dstress(3, 3) += 6. * sqrtp_2;
+            dstress(4, 4) += 6. * sqrtp_2;
+            dstress(5, 5) += 6. * sqrtp_2;
         }
     }
 
