@@ -130,10 +130,10 @@ struct Traits {
     using nu_t              = typename MAST::Base::ScalarConstant<SolScalarType>;
     using press_t           = typename MAST::Base::ScalarConstant<SolScalarType>;
     using thickness_t       = typename MAST::Base::ScalarConstant<SolScalarType>;
-    using material_t        = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<SolScalarType, 2, modulus_t, nu_t, Context>;
-    using section_t         = typename MAST::Physics::Elasticity::PlateBendingSectionProperty<SolScalarType, material_t, thickness_t, Context>;
-    using energy_t          = typename MAST::Physics::Elasticity::MindlinPlate::StrainEnergy<fe_var_t, section_t, Context>;
-    using press_load_t      = typename MAST::Physics::Elasticity::ShellFacePressureLoad<fe_var_t, press_t, Context>;
+    using material_t        = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<SolScalarType, 2, modulus_t, nu_t>;
+    using section_t         = typename MAST::Physics::Elasticity::PlateBendingSectionProperty<SolScalarType, material_t, thickness_t>;
+    using energy_t          = typename MAST::Physics::Elasticity::MindlinPlate::StrainEnergy<fe_var_t, section_t>;
+    using press_load_t      = typename MAST::Physics::Elasticity::ShellFacePressureLoad<fe_var_t, press_t>;
     using element_vector_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using element_matrix_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     using assembled_vector_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
