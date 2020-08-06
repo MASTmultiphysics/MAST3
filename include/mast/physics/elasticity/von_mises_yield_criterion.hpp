@@ -336,7 +336,8 @@ public:
          */
         
         scalar_t
-        v =  MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<scalar_t, dim>::value(internal.stress());
+        v =  MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<scalar_t, dim>::
+        value(internal.stress());
         
         v -= _vm_lim;
         

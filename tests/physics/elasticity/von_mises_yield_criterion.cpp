@@ -92,7 +92,7 @@ test_von_mises_yield_criterion_jacobian() {
     
     Eigen::Matrix<real_t, traits_t::yield_t::n_strain, 1>
     stress = Eigen::Matrix<real_t, traits_t::yield_t::n_strain, 1>::Zero(),
-    strain = Eigen::Matrix<real_t, traits_t::yield_t::n_strain, 1>::Zero();
+    strain = Eigen::Matrix<real_t, traits_t::yield_t::n_strain, 1>::Random();
 
     Eigen::Matrix<real_t, Eigen::Dynamic, 1>
     v = Eigen::Matrix<real_t, Eigen::Dynamic, 1>::Zero(2*traits_t::yield_t::n_strain+1);
