@@ -23,6 +23,7 @@
 // C++ includes
 #include <sys/stat.h>
 #include <string>
+#include <fstream>
 #include <boost/algorithm/string.hpp>
 
 
