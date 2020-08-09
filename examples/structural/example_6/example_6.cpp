@@ -588,7 +588,7 @@ public:
         sol = dynamic_cast<libMesh::PetscVector<real_t>*>(_c.sys->solution.get())->vec();
         
         MAST::Solvers::PETScWrapper::LinearSolver
-        linear_solver(_c.eq_sys->comm());
+        linear_solver(_c.eq_sys->comm().get());
         linear_solver.init(m);
         linear_solver.solve(sol, b);
 
@@ -727,6 +727,7 @@ int main(int argc, char** argv) {
     MAST::Optimization::Solvers::GCMMAInterface<func_eval_t> optimizer(init.comm());
     optimizer.max_inner_iters = 6;
     optimizer.constr_penalty  = 1.e5;
+    optimizer.max_iters       = 50;
     optimizer.set_function_evaluation(f_eval);
     
     // optimize

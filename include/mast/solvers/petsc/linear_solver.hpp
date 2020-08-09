@@ -24,9 +24,6 @@
 #include <mast/base/mast_data_types.h>
 #include <mast/base/exceptions.hpp>
 
-// timpi includes
-#include <timpi/communicator.h>
-
 // PETSc includes
 #include <petscmat.h>
 
@@ -40,7 +37,7 @@ class LinearSolver {
   
 public:
     
-    LinearSolver(const TIMPI::Communicator &comm):
+    LinearSolver(const MPI_Comm comm):
     _comm  (comm),
     _A     (nullptr) {
         
@@ -53,7 +50,7 @@ public:
             
             PetscErrorCode
             ierr = KSPDestroy(&_ksp);
-            CHKERRABORT(_comm.get(), ierr);
+            CHKERRABORT(_comm, ierr);
         }
     }
     
@@ -73,27 +70,27 @@ public:
         
         // setup the KSP
         PetscErrorCode
-        ierr = KSPCreate(_comm.get(), &_ksp);
-        CHKERRABORT(_comm.get(), ierr);
+        ierr = KSPCreate(_comm, &_ksp);
+        CHKERRABORT(_comm, ierr);
 
         if (scope) {
             
             ierr = KSPSetOptionsPrefix(_ksp, scope->c_str());
-            CHKERRABORT(_comm.get(), ierr);
+            CHKERRABORT(_comm, ierr);
         }
 
         ierr = KSPSetOperators(_ksp, *_A, *_A);
-        CHKERRABORT(_comm.get(), ierr);
+        CHKERRABORT(_comm, ierr);
         
         ierr = KSPSetFromOptions(_ksp);
-        CHKERRABORT(_comm.get(), ierr);
+        CHKERRABORT(_comm, ierr);
         
         // setup the PC
         ierr = KSPGetPC(_ksp, &pc);
-        CHKERRABORT(_comm.get(), ierr);
+        CHKERRABORT(_comm, ierr);
         
         ierr = PCSetFromOptions(pc);
-        CHKERRABORT(_comm.get(), ierr);
+        CHKERRABORT(_comm, ierr);
     }
     
     
@@ -110,7 +107,7 @@ public:
         
         // now solve
         ierr = KSPSolve(_ksp, b, x);
-        CHKERRABORT(_comm.get(), ierr);
+        CHKERRABORT(_comm, ierr);
     }
     
 
@@ -122,7 +119,7 @@ public:
     
 private:
 
-    const TIMPI::Communicator   &_comm;
+    const MPI_Comm   _comm;
     
     KSP  _ksp;
     Mat *_A;
