@@ -19,27 +19,27 @@
 
 // MAST includes
 #include <mast/base/exceptions.hpp>
-#include <mast/util/perf_log.hpp>
+#include <mast/base/scalar_constant.hpp>
 #include <mast/fe/eval/fe_basis_derivatives.hpp>
 #include <mast/fe/libmesh/fe_data.hpp>
 #include <mast/fe/libmesh/fe_side_data.hpp>
 #include <mast/fe/fe_var_data.hpp>
 #include <mast/fe/scalar_field_wrapper.hpp>
 #include <mast/physics/elasticity/isotropic_stiffness.hpp>
-#include <mast/base/scalar_constant.hpp>
 #include <mast/physics/elasticity/linear_strain_energy.hpp>
 #include <mast/physics/elasticity/pressure_load.hpp>
+#include <mast/physics/elasticity/libmesh/mat_null_space.hpp>
 #include <mast/optimization/topology/simp/penalized_density.hpp>
 #include <mast/optimization/topology/simp/penalized_youngs_modulus.hpp>
 #include <mast/optimization/topology/simp/libmesh/residual_and_jacobian.hpp>
 #include <mast/optimization/topology/simp/libmesh/assemble_output_sensitivity.hpp>
 #include <mast/optimization/topology/simp/libmesh/volume.hpp>
-#include <mast/numerics/libmesh/sparse_matrix_initialization.hpp>
-#include <mast/util/getpot_wrapper.hpp>
-#include <mast/mesh/libmesh/geometric_filter.hpp>
 #include <mast/optimization/design_parameter.hpp>
 #include <mast/optimization/solvers/gcmma_interface.hpp>
 #include <mast/optimization/utility/design_history.hpp>
+#include <mast/util/getpot_wrapper.hpp>
+#include <mast/mesh/libmesh/geometric_filter.hpp>
+#include <mast/solvers/petsc/linear_solver.hpp>
 
 // topology optimization benchmark cases
 #include <mast/mesh/generation/bracket2d.hpp>
@@ -51,7 +51,7 @@
 #include <libmesh/equation_systems.h>
 #include <libmesh/boundary_info.h>
 #include <libmesh/exodusII_io.h>
-#include <libmesh/linear_solver.h>
+#include <libmesh/petsc_matrix.h>
 
 
 // BEGIN_TRANSLATE SIMP Minimum Compliance Topology Optimization with MPI based solvers
@@ -102,6 +102,13 @@ public:
                          "radius of geometric filter for level set field", 0.015);
         filter = new MAST::Mesh::libMeshWrapper::GeometricFilter(*rho_sys, filter_r);
         eq_sys->reinit();
+
+        // create and attach the null space to the matrix
+        MAST::Physics::Elasticity::libMeshWrapper::NullSpace
+        null_sp(*sys, ModelType::dim);
+        
+        Mat m = dynamic_cast<libMesh::PetscMatrix<real_t>*>(sys->matrix)->mat();
+        null_sp.attach_to_matrix(m);
         
         mesh->print_info(std::cout);
         eq_sys->print_info(std::cout);
@@ -574,15 +581,16 @@ public:
         std::pair<unsigned int, real_t>
         solver_params = _c.sys->get_linear_solve_parameters();
 
-        std::unique_ptr<libMesh::LinearSolver<real_t>>
-        linear_solver(libMesh::LinearSolver<real_t>::build(_c.eq_sys->comm()).release());
-        linear_solver->init();
-        linear_solver->init_names(*_c.sys);
-
-        linear_solver->solve(*_c.sys->matrix, pc,
-                             *_c.sys->solution, *res,
-                             solver_params.second,
-                             solver_params.first);
+        Mat
+        m   = dynamic_cast<libMesh::PetscMatrix<real_t>*>(_c.sys->matrix)->mat();
+        Vec
+        b   = dynamic_cast<libMesh::PetscVector<real_t>*>(res.get())->vec(),
+        sol = dynamic_cast<libMesh::PetscVector<real_t>*>(_c.sys->solution.get())->vec();
+        
+        MAST::Solvers::PETScWrapper::LinearSolver
+        linear_solver(_c.eq_sys->comm());
+        linear_solver.init(m);
+        linear_solver.solve(sol, b);
 
         _c.sys->update();
 
