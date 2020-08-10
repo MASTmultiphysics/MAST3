@@ -43,6 +43,7 @@
 
 // topology optimization benchmark cases
 #include <mast/mesh/generation/bracket2d.hpp>
+#include <mast/mesh/generation/bracket3d.hpp>
 
 // libMesh includes
 #include <libmesh/replicated_mesh.h>
@@ -89,6 +90,8 @@ public:
         // displacement variables for elasticity solution
         sys->add_variable("u_x", libMesh::FEType(fe_order, fe_family));
         sys->add_variable("u_y", libMesh::FEType(fe_order, fe_family));
+        if (ModelType::dim == 3)
+            sys->add_variable("u_z", libMesh::FEType(fe_order, fe_family));
         
         // density field
         rho_sys->add_variable("rho", libMesh::FEType(fe_order, fe_family));
@@ -170,6 +173,9 @@ public:
     inline bool elem_is_quad() const {return (elem->type() == libMesh::QUAD4 ||
                                               elem->type() == libMesh::QUAD8 ||
                                               elem->type() == libMesh::QUAD9);}
+    inline bool elem_is_hex() const  {return (elem->type() == libMesh::HEX8 ||
+                                              elem->type() == libMesh::HEX20 ||
+                                              elem->type() == libMesh::HEX27);}
     inline bool if_compute_pressure_load_on_side(const uint_t s)
     { return ex_init.mesh->boundary_info->has_boundary_id(elem, s, ex_init.p_side_id);}
     
@@ -711,11 +717,11 @@ int main(int argc, char** argv) {
     libMesh::LibMeshInit init(argc, argv);
     MAST::Utility::GetPotWrapper input(argc, argv);
     
-    using model_t            = MAST::Mesh::Generation::Bracket2D;
+    using model_t     = MAST::Mesh::Generation::Bracket3D;
     
-    using traits_t           = MAST::Examples::Structural::Example6::Traits<real_t, real_t,    real_t, model_t>;
-    using elem_ops_t         = MAST::Examples::Structural::Example6::ElemOps<traits_t>;
-    using func_eval_t        = MAST::Examples::Structural::Example6::FunctionEvaluation<traits_t>;
+    using traits_t    = MAST::Examples::Structural::Example6::Traits<real_t, real_t, real_t, model_t>;
+    using elem_ops_t  = MAST::Examples::Structural::Example6::ElemOps<traits_t>;
+    using func_eval_t = MAST::Examples::Structural::Example6::FunctionEvaluation<traits_t>;
 
     traits_t::ex_init_t ex_init(init.comm(), input);
 
