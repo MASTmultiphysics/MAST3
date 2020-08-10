@@ -152,7 +152,7 @@ inline void compute_fe_quad_derivatives(const ScalarType xi,
 
             // for constant eta = -1
             // Hence, measure J_det using (dx/dxi  dy/dxi)
-            J_det   = Jac.row(0).norm();
+            J_det   = Jac.col(0).norm();
             ds      << dx_dxi, dy_dxi, 0;
         }
             break;
@@ -160,7 +160,7 @@ inline void compute_fe_quad_derivatives(const ScalarType xi,
         case 2: {
             // for constant xi  =  1
             // Hence, measure J_det using (dx/deta  dy/deta)
-            J_det   = Jac.row(1).norm();
+            J_det   = Jac.col(1).norm();
             ds      << dx_deta, dy_deta, 0;
         }
             break;
@@ -168,7 +168,7 @@ inline void compute_fe_quad_derivatives(const ScalarType xi,
         case 3: {
             // for constant eta =  1
             // Hence, measure J_det using (dx/dxi  dy/dxi)
-            J_det   = Jac.row(0).norm();
+            J_det   = Jac.col(0).norm();
             ds      << -dx_dxi, -dy_dxi, 0;
         }
             break;
@@ -176,7 +176,7 @@ inline void compute_fe_quad_derivatives(const ScalarType xi,
         case 4: {
             // for constant xi  = -1
             // Hence, measure J_det using (dx/deta  dy/deta)
-            J_det   = Jac.row(1).norm();
+            J_det   = Jac.col(1).norm();
             ds      << -dx_deta, -dy_deta, 0;
         }
             break;

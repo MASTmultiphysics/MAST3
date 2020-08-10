@@ -160,6 +160,80 @@ inline uint_t quad_side_Jac_col(uint_t s) {
 
 
 
+inline void hex_side_Jac_cols(const uint_t  s,
+                              uint_t       &c1,
+                              uint_t       &c2) {
+    
+    /*
+     *   HEX8: 7        6
+     *         o--------z
+     *        /:       /|         zeta
+     *       / :      / |          ^   eta (into page)
+     *    4 /  :   5 /  |          | /
+     *     o--------o   |          |/
+     *     |   o....|...o 2        o---> xi
+     *     |  .3    |  /
+     *     | .      | /
+     *     |.       |/
+     *     o--------o
+     *     0        1
+     *
+     *   libMesh side numbering:
+     *    {0, 3, 2, 1}, // Side 0
+     *    {0, 1, 5, 4}, // Side 1
+     *    {1, 2, 6, 5}, // Side 2
+     *    {2, 3, 7, 6}, // Side 3
+     *    {3, 0, 4, 7}, // Side 4
+     *    {4, 5, 6, 7}  // Side 5
+     */
+    
+    // identify row of the Jacobian matrix that will be used to compute
+    // the size
+    switch (s) {
+            
+        case 0: {
+            c1 = 1;  // { dx/deta,  dy/deta,  dz/deta}
+            c2 = 0;  // {   dx/xi,    dy/xi,    dz/xi}
+        }
+            break;
+            
+        case 1: {
+            c1 = 0;  // {   dx/xi,    dy/xi,    dz/xi}
+            c2 = 2;  // {dx/dzeta, dy/dzeta, dz/dzeta}
+        }
+            break;
+            
+        case 2: {
+            c1 = 1;  // { dx/deta,  dy/deta,  dz/deta}
+            c2 = 2;  // {dx/dzeta, dy/dzeta, dz/dzeta}
+        }
+            break;
+            
+        case 3: {
+            c1 = 2;  // {dx/dzeta, dy/dzeta, dz/dzeta}
+            c2 = 0;  // {   dx/xi,    dy/xi,    dz/xi}
+        }
+            break;
+            
+        case 4: {
+            c1 = 2;  // {dx/dzeta, dy/dzeta, dz/dzeta}
+            c2 = 1;  // { dx/deta,  dy/deta,  dz/deta}
+        }
+            break;
+            
+        case 5: {
+            c1 = 0;  // { dx/deta,  dy/deta,  dz/deta}
+            c2 = 1;  // {   dx/xi,    dy/xi,    dz/xi}
+        }
+            break;
+            
+        default:
+            Error(false, "Invalid side number for hex");
+    }
+}
+
+
+
 template <typename NodalScalarType,
           uint_t ElemDim,
           uint_t SpatialDim,
@@ -176,7 +250,7 @@ compute_detJ_side_quad
     
     uint_t
     nq      = dx_dxi.cols(),
-    row     = MAST::FEBasis::Evaluation::quad_side_Jac_col(s);
+    col     = MAST::FEBasis::Evaluation::quad_side_Jac_col(s);
     
     detJ        = Eigen::Matrix<NodalScalarType, Eigen::Dynamic, 1>::Zero(nq);
 
@@ -186,7 +260,42 @@ compute_detJ_side_quad
         dxdxi(dx_dxi.col(i).data(), SpatialDim, ElemDim);
         
         // determinant of dx_dxi
-        detJ(i) = dxdxi.row(row).norm();
+        detJ(i) = dxdxi.col(col).norm();
+    }
+}
+
+
+
+template <typename NodalScalarType,
+          uint_t ElemDim,
+          uint_t SpatialDim,
+          typename ContextType>
+inline
+typename std::enable_if<ElemDim == SpatialDim && ElemDim == 3, void>::type
+compute_detJ_side_hex
+(const ContextType& c,
+ const uint_t s,
+ const Eigen::Matrix<NodalScalarType, ElemDim*SpatialDim, Eigen::Dynamic>& dx_dxi,
+ Eigen::Matrix<NodalScalarType, Eigen::Dynamic, 1>& detJ) {
+    
+    Assert0(c.elem_is_hex(), "Element must be a hex");
+    
+    uint_t
+    nq   = dx_dxi.cols(),
+    c1   = -1,
+    c2   = -1;
+    
+    MAST::FEBasis::Evaluation::hex_side_Jac_cols(s, c1, c2);
+    
+    detJ  = Eigen::Matrix<NodalScalarType, Eigen::Dynamic, 1>::Zero(nq);
+
+    for (uint_t i=0; i<nq; i++) {
+        
+        Eigen::Map<const typename Eigen::Matrix<NodalScalarType, 3, 3>>
+        dxdxi(dx_dxi.col(i).data(), SpatialDim, ElemDim);
+        
+        // determinant of dx_dxi
+        detJ(i) = dxdxi.col(c1).cross(dxdxi.col(c2)).norm();
     }
 }
 
@@ -206,6 +315,26 @@ compute_detJ_side
      
      if (c.elem_is_quad())
          compute_detJ_side_quad<NodalScalarType, ElemDim, SpatialDim, ContextType>(c, s, dx_dxi, detJ);
+     else
+         Error(false, "Not implemented for element type.");
+ }
+
+
+
+template <typename NodalScalarType,
+          uint_t ElemDim,
+          uint_t SpatialDim,
+          typename ContextType>
+inline
+typename std::enable_if<ElemDim == SpatialDim && ElemDim == 3, void>::type
+compute_detJ_side
+ (const ContextType& c,
+  const uint_t s,
+  const Eigen::Matrix<NodalScalarType, ElemDim*SpatialDim, Eigen::Dynamic>& dx_dxi,
+  Eigen::Matrix<NodalScalarType, Eigen::Dynamic, 1>& detJ) {
+     
+     if (c.elem_is_hex())
+         compute_detJ_side_hex<NodalScalarType, ElemDim, SpatialDim, ContextType>(c, s, dx_dxi, detJ);
      else
          Error(false, "Not implemented for element type.");
  }
@@ -289,6 +418,51 @@ compute_quad_side_tangent_and_normal
 
 
 
+
+template <typename NodalScalarType,
+          uint_t ElemDim,
+          uint_t SpatialDim,
+          typename ContextType>
+inline
+typename std::enable_if<ElemDim == SpatialDim && ElemDim == 3, void>::type
+compute_hex_side_tangent_and_normal
+(const ContextType& c,
+ const uint_t s,
+ const Eigen::Matrix<NodalScalarType, ElemDim*SpatialDim, Eigen::Dynamic>& dx_dxi,
+ Eigen::Matrix<NodalScalarType, SpatialDim, Eigen::Dynamic>&               tangent,
+ Eigen::Matrix<NodalScalarType, SpatialDim, Eigen::Dynamic>&               normal) {
+    
+    Assert0(c.elem_is_quad(), "Element must be a quadrilateral");
+
+    uint_t
+    nq   = dx_dxi.cols(),
+    c1   = -1,
+    c2   = -1;
+    
+    MAST::FEBasis::Evaluation::hex_side_Jac_cols(s, c1, c2);
+    
+    tangent = Eigen::Matrix<NodalScalarType, SpatialDim, Eigen::Dynamic>::Zero(SpatialDim, nq);
+    normal  = Eigen::Matrix<NodalScalarType, SpatialDim, Eigen::Dynamic>::Zero(SpatialDim, nq);
+    
+    Eigen::Matrix<NodalScalarType, 3, 1>
+    dx = Eigen::Matrix<NodalScalarType, 3, 1>::Zero(3);
+    
+    for (uint_t i=0; i<nq; i++) {
+        
+        Eigen::Map<const typename Eigen::Matrix<NodalScalarType, 3, 3>>
+        dxdxi(dx_dxi.col(i).data(), 3, 3);
+        
+        // normal is dx1 x dx2
+        // dn = |  i     j    k   |
+        //      | dx1  dy1  dz1   |
+        //      | dx2  dy2  dz2   |
+        normal.col(i) =  dxdxi.col(c1).cross(dxdxi.col(c2));
+        normal.col(i) /= normal.col(i).norm();
+    }
+}
+
+
+
 template <typename NodalScalarType,
           uint_t ElemDim,
           uint_t SpatialDim,
@@ -309,6 +483,31 @@ compute_side_tangent_and_normal
      else
          Error(false, "Not implemented for element type.");
 }
+
+
+
+
+template <typename NodalScalarType,
+          uint_t ElemDim,
+          uint_t SpatialDim,
+          typename ContextType>
+inline
+typename std::enable_if<ElemDim == SpatialDim && ElemDim == 3, void>::type
+compute_side_tangent_and_normal
+ (const ContextType& c,
+  const uint_t s,
+  const Eigen::Matrix<NodalScalarType, SpatialDim*ElemDim, Eigen::Dynamic>& dx_dxi,
+  Eigen::Matrix<NodalScalarType, SpatialDim, Eigen::Dynamic>&               tangent,
+  Eigen::Matrix<NodalScalarType, SpatialDim, Eigen::Dynamic>&               normal) {
+    
+     if (c.elem_is_hex())
+         MAST::FEBasis::Evaluation::compute_hex_side_tangent_and_normal
+         <NodalScalarType, ElemDim, SpatialDim, ContextType>
+         (c, s, dx_dxi, tangent, normal);
+     else
+         Error(false, "Not implemented for element type.");
+}
+
 
 
 template <typename NodalScalarType,

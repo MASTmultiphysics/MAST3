@@ -185,6 +185,7 @@ private:
                         v.set(dof_ids[2],
                               (-sin(th) * n(0) + cos(th) * n(2)) - n(2));
                     }
+                        break;
                         
                     default:
                         Error(false, "Invalid rotation vector index");
