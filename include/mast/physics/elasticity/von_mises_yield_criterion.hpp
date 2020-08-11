@@ -103,7 +103,12 @@ public:
     }
 
     
-    inline ScalarType consistency_parameter() {
+    inline ScalarType consistency_parameter() const {
+        
+        return _data[_n_dofs-1];
+    }
+
+    inline ScalarType& consistency_parameter() {
         
         return _data[_n_dofs-1];
     }
@@ -216,26 +221,27 @@ public:
         // if the yield function is violated then an update needs to be computed
         if (yield > 0.) {
             
-            Eigen::Matrix<scalar_t, n_strain, 1>
-            n    = Eigen::Matrix<scalar_t, n_strain, 1>::Zero();
+            /*Eigen::Matrix<scalar_t, n_strain, 1>
+            n    = Eigen::Matrix<scalar_t, n_strain, 1>::Zero();*/
 
             Eigen::Matrix<scalar_t, n_strain+1, 1>
             x    = Eigen::Matrix<scalar_t, n_strain+1, 1>::Zero(),
             res  = Eigen::Matrix<scalar_t, n_strain+1, 1>::Zero();
             
-            Eigen::Matrix<scalar_t, n_strain, n_strain>
-            dnds = Eigen::Matrix<scalar_t, n_strain, n_strain>::Zero();
+            /*Eigen::Matrix<scalar_t, n_strain, n_strain>
+            dnds = Eigen::Matrix<scalar_t, n_strain, n_strain>::Zero();*/
 
             Eigen::Matrix<scalar_t, n_strain+1, n_strain+1>
-            jac  = Eigen::Matrix<scalar_t, n_strain+1, n_strain+1>::Zero();
+            *dummy = nullptr,
+            jac    = Eigen::Matrix<scalar_t, n_strain+1, n_strain+1>::Zero();
 
             bool
             terminate = false;
 
             // initialize the solution
-            x.topRows(n_strain) = internal.stress();
+            x.topRows(n_strain) = internal.stress(); // stress
             x(n_strain) = (c.current_plasticity_accessor->consistency_parameter() -
-                           c.previous_plasticity_accessor->consistency_parameter());
+                           c.previous_plasticity_accessor->consistency_parameter()); // delta Gamma
             
             real_t
             res_norm = 0.,
@@ -247,47 +253,56 @@ public:
             
             while (!terminate) {
                 
-                MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<scalar_t, dim>::
-                derivative(internal.stress(), n);
+                /*MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<scalar_t, dim>::
+                derivative(x.topRows(n_strain), n);
                 
                 // derivative of normal, needed for Jacobian
                 MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<scalar_t, dim>::
-                second_derivative(internal.stress(), dnds);
+                second_derivative(x.topRows(n_strain), dnds);
 
                 ////////////////////////////
                 // residual: stress update
                 ////////////////////////////
                 res.topRows(n_strain) =
-                x.topRows(n_strain) - c.previous_plasticity_accessor->stress() +
+                x.topRows(n_strain) - c.previous_plasticity_accessor->stress() -
                 m_stiff * (strain - c.previous_plasticity_accessor->plastic_strain() -
                            x(n_strain) * n);
                 
                 // yield criterion
-                res(n_strain) = yield_function(x, internal);
+                res(n_strain) = yield_function(c, internal);*/
 
+                this->return_mapping_residual_and_jacobian(c, strain, internal, res, dummy);
+                
                 // check the norm and if we need to continue iteration
                 res_norm = res.norm();
                 std::cout
                 << "Iter: " << std::setw(5) << iter
                 << " || res ||_2 = "
                 << std::setw(20) << res_norm << std::endl;
-                
+                for (uint_t i=0; i<n_strain+1; i++)
+                    std::cout
+                    <<  std::setw(20) << x(i)
+                    <<  std::setw(20) << res(i) << std::endl;
                 if (res_norm >= tol && iter < max_it) {
                     
-                    ////////////////////////////
+                    /*////////////////////////////
                     // Jacobian
                     ////////////////////////////
-                    jac.topLeftCorner(n_strain, n_strain) = x(n_variables()) * m_stiff * dnds;
+                    jac.topLeftCorner(n_strain, n_strain) = x(n_strain) * m_stiff * dnds;
                     for (uint_t i=0; i<n_strain; i++) jac(i,i) += 1.;
                     
                     jac.topRightCorner(n_strain, 1) = m_stiff * n;
                     
-                    jac.bottomLeftCorner(1, n_strain) = n.transpose();
+                    jac.bottomLeftCorner(1, n_strain) = n.transpose();*/
+                    this->return_mapping_residual_and_jacobian(c, strain, internal, res, &jac);
                     
                     ////////////////////////////
                     // update to the solution
                     ////////////////////////////
                     x -= Eigen::FullPivLU<Eigen::Matrix<scalar_t, n_strain+1, n_strain+1>>(jac).solve(res);
+                    
+                    internal.stress() = x.topRows(n_strain);
+                    internal.consistency_parameter() = x(n_strain);
                     
                     // increment the iteration
                     iter++;
@@ -379,6 +394,63 @@ public:
         Cn  = stiff * n;
         
         stiff -= (Cn*Cn.transpose())/(n.dot(Cn));
+    }
+    
+    
+    template <typename ContextType,
+              typename AccessorType,
+              typename Vec1Type,
+              typename Vec2Type,
+              typename MatType>
+    inline void return_mapping_residual_and_jacobian(ContextType    &c,
+                                                     const Vec1Type &strain,
+                                                     AccessorType   &accessor,
+                                                     Vec2Type       &res,
+                                                     MatType        *jac = nullptr) {
+                
+        Eigen::Matrix<scalar_t, n_strain, 1>
+        n    = Eigen::Matrix<scalar_t, n_strain, 1>::Zero();
+        Eigen::Matrix<scalar_t, n_strain, n_strain>
+        dnds = Eigen::Matrix<scalar_t, n_strain, n_strain>::Zero();
+
+        stiff_t       m_stiff;
+
+        // material stiffness matrix
+        _material->value(c, m_stiff);
+
+        MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<scalar_t, dim>::
+        derivative(accessor.stress(), n);
+        
+        // derivative of normal, needed for Jacobian
+        MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<scalar_t, dim>::
+        second_derivative(accessor.stress(), dnds);
+
+        ////////////////////////////
+        // residual: stress update
+        ////////////////////////////
+        res.topRows(n_strain) =
+        accessor.stress() - c.previous_plasticity_accessor->stress() -
+        m_stiff * (strain - c.previous_plasticity_accessor->plastic_strain() -
+                   (accessor.consistency_parameter() -
+                    c.previous_plasticity_accessor->consistency_parameter()) * n);
+        
+        // yield criterion
+        res(n_strain) = yield_function(c, accessor);
+        
+        if (jac) {
+            
+            ////////////////////////////
+            // Jacobian
+            ////////////////////////////
+            jac->topLeftCorner(n_strain, n_strain) =
+            (accessor.consistency_parameter() -
+             c.previous_plasticity_accessor->consistency_parameter()) * m_stiff * dnds;
+            for (uint_t i=0; i<n_strain; i++) (*jac)(i,i) += 1.;
+            
+            jac->topRightCorner(n_strain, 1) = m_stiff * n;
+            
+            jac->bottomLeftCorner(1, n_strain) = n.transpose();
+        }
     }
     
 private:
