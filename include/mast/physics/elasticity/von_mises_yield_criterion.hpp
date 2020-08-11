@@ -232,8 +232,11 @@ public:
             terminate = false;
 
             scalar_t
-            res_norm = 0.,
-            tol      = 1.e-10;
+            res_norm        = 0.,
+            dx_norm         = 0.,
+            res_scaled_norm = 0.,
+            stress_norm     = 0.,
+            tol             = 1.e-10;
             
             uint_t
             iter     = 0,
@@ -244,34 +247,66 @@ public:
                 this->return_mapping_residual_and_jacobian(c, strain, internal, res, &jac);
                 
                 // check the norm and if we need to continue iteration
-                res_norm = res.norm();
+                res_scaled_norm  = res_norm = res.norm();
+                stress_norm      = internal.stress().norm();
+                
+                if (stress_norm > 0.)
+                    res_scaled_norm /= stress_norm;
+                
                 std::cout
                 << "Iter: " << std::setw(5) << iter
                 << " || res ||_2 = "
-                << std::setw(20) << res_norm << std::endl;
-                
-                if (res_norm >= tol && iter < max_it) {
+                << std::setw(20) << res_norm
+                << ", || res ||_2/|| sigma ||_2 = "
+                << std::setw(20) << res_scaled_norm
+                << ", || dx ||_2 = "
+                << std::setw(20) << dx_norm
+                << std::endl;
+
+                if (!terminate) {
                     
                     ////////////////////////////
                     // update to the solution
                     ////////////////////////////
                     dx = Eigen::FullPivLU<Eigen::Matrix<scalar_t, n_strain+1, n_strain+1>>(jac).solve(res);
                     
-                    internal.stress() -= .5*dx.topRows(n_strain);
+                    internal.stress() -= dx.topRows(n_strain);
                     internal.consistency_parameter() -= dx(n_strain);
                     
                     // increment the iteration
                     iter++;
+                    
+                    dx_norm = dx.norm();
+                    
+                    if (dx_norm < tol) {
+                        
+                        terminate = true;
+                        std::cout
+                        << "Terminating Return-Mapping due to converged solution update"
+                        << std::endl;
+                    }
                 }
-                else if (iter == max_it) {
+                
+                if (iter == max_it) {
                     
                     terminate = true;
-                    std::cout << "Terminating Return-Mapping due to maximum iteration" << std::endl;
+                    std::cout
+                    << "Terminating Return-Mapping due to maximum iteration"
+                    << std::endl;
                 }
                 else if (res_norm < tol) {
                     
                     terminate = true;
-                    std::cout << "Terminating Return-Mapping due to converged residual" << std::endl;
+                    std::cout
+                    << "Terminating Return-Mapping due to converged residual"
+                    << std::endl;
+                }
+                else if (res_scaled_norm < tol) {
+                    
+                    terminate = true;
+                    std::cout
+                    << "Terminating Return-Mapping due to converged scaled residual"
+                    << std::endl;
                 }
             }
         }
