@@ -75,13 +75,13 @@ public:
 
     inline stress_t plastic_strain() {
         
-        return stress_t(&(_data[YieldCriterionType::n_strain-1]), YieldCriterionType::n_strain, 1);
+        return stress_t(&(_data[YieldCriterionType::n_strain]), YieldCriterionType::n_strain, 1);
     }
 
     
     inline const_stress_t plastic_strain() const {
         
-        return const_stress_t(&(_data[YieldCriterionType::n_strain-1]), YieldCriterionType::n_strain, 1);
+        return const_stress_t(&(_data[YieldCriterionType::n_strain]), YieldCriterionType::n_strain, 1);
     }
 
     
@@ -90,7 +90,7 @@ public:
         Assert0(_yield->if_kinematic_hardening,
                 "Kinematic hardening not enabled for yield criterion");
         
-        return stress_t(&(_data[2*YieldCriterionType::n_strain-1]), YieldCriterionType::n_strain, 1);
+        return stress_t(&(_data[2*YieldCriterionType::n_strain]), YieldCriterionType::n_strain, 1);
     }
 
     
@@ -99,7 +99,7 @@ public:
         Assert0(_yield->if_kinematic_hardening,
                 "Kinematic hardening not enabled for yield criterion");
         
-        return const_stress_t(&(_data[2*YieldCriterionType::n_strain-1]), YieldCriterionType::n_strain, 1);
+        return const_stress_t(&(_data[2*YieldCriterionType::n_strain]), YieldCriterionType::n_strain, 1);
     }
 
     
@@ -221,29 +221,17 @@ public:
         // if the yield function is violated then an update needs to be computed
         if (yield > 0.) {
             
-            /*Eigen::Matrix<scalar_t, n_strain, 1>
-            n    = Eigen::Matrix<scalar_t, n_strain, 1>::Zero();*/
-
             Eigen::Matrix<scalar_t, n_strain+1, 1>
-            x    = Eigen::Matrix<scalar_t, n_strain+1, 1>::Zero(),
+            dx   = Eigen::Matrix<scalar_t, n_strain+1, 1>::Zero(),
             res  = Eigen::Matrix<scalar_t, n_strain+1, 1>::Zero();
             
-            /*Eigen::Matrix<scalar_t, n_strain, n_strain>
-            dnds = Eigen::Matrix<scalar_t, n_strain, n_strain>::Zero();*/
-
             Eigen::Matrix<scalar_t, n_strain+1, n_strain+1>
-            *dummy = nullptr,
             jac    = Eigen::Matrix<scalar_t, n_strain+1, n_strain+1>::Zero();
 
             bool
             terminate = false;
 
-            // initialize the solution
-            x.topRows(n_strain) = internal.stress(); // stress
-            x(n_strain) = (c.current_plasticity_accessor->consistency_parameter() -
-                           c.previous_plasticity_accessor->consistency_parameter()); // delta Gamma
-            
-            real_t
+            scalar_t
             res_norm = 0.,
             tol      = 1.e-10;
             
@@ -253,25 +241,7 @@ public:
             
             while (!terminate) {
                 
-                /*MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<scalar_t, dim>::
-                derivative(x.topRows(n_strain), n);
-                
-                // derivative of normal, needed for Jacobian
-                MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<scalar_t, dim>::
-                second_derivative(x.topRows(n_strain), dnds);
-
-                ////////////////////////////
-                // residual: stress update
-                ////////////////////////////
-                res.topRows(n_strain) =
-                x.topRows(n_strain) - c.previous_plasticity_accessor->stress() -
-                m_stiff * (strain - c.previous_plasticity_accessor->plastic_strain() -
-                           x(n_strain) * n);
-                
-                // yield criterion
-                res(n_strain) = yield_function(c, internal);*/
-
-                this->return_mapping_residual_and_jacobian(c, strain, internal, res, dummy);
+                this->return_mapping_residual_and_jacobian(c, strain, internal, res, &jac);
                 
                 // check the norm and if we need to continue iteration
                 res_norm = res.norm();
@@ -281,28 +251,17 @@ public:
                 << std::setw(20) << res_norm << std::endl;
                 for (uint_t i=0; i<n_strain+1; i++)
                     std::cout
-                    <<  std::setw(20) << x(i)
+                    <<  std::setw(20) << dx(i)
                     <<  std::setw(20) << res(i) << std::endl;
                 if (res_norm >= tol && iter < max_it) {
-                    
-                    /*////////////////////////////
-                    // Jacobian
-                    ////////////////////////////
-                    jac.topLeftCorner(n_strain, n_strain) = x(n_strain) * m_stiff * dnds;
-                    for (uint_t i=0; i<n_strain; i++) jac(i,i) += 1.;
-                    
-                    jac.topRightCorner(n_strain, 1) = m_stiff * n;
-                    
-                    jac.bottomLeftCorner(1, n_strain) = n.transpose();*/
-                    this->return_mapping_residual_and_jacobian(c, strain, internal, res, &jac);
                     
                     ////////////////////////////
                     // update to the solution
                     ////////////////////////////
-                    x -= Eigen::FullPivLU<Eigen::Matrix<scalar_t, n_strain+1, n_strain+1>>(jac).solve(res);
+                    dx = Eigen::FullPivLU<Eigen::Matrix<scalar_t, n_strain+1, n_strain+1>>(jac).solve(res);
                     
-                    internal.stress() = x.topRows(n_strain);
-                    internal.consistency_parameter() = x(n_strain);
+                    internal.stress() -= .5*dx.topRows(n_strain);
+                    internal.consistency_parameter() -= dx(n_strain);
                     
                     // increment the iteration
                     iter++;
