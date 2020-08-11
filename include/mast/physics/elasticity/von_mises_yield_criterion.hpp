@@ -23,7 +23,6 @@
 // MAST includes
 #include <mast/base/mast_data_types.h>
 #include <mast/physics/elasticity/linear_elastic_strain_operator.hpp>
-//#include <mast/physics/elasticity/return_mapping_solver.hpp>
 #include <mast/physics/elasticity/von_mises_stress.hpp>
 
 
@@ -73,15 +72,27 @@ public:
     }
 
 
-    inline stress_t plastic_strain() {
+    inline stress_t strain() {
         
         return stress_t(&(_data[YieldCriterionType::n_strain]), YieldCriterionType::n_strain, 1);
     }
 
     
-    inline const_stress_t plastic_strain() const {
+    inline const_stress_t strain() const {
         
         return const_stress_t(&(_data[YieldCriterionType::n_strain]), YieldCriterionType::n_strain, 1);
+    }
+
+
+    inline stress_t plastic_strain() {
+        
+        return stress_t(&(_data[2*YieldCriterionType::n_strain]), YieldCriterionType::n_strain, 1);
+    }
+
+    
+    inline const_stress_t plastic_strain() const {
+        
+        return const_stress_t(&(_data[2*YieldCriterionType::n_strain]), YieldCriterionType::n_strain, 1);
     }
 
     
@@ -90,7 +101,7 @@ public:
         Assert0(_yield->if_kinematic_hardening,
                 "Kinematic hardening not enabled for yield criterion");
         
-        return stress_t(&(_data[2*YieldCriterionType::n_strain]), YieldCriterionType::n_strain, 1);
+        return stress_t(&(_data[3*YieldCriterionType::n_strain]), YieldCriterionType::n_strain, 1);
     }
 
     
@@ -99,7 +110,7 @@ public:
         Assert0(_yield->if_kinematic_hardening,
                 "Kinematic hardening not enabled for yield criterion");
         
-        return const_stress_t(&(_data[2*YieldCriterionType::n_strain]), YieldCriterionType::n_strain, 1);
+        return const_stress_t(&(_data[3*YieldCriterionType::n_strain]), YieldCriterionType::n_strain, 1);
     }
 
     
@@ -173,7 +184,7 @@ public:
     inline uint_t n_variables() const {
 
         uint_t
-        n  = 2*n_strain+1; // stress, plastic strain and consistency parameter
+        n  = 3*n_strain+1; // stress, strain, plastic strain and consistency parameter
         
         // if kinematic hardening is enabled then a backstress is included
         n += _if_kinematic_hardening?n_strain:0;
@@ -210,6 +221,9 @@ public:
         
         // material stiffness matrix
         _material->value(c, m_stiff);
+        
+        // store the strain in the accessor
+        internal.strain() = strain;
         
         // stress due to elastic strain
         internal.stress() = m_stiff * strain_e;
@@ -421,7 +435,7 @@ public:
         ////////////////////////////
         res.topRows(n_strain) =
         accessor.stress() - c.previous_plasticity_accessor->stress() -
-        m_stiff * (strain - c.previous_plasticity_accessor->plastic_strain() -
+        m_stiff * (strain - c.previous_plasticity_accessor->strain() -
                    (accessor.consistency_parameter() -
                     c.previous_plasticity_accessor->consistency_parameter()) * n);
         
