@@ -237,7 +237,7 @@ public:
             
             uint_t
             iter     = 0,
-            max_it   = 10;
+            max_it   = 20;
             
             while (!terminate) {
                 
@@ -249,10 +249,7 @@ public:
                 << "Iter: " << std::setw(5) << iter
                 << " || res ||_2 = "
                 << std::setw(20) << res_norm << std::endl;
-                for (uint_t i=0; i<n_strain+1; i++)
-                    std::cout
-                    <<  std::setw(20) << dx(i)
-                    <<  std::setw(20) << res(i) << std::endl;
+                
                 if (res_norm >= tol && iter < max_it) {
                     
                     ////////////////////////////

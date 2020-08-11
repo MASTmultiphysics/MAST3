@@ -90,6 +90,7 @@ inline void copy_value(real_t                                    factor,
 }
 
 
+// this removes the AD-derivative data from copy
 inline void copy_value(real_t                                          factor,
                        Eigen::Matrix<adouble_tl_t, Eigen::Dynamic, 1>& from,
                        Eigen::Matrix<adouble_tl_t, Eigen::Dynamic, 1>& to) {
@@ -143,8 +144,56 @@ inline void von_mises_yield_criterion_jacobian
     
     yield.set_material(*p.prop);
     yield.set_limit_stress(5.e6);
-    //yield.compute(c, strain, accessor1, &stiff);
     yield.return_mapping_residual_and_jacobian(c, strain, accessor1, res, jac);
+}
+
+
+
+template <typename Traits>
+inline void von_mises_yield_criterion_tangent_stiffness
+(Eigen::Matrix<typename Traits::scalar_t, Traits::n_strain,   1> &strain,
+ Eigen::Matrix<typename Traits::scalar_t, Traits::n_strain+1, 1> &x,
+ Eigen::Matrix<typename Traits::scalar_t, Traits::n_strain, 1> &stress,
+ Eigen::Matrix<typename Traits::scalar_t, Traits::n_strain, Traits::n_strain> *Cmat) {
+    
+    using scalar_t         = typename Traits::scalar_t;
+    
+    Context<typename Traits::accessor_t> c;
+    Prop<Traits> p;
+    
+    typename Traits::yield_t
+    yield;
+
+    const uint_t
+    n_strain = Traits::n_strain,
+    n_dofs   = yield.n_variables();
+    
+
+    Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>
+    v0 = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>::Zero(n_dofs),
+    v1 = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>::Zero(n_dofs);
+
+    v1.topRows(n_strain) = x.topRows(n_strain);
+    v1(n_dofs-1)         = x(n_strain);
+    
+    copy_value(0.8, v1, v0);
+    
+    MAST::Physics::Elasticity::ElastoPlasticity::Accessor<scalar_t, typename Traits::yield_t>
+    accessor0,
+    accessor1;
+    
+    accessor0.init(yield, v0.data());
+    accessor1.init(yield, v1.data());
+        
+    c.previous_plasticity_accessor = &accessor0;
+    c.current_plasticity_accessor  = &accessor1;
+
+    yield.set_material(*p.prop);
+    yield.set_limit_stress(5.e6);
+    yield.compute(c, strain, accessor1, Cmat);
+
+    // copy the stress value back
+    stress = accessor1.stress();
 }
 
 
@@ -158,8 +207,13 @@ test_von_mises_yield_criterion_jacobian() {
     n_strain = traits_t::yield_t::n_strain;
 
     Eigen::Matrix<real_t, n_strain, 1>
-    strain = 1.e-4 * Eigen::Matrix<real_t, n_strain, 1>::Random();
-    
+    strain = 1.e-4 * Eigen::Matrix<real_t, n_strain, 1>::Random(),
+    stress;
+
+    Eigen::Matrix<real_t, n_strain, n_strain>
+    Cmat    = Eigen::Matrix<real_t, n_strain, n_strain>::Zero(),
+    Cmat_ad = Eigen::Matrix<real_t, n_strain, n_strain>::Zero();
+
     // the return-mapping solver will stack variables in x as
     // {stress, consistency_param}
     Eigen::Matrix<real_t, n_strain+1, 1>
@@ -173,7 +227,7 @@ test_von_mises_yield_criterion_jacobian() {
     jac_ad = Eigen::Matrix<real_t, n_strain+1, n_strain+1>::Zero();
     
     von_mises_yield_criterion_jacobian<traits_t>(strain, x, res, &jac);
-    
+    von_mises_yield_criterion_tangent_stiffness<traits_t>(strain, x, stress, &Cmat);
     
     // compute the quantities using adouble_tl_t to verify the linearization
     {
@@ -206,9 +260,49 @@ test_von_mises_yield_criterion_jacobian() {
             for (uint_t j=0; j<n_strain+1; j++)
                 jac_ad(i,j) = res_(i).getADValue(j);
     }
+
+    
+    // compute the quantities using adouble_tl_t to verify the tangent stiffness
+    {
+        adtl::setNumDir(n_strain);
+        using traits_ad_t = Traits<adouble_tl_t, 2>;
+        
+        Eigen::Matrix<adouble_tl_t, n_strain, 1>
+        strain_ad = Eigen::Matrix<adouble_tl_t, n_strain, 1>::Zero(),
+        stress_;
+                
+        Eigen::Matrix<adouble_tl_t, n_strain, n_strain>
+        *Cmat_ = nullptr;
+
+        Eigen::Matrix<adouble_tl_t, n_strain+1, 1>
+        x_ad   = Eigen::Matrix<adouble_tl_t, n_strain+1, 1>::Zero();
+        
+        Eigen::Matrix<adouble_tl_t, n_strain+1, n_strain+1>
+        *jac_ = nullptr;
+        
+        // the adjoint can be computed in adol-c traceless vector mode
+        // with ndof components.
+        for (uint_t i=0; i<n_strain; i++) {
+          
+            strain_ad(i) = strain(i);
+            strain_ad(i).setADValue(i, 1.);
+        }
+        
+        for (uint_t i=0; i<n_strain+1; i++) x_ad(i) = x(i);
+        
+        von_mises_yield_criterion_tangent_stiffness<traits_ad_t>(strain_ad, x_ad, stress_, Cmat_);
+
+        for (uint_t i=0; i<n_strain; i++)
+            for (uint_t j=0; j<n_strain; j++)
+                Cmat_ad(i,j) = stress_(i).getADValue(j);
+    }
+
     
     CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(jac),
                Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(jac_ad)));
+
+    CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(Cmat),
+               Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(Cmat_ad)));
 }
 
 
