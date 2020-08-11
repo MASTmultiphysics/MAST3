@@ -143,7 +143,7 @@ inline void von_mises_yield_criterion_jacobian
     
     yield.set_material(*p.prop);
     yield.set_limit_stress(5.e6);
-    //yield.compute(c, strain, accessor, &stiff);
+    //yield.compute(c, strain, accessor1, &stiff);
     yield.return_mapping_residual_and_jacobian(c, strain, accessor1, res, jac);
 }
 
@@ -160,10 +160,13 @@ test_von_mises_yield_criterion_jacobian() {
     Eigen::Matrix<real_t, n_strain, 1>
     strain = 1.e-4 * Eigen::Matrix<real_t, n_strain, 1>::Random();
     
+    // the return-mapping solver will stack variables in x as
+    // {stress, consistency_param}
     Eigen::Matrix<real_t, n_strain+1, 1>
     x      = Eigen::Matrix<real_t, n_strain+1, 1>::Random(),
     res    = Eigen::Matrix<real_t, n_strain+1, 1>::Zero();
-    x.topRows(n_strain) *= 1.e4;
+    // scale the stresses by factor
+    x.topRows(n_strain) *= 1.e2;
     
     Eigen::Matrix<real_t, n_strain+1, n_strain+1>
     jac    = Eigen::Matrix<real_t, n_strain+1, n_strain+1>::Zero(),
@@ -172,6 +175,7 @@ test_von_mises_yield_criterion_jacobian() {
     von_mises_yield_criterion_jacobian<traits_t>(strain, x, res, &jac);
     
     
+    // compute the quantities using adouble_tl_t to verify the linearization
     {
         adtl::setNumDir(n_strain+1);
         using traits_ad_t = Traits<adouble_tl_t, 2>;
