@@ -325,10 +325,22 @@ public:
             }
         }
         
+        // set the plastic strain value based on the increment
+        Eigen::Matrix<scalar_t, n_strain, 1>
+        n    = Eigen::Matrix<scalar_t, n_strain, 1>::Zero();
+        
+        MAST::Physics::Elasticity::LinearContinuum::vonMisesStress<scalar_t, dim>::
+        derivative(internal.stress(), n);
+        
+        internal.plastic_strain()  = c.previous_plasticity_accessor->plastic_strain();
+        internal.plastic_strain() += (internal.consistency_parameter() -
+                                      c.previous_plasticity_accessor->consistency_parameter()) * n;
+
+        
         // compute the stiffness tangent if the matrix was provided
         if (stiff) {
             
-            if (yield <= 0.)
+            if (yield < 0.)
                 // for elastic material response the standard material stiffness is acceptable
                 *stiff = m_stiff;
             else
