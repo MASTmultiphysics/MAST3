@@ -185,9 +185,17 @@ inline void von_mises_yield_criterion_tangent_stiffness
     c.previous_plasticity_accessor = &accessor0;
 
     yield.set_material(*p.prop);
-    yield.set_limit_stress(6.2025e6);
+    yield.set_limit_stress(5.e6);
     yield.compute(c, strain, accessor1, Cmat);
 
+    /*// we use this as the starting point for the
+    for (uint_t i=0; i<v0.size(); i++)
+    std::cout << std::setw(20) << v0(i) << std::setw(20) << v1(i) << std::endl;
+    copy_value(1., v1, v0);
+    yield.compute(c, strain, accessor1, Cmat);
+
+    for (uint_t i=0; i<v0.size(); i++)
+    std::cout << std::setw(20) << v0(i) << std::setw(20) << v1(i) << std::endl;*/
     // copy the stress value back
     stress = accessor1.stress();
 }
@@ -284,7 +292,7 @@ test_von_mises_yield_criterion_jacobian() {
             strain_ad(i).setADValue(i, 1.);
         }
         
-        for (uint_t i=0; i<n_strain+1; i++) x_ad(i) = x(i);
+        //for (uint_t i=0; i<n_strain+1; i++) x_ad(i) = x(i);
         
         von_mises_yield_criterion_tangent_stiffness<traits_ad_t>(strain_ad, x_ad, stress_, Cmat_);
 
