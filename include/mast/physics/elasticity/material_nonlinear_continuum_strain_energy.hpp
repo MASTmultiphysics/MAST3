@@ -30,7 +30,7 @@ namespace ElastoPlasticity {
 
 
 template <typename FEVarType,
-          typename SectionPropertyType,
+          typename YieldSurfaceType,
           uint_t Dim>
 class StrainEnergy {
     
@@ -45,18 +45,18 @@ public:
     n_strain               = MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<Dim>::value;
 
     StrainEnergy():
-    _property    (nullptr),
+    _yield       (nullptr),
     _fe_var_data (nullptr)
     { }
     
     virtual ~StrainEnergy() { }
 
     inline void
-    set_section_property(const SectionPropertyType& p) {
+    set_yield_surface(const YieldSurfaceType& ys) {
         
-        Assert0(!_property, "Property already initialized.");
+        Assert0(!_yield, "Yield surface already initialized.");
         
-        _property = &p;
+        _yield = &ys;
     }
 
     inline void set_fe_var_data(const FEVarType& fe_data)
@@ -78,7 +78,7 @@ public:
                         matrix_t* jac = nullptr) const {
         
         Assert0(_fe_var_data, "FE data not initialized.");
-        Assert0(_property, "Section property not initialized");
+        Assert0(_yield, "Yield surface not initialized");
         
         const typename FEVarType::fe_shape_deriv_t
         &fe = _fe_var_data->get_fe_shape_data();
@@ -89,7 +89,7 @@ public:
         vector_t
         vec     = vector_t::Zero(Dim*fe.n_basis());
         
-        typename SectionPropertyType::stiff_t
+        typename YieldSurfaceType::stiff_t
         mat;
         
         matrix_t
@@ -109,7 +109,7 @@ public:
             <scalar_t, scalar_t, FEVarType, Dim>(*_fe_var_data, i, epsilon, Bxmat);
             
             // evaluate the stress and tangent stiffness matrix
-            _property->compute(c, epsilon, *c.mp_accessor, &mat);
+            _yield->compute(c, epsilon, *c.mp_accessor, &mat);
 
             Bxmat.vector_mult_transpose(vec, stress);
             res += fe.detJxW(i) * vec;
@@ -130,7 +130,7 @@ public:
                            matrix_t* jac = nullptr) const {
         
         Assert0(_fe_var_data, "FE data not initialized.");
-        Assert0(_property, "Section property not initialized");
+        Assert0(_yield, "Yield surface not initialized");
         
         const typename FEVarType::fe_shape_deriv_t
         &fe = _fe_var_data->get_fe_shape_data();
@@ -141,7 +141,7 @@ public:
         vector_t
         vec     = vector_t::Zero(Dim*fe.n_basis());
 
-        typename SectionPropertyType::stiff_t
+        typename YieldSurfaceType::stiff_t
         mat;
         matrix_t
         mat1 = matrix_t::Zero(n_strain, Dim*fe.n_basis()),
@@ -159,7 +159,7 @@ public:
             MAST::Physics::Elasticity::LinearContinuum::strain
             <scalar_t, scalar_t, FEVarType, Dim>(*_fe_var_data, i, epsilon, Bxmat);
             
-            //_property->derivative(c, f, stress, &mat);
+            //_yield->derivative(c, f, stress, &mat);
 
             Bxmat.vector_mult_transpose(vec, stress);
             res += fe.detJxW(i) * vec;
@@ -177,7 +177,7 @@ public:
 private:
     
     
-    const SectionPropertyType       *_property;
+    const YieldSurfaceType          *_yield;
     const FEVarType                 *_fe_var_data;
 };
 

@@ -259,7 +259,7 @@ public:
         _yield->set_limit_stress(1.e6);
         _yield->set_material(*_prop);
         _energy   = new typename TraitsType::energy_t;
-        _energy->set_section_property(*_yield);
+        _energy->set_yield_surface(*_yield);
         _p_load   = new typename TraitsType::press_load_t;
         _p_load->set_section_area(*area);
         _p_load->set_pressure(*press);
