@@ -85,7 +85,7 @@ vonMisesStress<ScalarType, 2> {
         
         // if p == 0, then the sensitivity returns nan
         // Hence, we are avoiding this by setting it to zero whenever p = 0.
-        if (fabs(p) > 0.) {
+        if (abs(p) > 0.) {
             
             dstress(0) =   (stress(0) - stress(1)) + stress(0);
             dstress(1) = - (stress(0) - stress(1)) + stress(1);
@@ -131,7 +131,7 @@ vonMisesStress<ScalarType, 2> {
         
         // if p == 0, then the sensitivity returns nan
         // Hence, we are avoiding this by setting it to zero whenever p = 0.
-        if (fabs(p) > 0.) {
+        if (abs(p) > 0.) {
             
             Eigen::Matrix<scalar_t, ns, 1>
             ds;

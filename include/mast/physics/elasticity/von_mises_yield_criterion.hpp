@@ -24,6 +24,7 @@
 #include <mast/base/mast_data_types.h>
 #include <mast/physics/elasticity/linear_elastic_strain_operator.hpp>
 #include <mast/physics/elasticity/von_mises_stress.hpp>
+#include <mast/numerics/utility.hpp>
 
 
 namespace MAST {
@@ -50,7 +51,10 @@ public:
     
     virtual ~Accessor() { }
 
-    
+
+    /*!
+     * initializes the data in this accessor with a specified data independent of a system
+     */
     inline void init(YieldCriterionType   &yield,
                      ScalarType           *data) {
         
@@ -200,7 +204,7 @@ public:
     inline void compute(ContextType     &c,
                         const VecType   &strain,
                         AccessorType    &internal,
-                        stiff_t         *stiff = nullptr) {
+                        stiff_t         *stiff = nullptr) const {
         
         Assert2(strain.size() == n_strain,
                 strain.size(), n_strain,
@@ -233,7 +237,7 @@ public:
         yield = this->yield_function(c, internal);
         
         // if the yield function is violated then an update needs to be computed
-        if (yield > 0.) {
+        if (_active_yield_function(yield)) {
             
             Eigen::Matrix<scalar_t, n_strain+1, 1>
             dx   = Eigen::Matrix<scalar_t, n_strain+1, 1>::Zero(),
@@ -245,7 +249,7 @@ public:
             bool
             terminate = false;
 
-            scalar_t
+            real_t
             res_norm        = 0.,
             dx_norm         = 0.,
             res_scaled_norm = 0.,
@@ -261,8 +265,8 @@ public:
                 this->return_mapping_residual_and_jacobian(c, strain, internal, res, &jac);
                 
                 // check the norm and if we need to continue iteration
-                res_scaled_norm  = res_norm = res.norm();
-                stress_norm      = internal.stress().norm();
+                res_scaled_norm  = res_norm = MAST::Numerics::Utility::real_norm(res);
+                stress_norm      = MAST::Numerics::Utility::real_norm(internal.stress());
                 
                 if (stress_norm > 0.)
                     res_scaled_norm /= stress_norm;
@@ -290,7 +294,7 @@ public:
                     // increment the iteration
                     iter++;
                     
-                    dx_norm = dx.norm();
+                    dx_norm = MAST::Numerics::Utility::real_norm(dx);
                     
                     if (dx_norm < tol) {
                         
@@ -340,7 +344,7 @@ public:
         // compute the stiffness tangent if the matrix was provided
         if (stiff) {
             
-            if (yield < 0.)
+            if (!_active_yield_function(yield))
                 // for elastic material response the standard material stiffness is acceptable
                 *stiff = m_stiff;
             else
@@ -358,7 +362,7 @@ public:
     template <typename ContextType,
               typename AccessorType>
     inline scalar_t yield_function(ContextType   &c,
-                                   AccessorType  &internal) {
+                                   AccessorType  &internal) const {
 
         /*Eigen::Matrix<scalar_t, n_strain, 1>
         s;
@@ -385,7 +389,7 @@ public:
               typename AccessorType>
     inline void compute_tangent_stiffness(ContextType         &c,
                                           const AccessorType  &internal,
-                                          stiff_t             &stiff) {
+                                          stiff_t             &stiff) const {
 
         Assert2(internal.stress().size() == n_strain,
                 internal.stress().size(), n_strain,
@@ -419,11 +423,12 @@ public:
               typename Vec1Type,
               typename Vec2Type,
               typename MatType>
-    inline void return_mapping_residual_and_jacobian(ContextType    &c,
-                                                     const Vec1Type &strain,
-                                                     AccessorType   &accessor,
-                                                     Vec2Type       &res,
-                                                     MatType        *jac = nullptr) {
+    inline void
+    return_mapping_residual_and_jacobian(ContextType    &c,
+                                         const Vec1Type &strain,
+                                         AccessorType   &accessor,
+                                         Vec2Type       &res,
+                                         MatType        *jac = nullptr) const {
                 
         Eigen::Matrix<scalar_t, n_strain, 1>
         n    = Eigen::Matrix<scalar_t, n_strain, 1>::Zero();
@@ -471,6 +476,18 @@ public:
     }
     
 private:
+    
+    template <typename ValType>
+    inline bool _active_yield_function(const ValType &v) const {
+        
+        return v >= 0;
+    }
+
+    inline bool _active_yield_function(const complex_t &v) const {
+        
+        return v.real() >= 0;
+    }
+
     
     bool             _if_kinematic_hardening;
     real_t           _vm_lim;

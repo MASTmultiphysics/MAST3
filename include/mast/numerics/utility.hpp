@@ -37,6 +37,33 @@ namespace Numerics {
 namespace Utility {
 
 
+template <typename VecType>
+inline typename
+std::enable_if<std::is_same<typename Eigen::internal::traits<VecType>::Scalar,
+                            real_t>::value, real_t>::type
+real_norm(const VecType& v) {
+    return v.norm();
+}
+
+
+template <typename VecType>
+inline typename
+std::enable_if<std::is_same<typename Eigen::internal::traits<VecType>::Scalar,
+                            complex_t>::value, real_t>::type
+real_norm(const VecType& v) {
+    return v.norm();
+}
+
+
+template <typename VecType>
+inline typename
+std::enable_if<std::is_same<typename Eigen::internal::traits<VecType>::Scalar,
+                            adouble_tl_t>::value, real_t>::type
+real_norm(const VecType& v) {
+    return v.norm().getValue();
+}
+
+
 template <typename ValType>
 inline void
 setZero(ValType& m) { m.setZero();}
