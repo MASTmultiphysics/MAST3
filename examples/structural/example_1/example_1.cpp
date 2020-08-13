@@ -19,17 +19,16 @@
 
 // MAST includes
 #include <mast/base/exceptions.hpp>
-#include <mast/util/perf_log.hpp>
+#include <mast/base/scalar_constant.hpp>
+#include <mast/base/assembly/libmesh/residual_and_jacobian.hpp>
+#include <mast/base/assembly/libmesh/residual_sensitivity.hpp>
 #include <mast/fe/eval/fe_basis_derivatives.hpp>
 #include <mast/fe/libmesh/fe_data.hpp>
 #include <mast/fe/libmesh/fe_side_data.hpp>
 #include <mast/fe/fe_var_data.hpp>
 #include <mast/physics/elasticity/isotropic_stiffness.hpp>
-#include <mast/base/scalar_constant.hpp>
 #include <mast/physics/elasticity/linear_strain_energy.hpp>
 #include <mast/physics/elasticity/pressure_load.hpp>
-#include <mast/base/assembly/libmesh/residual_and_jacobian.hpp>
-#include <mast/base/assembly/libmesh/residual_sensitivity.hpp>
 #include <mast/numerics/libmesh/sparse_matrix_initialization.hpp>
 
 // libMesh includes
@@ -37,6 +36,7 @@
 #include <libmesh/elem.h>
 #include <libmesh/mesh_generation.h>
 #include <libmesh/equation_systems.h>
+#include <libmesh/nonlinear_implicit_system.h>
 #include <libmesh/boundary_info.h>
 #include <libmesh/dirichlet_boundaries.h>
 #include <libmesh/zero_function.h>
@@ -94,9 +94,9 @@ public:
         delete mesh;
     }
     
-    uint_t elem_dim() const {return elem->dim();}
-    uint_t  n_nodes() const {return elem->n_nodes();}
-    real_t  nodal_coord(uint_t nd, uint_t c) const {return elem->point(nd)(c);}
+    inline uint_t elem_dim() const {return elem->dim();}
+    inline uint_t  n_nodes() const {return elem->n_nodes();}
+    inline real_t  nodal_coord(uint_t nd, uint_t c) const {return elem->point(nd)(c);}
     inline bool elem_is_quad() const {return (elem->type() == libMesh::QUAD4 ||
                                               elem->type() == libMesh::QUAD8 ||
                                               elem->type() == libMesh::QUAD9);}

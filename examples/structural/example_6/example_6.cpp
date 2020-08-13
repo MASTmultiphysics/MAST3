@@ -19,6 +19,7 @@
 
 // MAST includes
 #include <mast/base/exceptions.hpp>
+#include <mast/base/scalar_constant.hpp>
 #include <mast/util/perf_log.hpp>
 #include <mast/fe/eval/fe_basis_derivatives.hpp>
 #include <mast/fe/libmesh/fe_data.hpp>
@@ -26,7 +27,6 @@
 #include <mast/fe/fe_var_data.hpp>
 #include <mast/fe/scalar_field_wrapper.hpp>
 #include <mast/physics/elasticity/isotropic_stiffness.hpp>
-#include <mast/base/scalar_constant.hpp>
 #include <mast/physics/elasticity/linear_strain_energy.hpp>
 #include <mast/physics/elasticity/pressure_load.hpp>
 #include <mast/optimization/topology/simp/penalized_density.hpp>
@@ -156,10 +156,10 @@ public:
     virtual ~Context() { }
     
     // assembly methods
-    uint_t  elem_dim() const {return elem->dim();}
-    uint_t  n_nodes() const {return elem->n_nodes();}
-    real_t  nodal_coord(uint_t nd, uint_t c) const {return elem->point(nd)(c);}
-    real_t  qp_location(uint_t i) const { return fe->xyz(qp, i);}
+    inline uint_t  elem_dim() const {return elem->dim();}
+    inline uint_t  n_nodes() const {return elem->n_nodes();}
+    inline real_t  nodal_coord(uint_t nd, uint_t c) const {return elem->point(nd)(c);}
+    inline real_t  qp_location(uint_t i) const { return fe->xyz(qp, i);}
     inline bool elem_is_quad() const {return (elem->type() == libMesh::QUAD4 ||
                                               elem->type() == libMesh::QUAD8 ||
                                               elem->type() == libMesh::QUAD9);}
