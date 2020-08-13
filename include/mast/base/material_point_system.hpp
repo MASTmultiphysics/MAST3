@@ -29,7 +29,6 @@
 namespace MAST {
 namespace Base {
 
-template <typename ScalarType>
 class MaterialPointSystem {
   
 public:
@@ -50,19 +49,19 @@ public:
             for (; it != end; it++) delete *it;
         }*/
         
-        // delete the data
+        /*// delete the data
         {
             std::map<std::string, MAST::Base::MaterialPointDataStorage<ScalarType>*>::iterator
             it   = _data.begin(),
             end  = _data.end();
             
             for (; it != end; it++) delete it->second;
-        }
+        }*/
     }
 
     void initialize(uint_t n_qp_per_elem) {
 
-        Assert0(!initialized, "System already initialization");
+        Assert0(!_initialized, "System already initialization");
         
         _n_points_on_rank.resize(_mesh.comm().size(), 0);
         _begin_point_id.resize(_mesh.comm().size(), 0);
@@ -82,7 +81,7 @@ public:
     }
     
     
-    inline MAST::Base::MaterialPointDataStorage<ScalarType>*>&
+    /*inline MAST::Base::MaterialPointDataStorage<ScalarType>*>&
     add_variable(const std::string& nm, uint_t n_components)  {
         
         Assert0(!initialized, "Variables can be added prior to system initialization");
@@ -94,7 +93,7 @@ public:
     inline MAST::Base::MaterialPointDataStorage<ScalarType>*>&
     get_variable(const std::string& nm)  {
         
-    }
+    }*/
 
 
 private:
@@ -111,7 +110,7 @@ private:
 
     //std::vector<MAST::Base::MaterialPoint*>  _material_points;
     
-    std::map<std::string, MAST::Base::MaterialPointDataStorage<ScalarType>*> _data;
+    //std::map<std::string, MAST::Base::MaterialPointDataStorage<ScalarType>*> _data;
 };
 
 } // namespace Base

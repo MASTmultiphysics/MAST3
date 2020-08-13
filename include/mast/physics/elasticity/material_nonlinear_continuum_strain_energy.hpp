@@ -89,7 +89,7 @@ public:
         vector_t
         vec     = vector_t::Zero(Dim*fe.n_basis());
         
-        typename SectionPropertyType::value_t
+        typename SectionPropertyType::stiff_t
         mat;
         
         matrix_t
@@ -103,12 +103,14 @@ public:
         
         for (uint_t i=0; i<fe.n_q_points(); i++) {
             
-            c.qp = i;
+            c.init_for_qp(i);
             
-            _property->value(c, mat);
             MAST::Physics::Elasticity::LinearContinuum::strain
             <scalar_t, scalar_t, FEVarType, Dim>(*_fe_var_data, i, epsilon, Bxmat);
-            stress = mat * epsilon;
+            
+            // evaluate the stress and tangent stiffness matrix
+            _property->compute(c, epsilon, *c.mp_accessor, &mat);
+
             Bxmat.vector_mult_transpose(vec, stress);
             res += fe.detJxW(i) * vec;
             
@@ -139,7 +141,7 @@ public:
         vector_t
         vec     = vector_t::Zero(Dim*fe.n_basis());
 
-        typename SectionPropertyType::value_t
+        typename SectionPropertyType::stiff_t
         mat;
         matrix_t
         mat1 = matrix_t::Zero(n_strain, Dim*fe.n_basis()),
@@ -152,12 +154,13 @@ public:
         
         for (uint_t i=0; i<fe.n_q_points(); i++) {
             
-            c.qp = i;
-            
-            _property->derivative(c, f, mat);
+            c.init_for_qp(i);
+
             MAST::Physics::Elasticity::LinearContinuum::strain
             <scalar_t, scalar_t, FEVarType, Dim>(*_fe_var_data, i, epsilon, Bxmat);
-            stress = mat * epsilon;
+            
+            //_property->derivative(c, f, stress, &mat);
+
             Bxmat.vector_mult_transpose(vec, stress);
             res += fe.detJxW(i) * vec;
             

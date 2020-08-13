@@ -19,18 +19,19 @@
 
 // MAST includes
 #include <mast/base/exceptions.hpp>
-#include <mast/util/perf_log.hpp>
+#include <mast/base/scalar_constant.hpp>
+#include <mast/base/material_point_system.hpp>
+#include <mast/base/material_point_data_storage.hpp>
+#include <mast/base/assembly/libmesh/residual_and_jacobian.hpp>
+#include <mast/base/assembly/libmesh/residual_sensitivity.hpp>
 #include <mast/fe/eval/fe_basis_derivatives.hpp>
 #include <mast/fe/libmesh/fe_data.hpp>
 #include <mast/fe/libmesh/fe_side_data.hpp>
 #include <mast/fe/fe_var_data.hpp>
 #include <mast/physics/elasticity/isotropic_stiffness.hpp>
-#include <mast/base/scalar_constant.hpp>
 #include <mast/physics/elasticity/material_nonlinear_continuum_strain_energy.hpp>
 #include <mast/physics/elasticity/von_mises_yield_criterion.hpp>
 #include <mast/physics/elasticity/pressure_load.hpp>
-#include <mast/base/assembly/libmesh/residual_and_jacobian.hpp>
-#include <mast/base/assembly/libmesh/residual_sensitivity.hpp>
 #include <mast/numerics/libmesh/sparse_matrix_initialization.hpp>
 
 // libMesh includes
@@ -38,6 +39,7 @@
 #include <libmesh/elem.h>
 #include <libmesh/mesh_generation.h>
 #include <libmesh/equation_systems.h>
+#include <libmesh/nonlinear_implicit_system.h>
 #include <libmesh/boundary_info.h>
 #include <libmesh/dirichlet_boundaries.h>
 #include <libmesh/zero_function.h>
@@ -53,11 +55,11 @@ namespace Examples {
 namespace Structural {
 namespace Example4 {
 
-class Context {
+class InitExample {
     
 public:
     
-    Context(libMesh::Parallel::Communicator& comm):
+    InitExample(libMesh::Parallel::Communicator& comm):
     q_type    (libMesh::QGAUSS),
     q_order   (libMesh::FOURTH),
     fe_order  (libMesh::SECOND),
@@ -65,14 +67,10 @@ public:
     mesh      (new libMesh::ReplicatedMesh(comm)),
     eq_sys    (new libMesh::EquationSystems(*mesh)),
     sys       (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("structural")),
-    elem      (nullptr),
-    qp        (-1),
     p_side_id (1) {
 
-
-
         libMesh::MeshTools::Generation::build_square(*mesh,
-                                                     2, 2,
+                                                     20, 20,
                                                      0.0, 10.0,
                                                      0.0, 10.0,
                                                      libMesh::QUAD9);
@@ -89,21 +87,12 @@ public:
         eq_sys->print_info(std::cout);
     }
 
-    virtual ~Context() {
+    virtual ~InitExample() {
         
         delete eq_sys;
         delete mesh;
     }
     
-    uint_t elem_dim() const {return elem->dim();}
-    uint_t  n_nodes() const {return elem->n_nodes();}
-    real_t  nodal_coord(uint_t nd, uint_t c) const {return elem->point(nd)(c);}
-    inline bool elem_is_quad() const {return (elem->type() == libMesh::QUAD4 ||
-                                              elem->type() == libMesh::QUAD8 ||
-                                              elem->type() == libMesh::QUAD9);}
-    inline bool if_compute_pressure_load_on_side(const uint_t s)
-    { return mesh->boundary_info->has_boundary_id(elem, s, p_side_id);}
-
     libMesh::QuadratureType           q_type;
     libMesh::Order                    q_order;
     libMesh::Order                    fe_order;
@@ -111,9 +100,66 @@ public:
     libMesh::ReplicatedMesh          *mesh;
     libMesh::EquationSystems         *eq_sys;
     libMesh::NonlinearImplicitSystem *sys;
-    const libMesh::Elem              *elem;
-    uint_t                            qp;
     uint_t                            p_side_id;
+};
+
+
+
+template <typename TraitsType>
+class Context {
+    
+public:
+
+    Context(InitExample& init):
+    ex_init                      (init),
+    mesh                         (init.mesh),
+    eq_sys                       (init.eq_sys),
+    sys                          (init.sys),
+    elem                         (nullptr),
+    qp                           (-1),
+    fe                           (nullptr),
+    yield                        (nullptr),
+    mp_accessor                  (nullptr),
+    previous_plasticity_accessor (nullptr),
+    mp_sys                       (nullptr),
+    mp_storage                   (nullptr)
+    { }
+    
+    virtual ~Context() { }
+    
+    inline void init_for_qp(uint_t q) {
+        
+        qp = q;
+        
+        mp_accessor->init(*yield,
+                          mp_storage->value(elem->id(), qp).data());
+    }
+    
+    // assembly methods
+    inline uint_t  elem_dim() const {return elem->dim();}
+    inline uint_t  n_nodes() const {return elem->n_nodes();}
+    inline real_t  nodal_coord(uint_t nd, uint_t c) const {return elem->point(nd)(c);}
+    inline real_t  qp_location(uint_t i) const { return fe->xyz(qp, i);}
+    inline bool elem_is_quad() const {return (elem->type() == libMesh::QUAD4 ||
+                                              elem->type() == libMesh::QUAD8 ||
+                                              elem->type() == libMesh::QUAD9);}
+    inline bool if_compute_pressure_load_on_side(const uint_t s)
+    { return ex_init.mesh->boundary_info->has_boundary_id(elem, s, ex_init.p_side_id);}
+    
+    
+    InitExample                         &ex_init;
+    libMesh::ReplicatedMesh             *mesh;
+    libMesh::EquationSystems            *eq_sys;
+    libMesh::NonlinearImplicitSystem    *sys;
+    libMesh::ExplicitSystem             *rho_sys;
+    const libMesh::Elem                 *elem;
+    uint_t                               qp;
+    typename TraitsType::fe_shape_t     *fe;
+    typename TraitsType::yield_t        *yield;
+    typename TraitsType::mp_accessor_t  *mp_accessor;
+    typename TraitsType::mp_accessor_t  *previous_plasticity_accessor;
+    typename TraitsType::mp_system_t    *mp_sys;
+    typename TraitsType::mp_storage_t   *mp_storage;
 };
 
 
@@ -125,22 +171,28 @@ template <typename BasisScalarType,
 struct Traits {
 
     using scalar_t          = typename MAST::DeducedScalarType<typename MAST::DeducedScalarType<BasisScalarType, NodalScalarType>::type, SolScalarType>::type;
+    using traits_t          = MAST::Examples::Structural::Example4::Traits<BasisScalarType, NodalScalarType, SolScalarType, Dim>;
+    using context_t         = Context<traits_t>;
     using fe_basis_t        = typename MAST::FEBasis::libMeshWrapper::FEBasis<BasisScalarType, Dim>;
     using fe_shape_t        = typename MAST::FEBasis::Evaluation::FEShapeDerivative<BasisScalarType, NodalScalarType, Dim, Dim, fe_basis_t>;
     using fe_data_t         = typename MAST::FEBasis::libMeshWrapper::FEData<Dim, fe_basis_t, fe_shape_t>;
     using fe_side_data_t    = typename MAST::FEBasis::libMeshWrapper::FESideData<Dim, fe_basis_t, fe_shape_t>;
-    using fe_var_t          = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, Dim, Dim, Context, fe_shape_t>;
+    using fe_var_t          = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, Dim, Dim, context_t, fe_shape_t>;
     using modulus_t         = typename MAST::Base::ScalarConstant<SolScalarType>;
     using nu_t              = typename MAST::Base::ScalarConstant<SolScalarType>;
     using press_t           = typename MAST::Base::ScalarConstant<SolScalarType>;
     using area_t            = typename MAST::Base::ScalarConstant<SolScalarType>;
     using prop_t            = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<SolScalarType, Dim, modulus_t, nu_t>;
-    using energy_t          = typename MAST::Physics::Elasticity::ElastoPlasticity::StrainEnergy<fe_var_t, prop_t, Dim>;
+    using yield_t           = typename MAST::Physics::Elasticity::ElastoPlasticity::vonMisesYieldFunction<scalar_t, prop_t>;
+    using energy_t          = typename MAST::Physics::Elasticity::ElastoPlasticity::StrainEnergy<fe_var_t, yield_t, Dim>;
     using press_load_t      = typename MAST::Physics::Elasticity::SurfacePressureLoad<fe_var_t, press_t, area_t, Dim>;
     using element_vector_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using element_matrix_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     using assembled_vector_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using assembled_matrix_t = Eigen::SparseMatrix<scalar_t>;
+    using mp_accessor_t     = typename MAST::Physics::Elasticity::ElastoPlasticity::Accessor<scalar_t, yield_t>;
+    using mp_system_t        = MAST::Base::MaterialPointSystem;
+    using mp_storage_t       = MAST::Base::MaterialPointDataStorage<scalar_t>;
 };
 
 
@@ -168,6 +220,7 @@ public:
     _fe_var       (nullptr),
     _fe_side_var  (nullptr),
     _prop         (nullptr),
+    _yield        (nullptr),
     _energy       (nullptr),
     _p_load       (nullptr) {
         
@@ -200,10 +253,13 @@ public:
         press    = new typename TraitsType::press_t(1.e2);
         area     = new typename TraitsType::area_t(1.0);
         _prop    = new typename TraitsType::prop_t;
+        _yield   = new typename TraitsType::yield_t;
         
         _prop->set_modulus_and_nu(*E, *nu);
+        _yield->set_limit_stress(1.e6);
+        _yield->set_material(*_prop);
         _energy   = new typename TraitsType::energy_t;
-        _energy->set_section_property(*_prop);
+        _energy->set_section_property(*_yield);
         _p_load   = new typename TraitsType::press_load_t;
         _p_load->set_section_area(*area);
         _p_load->set_pressure(*press);
@@ -283,6 +339,7 @@ private:
     typename TraitsType::fe_var_t          *_fe_var;
     typename TraitsType::fe_var_t          *_fe_side_var;
     typename TraitsType::prop_t            *_prop;
+    typename TraitsType::yield_t           *_yield;
     typename TraitsType::energy_t          *_energy;
     typename TraitsType::press_load_t      *_p_load;
 };
@@ -290,7 +347,7 @@ private:
 
 template <typename TraitsType>
 inline void
-compute_residual(Context                                        &c,
+compute_residual(Context<TraitsType>                            &c,
                  ElemOps<TraitsType>                            &e_ops,
                  const typename TraitsType::assembled_vector_t  &sol,
                  typename TraitsType::assembled_vector_t        &res) {
@@ -314,7 +371,7 @@ compute_residual(Context                                        &c,
 
 template <typename TraitsType, typename ScalarFieldType>
 inline void
-compute_residual_sensitivity(Context                                        &c,
+compute_residual_sensitivity(Context<TraitsType>                            &c,
                              ElemOps<TraitsType>                            &e_ops,
                              const ScalarFieldType                          &f,
                              const typename TraitsType::assembled_vector_t  &sol,
@@ -322,7 +379,7 @@ compute_residual_sensitivity(Context                                        &c,
     
     using scalar_t   = typename TraitsType::scalar_t;
 
-    MAST::Base::Assembly::libMeshWrapper::ResidualSensitivity<scalar_t, ElemOps<TraitsType>>
+    MAST::Base::Assembly::libMeshWrapper::ResidualAndJacobian<scalar_t, ElemOps<TraitsType>>
     assembly;
     
     assembly.set_elem_ops(e_ops);
@@ -339,7 +396,7 @@ compute_residual_sensitivity(Context                                        &c,
 
 template <typename TraitsType>
 inline void
-compute_sol(Context                                  &c,
+compute_sol(Context<TraitsType>                      &c,
             ElemOps<TraitsType>                      &e_ops,
             typename TraitsType::assembled_vector_t  &sol) {
     
@@ -367,7 +424,7 @@ compute_sol(Context                                  &c,
 
 template <typename TraitsType, typename ScalarFieldType>
 inline void
-compute_sol_sensitivity(Context                                        &c,
+compute_sol_sensitivity(Context<TraitsType>                            &c,
                         ElemOps<TraitsType>                            &e_ops,
                         const ScalarFieldType                          &f,
                         const typename TraitsType::assembled_vector_t  &sol,
@@ -421,11 +478,16 @@ int main(int argc, const char** argv) {
     using traits_complex_t   = MAST::Examples::Structural::Example4::Traits<real_t, real_t, complex_t, 2>;
 
 
-    MAST::Examples::Structural::Example4::Context c(init.comm());
+    MAST::Examples::Structural::Example4::InitExample
+    ex_init(init.comm());
+    
+    MAST::Examples::Structural::Example4::Context<traits_t> c(ex_init);
+    MAST::Examples::Structural::Example4::Context<traits_complex_t> c_c(ex_init);
+    
     MAST::Examples::Structural::Example4::ElemOps<traits_t>
-    e_ops(c.q_order, c.q_type, c.fe_order, c.fe_family);
+    e_ops(ex_init.q_order, ex_init.q_type, ex_init.fe_order, ex_init.fe_family);
     MAST::Examples::Structural::Example4::ElemOps<traits_complex_t>
-    e_ops_c(c.q_order, c.q_type, c.fe_order, c.fe_family);
+    e_ops_c(ex_init.q_order, ex_init.q_type, ex_init.fe_order, ex_init.fe_family);
 
     typename traits_t::assembled_vector_t
     sol,
@@ -446,7 +508,7 @@ int main(int argc, const char** argv) {
 
     // compute the solution sensitivity wrt E
     (*e_ops_c.E)() += complex_t(0., ComplexStepDelta);
-    MAST::Examples::Structural::Example4::compute_sol<traits_complex_t>(c, e_ops_c, sol_c);
+    MAST::Examples::Structural::Example4::compute_sol<traits_complex_t>(c_c, e_ops_c, sol_c);
     (*e_ops_c.E)() -= complex_t(0., ComplexStepDelta);
     MAST::Examples::Structural::Example4::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.E, sol, dsol);
     
@@ -460,7 +522,7 @@ int main(int argc, const char** argv) {
 
     // compute the solution sensitivity wrt nu
     (*e_ops_c.nu)() += complex_t(0., ComplexStepDelta);
-    MAST::Examples::Structural::Example4::compute_sol<traits_complex_t>(c, e_ops_c, sol_c);
+    MAST::Examples::Structural::Example4::compute_sol<traits_complex_t>(c_c, e_ops_c, sol_c);
     (*e_ops_c.nu)() -= complex_t(0., ComplexStepDelta);
     MAST::Examples::Structural::Example4::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.nu, sol, dsol);
     
@@ -474,7 +536,7 @@ int main(int argc, const char** argv) {
 
     // compute the solution sensitivity wrt p
     (*e_ops_c.press)() += complex_t(0., ComplexStepDelta);
-    MAST::Examples::Structural::Example4::compute_sol<traits_complex_t>(c, e_ops_c, sol_c);
+    MAST::Examples::Structural::Example4::compute_sol<traits_complex_t>(c_c, e_ops_c, sol_c);
     (*e_ops_c.press)() -= complex_t(0., ComplexStepDelta);
     MAST::Examples::Structural::Example4::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.press, sol, dsol);
     
@@ -488,7 +550,7 @@ int main(int argc, const char** argv) {
 
     // compute the solution sensitivity wrt section area
     (*e_ops_c.area)() += complex_t(0., ComplexStepDelta);
-    MAST::Examples::Structural::Example4::compute_sol<traits_complex_t>(c, e_ops_c, sol_c);
+    MAST::Examples::Structural::Example4::compute_sol<traits_complex_t>(c_c, e_ops_c, sol_c);
     (*e_ops_c.area)() -= complex_t(0., ComplexStepDelta);
     MAST::Examples::Structural::Example4::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.area, sol, dsol);
     
