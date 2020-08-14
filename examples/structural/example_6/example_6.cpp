@@ -46,12 +46,13 @@
 #include <mast/mesh/generation/bracket3d.hpp>
 
 // libMesh includes
-#include <libmesh/replicated_mesh.h>
+#include <libmesh/distributed_mesh.h>
 #include <libmesh/elem.h>
 #include <libmesh/mesh_generation.h>
 #include <libmesh/equation_systems.h>
 #include <libmesh/boundary_info.h>
 #include <libmesh/exodusII_io.h>
+#include <libmesh/nemesis_io.h>
 #include <libmesh/petsc_matrix.h>
 
 
@@ -77,7 +78,7 @@ public:
     q_order   (libMesh::SECOND),
     fe_order  (libMesh::FIRST),
     fe_family (libMesh::LAGRANGE),
-    mesh      (new libMesh::ReplicatedMesh(comm)),
+    mesh      (new libMesh::DistributedMesh(comm)),
     eq_sys    (new libMesh::EquationSystems(*mesh)),
     sys       (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("structural")),
     rho_sys   (&eq_sys->add_system<libMesh::ExplicitSystem>("density")),
@@ -99,12 +100,18 @@ public:
         model->init_analysis_dirichlet_conditions(*this);
         
         eq_sys->init();
+
+        //mesh->write("mesh.exo");
+        libMesh::Nemesis_IO(*mesh).write("mesh.exo");
+        
+        std::cout << "before rho_sys->reinit()" << std::endl;
+        Error(false, "");
         
         real_t
         filter_r = input("filter_radius",
                          "radius of geometric filter for level set field", 0.015);
         filter = new MAST::Mesh::libMeshWrapper::GeometricFilter(*rho_sys, filter_r);
-        eq_sys->reinit();
+        rho_sys->reinit();
 
         // create and attach the null space to the matrix
         MAST::Physics::Elasticity::libMeshWrapper::NullSpace
@@ -135,7 +142,7 @@ public:
     libMesh::Order                               q_order;
     libMesh::Order                               fe_order;
     libMesh::FEFamily                            fe_family;
-    libMesh::ReplicatedMesh                     *mesh;
+    libMesh::DistributedMesh                    *mesh;
     libMesh::EquationSystems                    *eq_sys;
     libMesh::NonlinearImplicitSystem            *sys;
     libMesh::ExplicitSystem                     *rho_sys;
@@ -181,7 +188,7 @@ public:
     
     
     InitExample<model_t>                &ex_init;
-    libMesh::ReplicatedMesh             *mesh;
+    libMesh::DistributedMesh            *mesh;
     libMesh::EquationSystems            *eq_sys;
     libMesh::NonlinearImplicitSystem    *sys;
     libMesh::ExplicitSystem             *rho_sys;

@@ -333,13 +333,13 @@ struct Bracket2D {
         // all ranks will have DVs defined for all variables. So, we should be
         // operating on a replicated mesh
         //
-        Assert0(c.mesh->is_replicated(),
-                "Function currently assumes replicated mesh");
+        //Assert0(c.mesh->is_replicated(),
+        //        "Function currently assumes replicated mesh");
                 
         // iterate over all the element values
         libMesh::MeshBase::const_node_iterator
-        it  = c.mesh->nodes_begin(),
-        end = c.mesh->nodes_end();
+        it  = c.mesh->local_nodes_begin(),
+        end = c.mesh->local_nodes_end();
         
         //
         // maximum number of dvs is the number of nodes on the level set function
@@ -401,8 +401,8 @@ struct Bracket2D {
         // now, remove elements that are outside of the L-bracket domain
         //
         libMesh::MeshBase::element_iterator
-        e_it   = mesh.elements_begin(),
-        e_end  = mesh.elements_end();
+        e_it   = mesh.local_elements_begin(),
+        e_end  = mesh.local_elements_end();
         
         for ( ; e_it!=e_end; e_it++) {
             
@@ -433,8 +433,8 @@ struct Bracket2D {
         facing_right = false,
         facing_down  = false;
         
-        e_it   = mesh.elements_begin();
-        e_end  = mesh.elements_end();
+        e_it   = mesh.local_elements_begin();
+        e_end  = mesh.local_elements_end();
         
         for ( ; e_it != e_end; e_it++) {
             
