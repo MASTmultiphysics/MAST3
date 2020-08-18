@@ -432,7 +432,7 @@ compute_hex_side_tangent_and_normal
  Eigen::Matrix<NodalScalarType, SpatialDim, Eigen::Dynamic>&               tangent,
  Eigen::Matrix<NodalScalarType, SpatialDim, Eigen::Dynamic>&               normal) {
     
-    Assert0(c.elem_is_quad(), "Element must be a quadrilateral");
+    Assert0(c.elem_is_hex(), "Element must be a hexagon");
 
     uint_t
     nq   = dx_dxi.cols(),
