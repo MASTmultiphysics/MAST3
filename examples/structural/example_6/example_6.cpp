@@ -51,7 +51,6 @@
 #include <libmesh/mesh_generation.h>
 #include <libmesh/equation_systems.h>
 #include <libmesh/boundary_info.h>
-#include <libmesh/exodusII_io.h>
 #include <libmesh/nemesis_io.h>
 #include <libmesh/petsc_matrix.h>
 
@@ -100,18 +99,12 @@ public:
         model->init_analysis_dirichlet_conditions(*this);
         
         eq_sys->init();
-
-        //mesh->write("mesh.exo");
-        libMesh::Nemesis_IO(*mesh).write("mesh.exo");
-        
-        std::cout << "before rho_sys->reinit()" << std::endl;
-        Error(false, "");
         
         real_t
         filter_r = input("filter_radius",
                          "radius of geometric filter for level set field", 0.015);
         filter = new MAST::Mesh::libMeshWrapper::GeometricFilter(*rho_sys, filter_r);
-        rho_sys->reinit();
+        //rho_sys->reinit();
 
         // create and attach the null space to the matrix
         MAST::Physics::Elasticity::libMeshWrapper::NullSpace
@@ -450,29 +443,32 @@ public:
                        context_t           &c):
     _e_ops        (e_ops),
     _c            (c),
+    _dvs          (new MAST::Optimization::DesignParameterVector<scalar_t>(c.rho_sys->comm())),
     _volume       (_c.ex_init.model->reference_volume(_c.ex_init)),
     _vf           (_c.ex_init.input("volume_fraction",
                                     "upper limit for the volume fraction", 0.2)) {
         
         // initialize the design variable vector
-        _c.ex_init.model->init_simp_dvs(_c.ex_init, _dvs);
+        _c.ex_init.model->init_simp_dvs(_c.ex_init, *_dvs);
     }
     
-    virtual ~FunctionEvaluation() {}
+    virtual ~FunctionEvaluation() {
+        delete _dvs;
+    }
     
     
-    inline uint_t n_vars() const {return _dvs.size();}
+    inline uint_t n_vars() const {return _dvs->size();}
     inline uint_t   n_eq() const {return 0;}
     inline uint_t n_ineq() const {return 1;}
     virtual void init_dvar(std::vector<scalar_t>& x,
                            std::vector<scalar_t>& xmin,
                            std::vector<scalar_t>& xmax) {
 
-        Assert1(_dvs.size(), _dvs.size(), "Design variables must be initialized");
+        Assert1(_dvs->size(), _dvs->size(), "Design variables must be initialized");
         
-        x.resize(_dvs.size());
-        xmin.resize(_dvs.size());
-        xmax.resize(_dvs.size());
+        x.resize(_dvs->size(), 0.);
+        xmin.resize(_dvs->size());
+        xmax.resize(_dvs->size());
         
         std::fill(xmin.begin(), xmin.end(),      0.);
         std::fill(xmax.begin(), xmax.end(),    1.e0);
@@ -497,8 +493,10 @@ public:
         }
         else {
             
-            for (uint_t i=0; i<_dvs.size(); i++)
-                x[i] = _dvs[i]();
+            for (uint_t i=_dvs->local_begin(); i<_dvs->local_end(); i++)
+                x[i] = (*_dvs)[i]();
+            
+            _c.rho_sys->comm().sum(x);
         }
     }
     
@@ -513,8 +511,8 @@ public:
 
         std::cout << "New Evaluation" << std::endl;
         
-        Assert2(x.size() == _dvs.size(),
-                x.size(), _dvs.size(),
+        Assert2(x.size() == _dvs->size(),
+                x.size(), _dvs->size(),
                 "Incompatible design variable vector size.");
 
         libMesh::ExplicitSystem
@@ -536,9 +534,9 @@ public:
         // will be overwritten in \p rho_base.
         *rho_base = 1.;
         
-        for (uint_t i=0; i<_dvs.size(); i++) {
+        for (uint_t i=_dvs->local_begin(); i<_dvs->local_end(); i++) {
             
-            uint_t dof_id = _dvs.template get_parameter_for_dv<int>(i, "dof_id");
+            uint_t dof_id = _dvs->template get_parameter_for_dv<int>(i, "dof_id");
             
             if (dof_id >= first_local_rho && dof_id <  last_local_rho)
                 rho_base->set(dof_id, x[i]);
@@ -549,7 +547,7 @@ public:
         <scalar_t,
         typename TraitsType::assembled_vector_t,
         typename TraitsType::assembled_vector_t>
-        (_dvs, *rho_base, *_c.rho_sys->solution);
+        (*_dvs, *rho_base, *_c.rho_sys->solution);
         _c.rho_sys->solution->close();
         
         // this will copy the solution to libMesh::System::current_local_soluiton
@@ -608,7 +606,7 @@ public:
         _c.sys->update();
 
         {
-            libMesh::ExodusII_IO writer(*_c.mesh);
+            libMesh::Nemesis_IO writer(*_c.mesh);
             writer.write_timestep("solution.exo", *_c.eq_sys, 1, 1.);
         }
 
@@ -666,7 +664,7 @@ public:
                                      *_c.rho_sys->current_local_solution,  // filtered density
                                      *res,                                 // adjoint solution
                                      *_c.ex_init.filter,                   // geometric filter
-                                     _dvs,
+                                     *_dvs,
                                      obj_grad);
         }
         
@@ -684,7 +682,7 @@ public:
             volume.derivative(_c,
                               *_c.rho_sys->current_local_solution,
                               *_c.ex_init.filter,
-                              _dvs,
+                              *_dvs,
                               grads);
             for (uint_t i=0; i<grads.size(); i++)
                 grads[i] /= _volume;
@@ -708,7 +706,7 @@ private:
     
     ElemOps<TraitsType>                                 &_e_ops;
     context_t                                           &_c;
-    MAST::Optimization::DesignParameterVector<scalar_t>  _dvs;
+    MAST::Optimization::DesignParameterVector<scalar_t> *_dvs;
     real_t                                               _volume;
     real_t                                               _vf;
 };
