@@ -405,7 +405,7 @@ private:
          * Must return the number of data points
          */
         inline size_t
-        kdtree_get_point_count() const { return _mesh.n_nodes(); }
+        kdtree_get_point_count() const { return _mesh.n_local_nodes(); }
         
         /**
          * Returns the distance between the vector "p1[0:size-1]"
@@ -461,10 +461,7 @@ private:
     inline void _init2() {
         
         libMesh::MeshBase& mesh = _system.get_mesh();
-        
-        // currently implemented for replicated mesh
-        Assert0(mesh.is_replicated(), "Method implemented only for replicated mesh");
-        
+                
         // Loop over nodes to try and detect duplicates.  We use nanoflann
         // for this, inspired by
         // https://gist.github.com/jwpeterson/7a36f9f794df67d51126#file-detect_slit-cc-L65
@@ -482,7 +479,7 @@ private:
         kd_tree_t kd_tree(3, mesh_adaptor, nanoflann::KDTreeSingleIndexAdaptorParams(/*max leaf=*/10));
         
         // Construct the tree
-        kd_tree.buildIndex();
+        //kd_tree.buildIndex();
         
         real_t
         d_12 = 0.,
@@ -502,8 +499,8 @@ private:
         dof_2;
         
         libMesh::MeshBase::const_node_iterator
-        node_it      =  mesh.nodes_begin(),
-        node_end     =  mesh.nodes_end();
+        node_it      =  mesh.local_nodes_begin(),
+        node_end     =  mesh.local_nodes_end();
         
         // For every node in the mesh, search the KDtree and find any
         // nodes at _radius distance from the current
@@ -515,18 +512,17 @@ private:
             dof_1 = node->dof_number(_system.number(), 0, 0);
 
             // only local dofs are processed.
-            if (/*dof_1 >= first_local_dof &&
-                dof_1 <  last_local_dof*/
-                dof_map.semilocal_index(dof_1)) {
+            if (dof_map.semilocal_index(dof_1)) {
                 
                 real_t query_pt[3] = {(*node)(0), (*node)(1), (*node)(2)};
                 
                 std::vector<std::pair<size_t, real_t>>
                 indices_dists;
-                nanoflann::RadiusResultSet<real_t, size_t>
+                indices_dists.push_back(std::pair<size_t, real_t>(dof_1, 0.));
+                /*nanoflann::RadiusResultSet<real_t, size_t>
                 resultSet(_radius*_radius, indices_dists);
                 
-                kd_tree.findNeighbors(resultSet, query_pt, nanoflann::SearchParams());
+                kd_tree.findNeighbors(resultSet, query_pt, nanoflann::SearchParams());*/
                 
                 sum       = 0.;
                 
@@ -576,8 +572,8 @@ private:
         
         // compute the largest element size
         libMesh::MeshBase::const_element_iterator
-        e_it          = mesh.elements_begin(),
-        e_end         = mesh.elements_end();
+        e_it          = mesh.local_elements_begin(),
+        e_end         = mesh.local_elements_end();
         
         for ( ; e_it != e_end; e_it++) {
             const libMesh::Elem* e = *e_it;
@@ -586,6 +582,8 @@ private:
             if (_fe_size < d_12)
                 _fe_size = d_12;
         }
+
+        _system.comm().min(_fe_size);
     }
 #endif
     

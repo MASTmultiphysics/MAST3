@@ -351,9 +351,9 @@ struct Bracket3D {
                        libMesh::UnstructuredMesh& mesh) {
         
         real_t
-        length  = c.input("length", "length of domain along x-axis", 1.),
-        height  = c.input("height", "length of domain along y-axis", 1.),
-        width   = c.input("width",  "length of domain along z-axis", 1.);
+        length  = c.input("length", "length of domain along x-axis", 0.3),
+        height  = c.input("height", "length of domain along y-axis", 0.3),
+        width   = c.input("width",  "length of domain along z-axis", 0.3);
         
         uint_t
         nx_divs = c.input("nx_divs", "number of elements along x-axis", 10),
@@ -497,6 +497,7 @@ struct Bracket3D {
             }
         }
         
+        dvs.synchronize();
         c.rho_sys->solution->close();
     }
 };

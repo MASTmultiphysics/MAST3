@@ -121,7 +121,7 @@ public:
         param_dof_ids(dvs.size());
         
         // cache values for later use
-        for (uint_t i=0; i<dvs.size(); i++)
+        for (uint_t i=dvs.local_begin(); i<dvs.local_end(); i++)
             param_dof_ids[i] = dvs.get_data_for_parameter(dvs[i]).template get<int>("dof_id");
         
         std::set<uint_t> density_dofs;
@@ -141,7 +141,7 @@ public:
             density_accessor.init(*c.elem);
             density_accessor.init_dof_id_set(density_dofs);
 
-            for (uint_t i=0; i<dvs.size(); i++) {
+            for (uint_t i=dvs.local_begin(); i<dvs.local_end(); i++) {
                 
                 // this assumes that if the DV (which is associated with a node)
                 // is connected to this element, then the dof_indices for this
