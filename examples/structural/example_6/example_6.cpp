@@ -450,9 +450,14 @@ public:
         
         // initialize the design variable vector
         _c.ex_init.model->init_simp_dvs(_c.ex_init, *_dvs);
+        
+        // open the file where the history will be stored
+        _history.open("optim_history.txt", std::ostream::out);
     }
     
     virtual ~FunctionEvaluation() {
+        
+        _history.close();
         delete _dvs;
     }
     
@@ -710,12 +715,12 @@ public:
         writer.write_timestep(oss.str(), *_c.eq_sys, 1, (real_t)iter);
         
         // also, save the design iteration to a text file
-        MAST::Optimization::Utility::write_dv_to_file(*this,
-                                                      "optim_history.txt",
-                                                      iter,
-                                                      dvars,
-                                                      o,
-                                                      f);
+        MAST::Optimization::Utility::write_dhistory_to_file(*this,
+                                                            _history,
+                                                            iter,
+                                                            dvars,
+                                                            o,
+                                                            f);
 
     }
     
@@ -726,6 +731,7 @@ private:
     MAST::Optimization::DesignParameterVector<scalar_t> *_dvs;
     real_t                                               _volume;
     real_t                                               _vf;
+    std::ofstream                                        _history;
 };
 } // namespace Example6
 } // namespace Structural

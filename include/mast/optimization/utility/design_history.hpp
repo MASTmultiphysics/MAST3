@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <string>
 #include <fstream>
+#include <iomanip>
 #include <boost/algorithm/string.hpp>
 
 
@@ -36,20 +37,98 @@ namespace Optimization {
 namespace Utility {
 
 template <typename FuncEvalType>
-inline void write_dv_to_file(const FuncEvalType          &feval,
-                             const std::string           &file,
-                             const uint_t                 iter,
-                             const std::vector<real_t>   &x,
-                             const real_t                &obj,
-                             const std::vector<real_t>   &fval) {
+inline void
+write_dhistory_to_screen(const FuncEvalType          &feval,
+                         std::ostream                &out,
+                         const uint_t                 iter,
+                         const std::vector<real_t>   &x,
+                         const real_t                &obj,
+                         const std::vector<real_t>   &fval) {
     
-    std::ofstream output;
+    out
+    << " *************************** " << std::endl
+    << " *** Optimization Output *** " << std::endl
+    << " *************************** " << std::endl
+    << std::endl
+    << "Iter:            "  << std::setw(10) << iter << std::endl
+    << "Nvars:           " << std::setw(10) << x.size() << std::endl
+    << "Ncons-Equality:  " << std::setw(10) << feval.n_eq() << std::endl
+    << "Ncons-Inquality: " << std::setw(10) << feval.n_ineq() << std::endl
+    << std::endl
+    << "Obj =                  " << std::setw(20) << obj << std::endl
+    << std::endl
+    << "Vars:            " << std::endl;
+    
+    for (unsigned int i=0; i<feval.n_vars(); i++)
+        out
+        << "x     [ " << std::setw(10) << i << " ] = "
+        << std::setw(20) << x[i] << std::endl;
+    
+    if (feval.n_eq()) {
+        
+        out << std::endl
+        << "Equality Constraints: " << std::endl;
+        
+        for (unsigned int i=0; i<feval.n_eq(); i++)
+            out
+            << "feq [ " << std::setw(10) << i << " ] = "
+            << std::setw(20) << fval[i] << std::endl;
+    }
+    
+    if (feval.n_ineq()) {
+        
+        out << std::endl
+        << "Inequality Constraints: " << std::endl;
+        unsigned int
+        n_active      = 0,
+        n_violated    = 0,
+        max_constr_id = 0;
+        real_t
+        max_constr  = -1.e20;
+        
+        for (unsigned int i=0; i<feval.n_ineq(); i++) {
+            out
+            << "fineq [ " << std::setw(10) << i << " ] = "
+            << std::setw(20) << fval[i+feval.n_eq()];
+            if (fabs(fval[i+feval.n_eq()]) <= feval.tol()) {
+                n_active++;
+                out << "  ***";
+            }
+            else if (fval[i+feval.n_eq()] > feval.tol()) {
+                n_violated++;
+                out << "  +++";
+            }
+            out  << std::endl;
+            
+            if (max_constr < fval[i+feval.n_eq()]) {
+                max_constr_id = i;
+                max_constr    = fval[i+feval.n_eq()];
+            }
+        }
+        
+        out << std::endl
+        << std::setw(35) << " N Active Constraints: "
+        << std::setw(20) << n_active << std::endl
+        << std::setw(35) << " N Violated Constraints: "
+        << std::setw(20) << n_violated << std::endl
+        << std::setw(35) << " Most critical constraint: "
+        << std::setw(20) << max_constr << std::endl;
+    }
+    
+    out << std::endl
+    << " *************************** " << std::endl;
 
-    // create a new file for first iteration. Otherwise append
-    if (iter == 0)
-        output.open(file.c_str(), std::ofstream::out);
-    else
-        output.open(file.c_str(), std::ofstream::app);
+}
+
+
+template <typename FuncEvalType>
+inline void
+write_dhistory_to_file(const FuncEvalType          &feval,
+                       std::ostream                &output,
+                       const uint_t                 iter,
+                       const std::vector<real_t>   &x,
+                       const real_t                &obj,
+                       const std::vector<real_t>   &fval) {
     
     // write header for the first iteration
     if (iter == 0) {
@@ -82,9 +161,6 @@ inline void write_dv_to_file(const FuncEvalType          &feval,
     for (unsigned int i=0; i < fval.size(); i++)
         output << std::setw(20) << fval[i];
     output << std::endl;
-    
-    
-    output.close();
 }
 
 
