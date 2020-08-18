@@ -605,11 +605,6 @@ public:
 
         _c.sys->update();
 
-        {
-            libMesh::Nemesis_IO writer(*_c.mesh);
-            writer.write_timestep("solution.exo", *_c.eq_sys, 1, 1.);
-        }
-
         // compliance is defined using the external work done \f$ c = x^T f \f$
         scalar_t
         vol    = 0.,
@@ -700,6 +695,28 @@ public:
                        real_t                     &o,
                        std::vector<real_t>        &fvals) {
         
+        std::ostringstream oss;
+        oss << "output_optim.e-s." << std::setfill('0') << std::setw(5) << iter ;
+        
+        std::vector<bool> eval_grads(this->n_ineq(), false);
+        std::vector<real_t> f(this->n_ineq(), 0.), grads;
+        
+        this->evaluate(dvars, o, false, grads, f, eval_grads, grads);
+
+        _c.sys->time = iter;
+        libMesh::Nemesis_IO writer(*_c.mesh);
+        // "1" is the number of time-steps in the file,
+        // as opposed to the time-step number.
+        writer.write_timestep(oss.str(), *_c.eq_sys, 1, (real_t)iter);
+        
+        // also, save the design iteration to a text file
+        MAST::Optimization::Utility::write_dv_to_file(*this,
+                                                      "optim_history.txt",
+                                                      iter,
+                                                      dvars,
+                                                      o,
+                                                      f);
+
     }
     
 private:

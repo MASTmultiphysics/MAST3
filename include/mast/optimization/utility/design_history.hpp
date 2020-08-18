@@ -35,18 +35,64 @@ namespace MAST {
 namespace Optimization {
 namespace Utility {
 
-inline void write_dv_to_file(const std::string     &file,
-                             const uint_t           iter,
-                             std::vector<real_t>  &dv) {
+template <typename FuncEvalType>
+inline void write_dv_to_file(const FuncEvalType          &feval,
+                             const std::string           &file,
+                             const uint_t                 iter,
+                             const std::vector<real_t>   &x,
+                             const real_t                &obj,
+                             const std::vector<real_t>   &fval) {
     
+    std::ofstream output;
+
+    // create a new file for first iteration. Otherwise append
+    if (iter == 0)
+        output.open(file.c_str(), std::ofstream::out);
+    else
+        output.open(file.c_str(), std::ofstream::app);
+    
+    // write header for the first iteration
+    if (iter == 0) {
+
+        // number of desing variables
+        output
+        << std::setw(10) << "n_dv" << std::setw(10) << feval.n_vars() << std::endl;
+        output
+        << std::setw(10) << "n_eq" << std::setw(10) << feval.n_eq() << std::endl;
+        output
+        << std::setw(10) << "n_ineq" << std::setw(10) << feval.n_ineq() << std::endl;
+
+        output << std::setw(10) << "Iter";
+        for (unsigned int i=0; i < x.size(); i++) {
+            std::stringstream x; x << "x_" << i;
+            output << std::setw(20) << x.str();
+        }
+        output << std::setw(20) << "Obj";
+        for (unsigned int i=0; i<fval.size(); i++) {
+            std::stringstream f; f << "f_" << i;
+            output << std::setw(20) << f.str();
+        }
+        output << std::endl;
+    }
+    
+    output << std::setw(10) << iter;
+    for (unsigned int i=0; i < x.size(); i++)
+        output << std::setw(20) << x[i];
+    output << std::setw(20) << obj;
+    for (unsigned int i=0; i < fval.size(); i++)
+        output << std::setw(20) << fval[i];
+    output << std::endl;
+    
+    
+    output.close();
 }
 
 
-template <typename FuncEvalType, typename ScalarType>
+template <typename FuncEvalType>
 inline void initialize_dv_from_output_file(const FuncEvalType      &f_eval,
                                            const std::string       &file,
                                            const uint_t             iter,
-                                           std::vector<ScalarType> &dv) {
+                                           std::vector<real_t>     &dv) {
     
     
     struct stat stat_info;
@@ -126,9 +172,55 @@ inline void initialize_dv_from_output_file(const FuncEvalType      &f_eval,
     
     // make sure that the file has data
     for (unsigned int i=0; i<ndv; i++)
-        dv[i] = ScalarType(stod(results[i+1]));
+        dv[i] = real_t(stod(results[i+1]));
 }
 
+
+
+template <typename FuncEvalType>
+inline void write_dv_to_file(const FuncEvalType            &feval,
+                             const std::string             &file,
+                             const uint_t                   iter,
+                             const std::vector<complex_t>  &x,
+                             const complex_t               &obj,
+                             const std::vector<complex_t>  &fval) {
+    
+    Error(false, "Not implemented for complex type");
+}
+
+
+template <typename FuncEvalType>
+inline void initialize_dv_from_output_file(const FuncEvalType      &f_eval,
+                                           const std::string       &file,
+                                           const uint_t             iter,
+                                           std::vector<complex_t>  &dv) {
+
+    Error(false, "Not implemented for complex type");
+}
+
+
+#if MAST_ENABLE_ADOLC == 1
+template <typename FuncEvalType>
+inline void write_dv_to_file(const FuncEvalType               &feval,
+                             const std::string                &file,
+                             const uint_t                      iter,
+                             const std::vector<adouble_tl_t>  &x,
+                             const adouble_tl_t               &obj,
+                             const std::vector<adouble_tl_t>  &fval) {
+    
+    Error(false, "Not implemented for adouble type");
+}
+
+
+template <typename FuncEvalType>
+inline void initialize_dv_from_output_file(const FuncEvalType         &f_eval,
+                                           const std::string          &file,
+                                           const uint_t                iter,
+                                           std::vector<adouble_tl_t>  &dv) {
+    
+    Error(false, "Not implemented for adouble type");
+}
+#endif
 
 } // namespace Utility
 } // namespace Optimization
