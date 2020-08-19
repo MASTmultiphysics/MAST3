@@ -46,12 +46,12 @@
 #include <mast/mesh/generation/bracket3d.hpp>
 
 // libMesh includes
-#include <libmesh/replicated_mesh.h>
+#include <libmesh/distributed_mesh.h>
 #include <libmesh/elem.h>
 #include <libmesh/mesh_generation.h>
 #include <libmesh/equation_systems.h>
 #include <libmesh/boundary_info.h>
-#include <libmesh/exodusII_io.h>
+#include <libmesh/nemesis_io.h>
 #include <libmesh/petsc_matrix.h>
 
 
@@ -77,7 +77,7 @@ public:
     q_order   (libMesh::SECOND),
     fe_order  (libMesh::FIRST),
     fe_family (libMesh::LAGRANGE),
-    mesh      (new libMesh::ReplicatedMesh(comm)),
+    mesh      (new libMesh::DistributedMesh(comm)),
     eq_sys    (new libMesh::EquationSystems(*mesh)),
     sys       (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("structural")),
     rho_sys   (&eq_sys->add_system<libMesh::ExplicitSystem>("density")),
@@ -104,7 +104,7 @@ public:
         filter_r = input("filter_radius",
                          "radius of geometric filter for level set field", 0.015);
         filter = new MAST::Mesh::libMeshWrapper::GeometricFilter(*rho_sys, filter_r);
-        eq_sys->reinit();
+        //rho_sys->reinit();
 
         // create and attach the null space to the matrix
         MAST::Physics::Elasticity::libMeshWrapper::NullSpace
@@ -135,7 +135,7 @@ public:
     libMesh::Order                               q_order;
     libMesh::Order                               fe_order;
     libMesh::FEFamily                            fe_family;
-    libMesh::ReplicatedMesh                     *mesh;
+    libMesh::DistributedMesh                    *mesh;
     libMesh::EquationSystems                    *eq_sys;
     libMesh::NonlinearImplicitSystem            *sys;
     libMesh::ExplicitSystem                     *rho_sys;
@@ -181,7 +181,7 @@ public:
     
     
     InitExample<model_t>                &ex_init;
-    libMesh::ReplicatedMesh             *mesh;
+    libMesh::DistributedMesh            *mesh;
     libMesh::EquationSystems            *eq_sys;
     libMesh::NonlinearImplicitSystem    *sys;
     libMesh::ExplicitSystem             *rho_sys;
@@ -443,29 +443,37 @@ public:
                        context_t           &c):
     _e_ops        (e_ops),
     _c            (c),
+    _dvs          (new MAST::Optimization::DesignParameterVector<scalar_t>(c.rho_sys->comm())),
     _volume       (_c.ex_init.model->reference_volume(_c.ex_init)),
     _vf           (_c.ex_init.input("volume_fraction",
                                     "upper limit for the volume fraction", 0.2)) {
         
         // initialize the design variable vector
-        _c.ex_init.model->init_simp_dvs(_c.ex_init, _dvs);
+        _c.ex_init.model->init_simp_dvs(_c.ex_init, *_dvs);
+        
+        // open the file where the history will be stored
+        _history.open("optim_history.txt", std::ostream::out);
     }
     
-    virtual ~FunctionEvaluation() {}
+    virtual ~FunctionEvaluation() {
+        
+        _history.close();
+        delete _dvs;
+    }
     
     
-    inline uint_t n_vars() const {return _dvs.size();}
+    inline uint_t n_vars() const {return _dvs->size();}
     inline uint_t   n_eq() const {return 0;}
     inline uint_t n_ineq() const {return 1;}
     virtual void init_dvar(std::vector<scalar_t>& x,
                            std::vector<scalar_t>& xmin,
                            std::vector<scalar_t>& xmax) {
 
-        Assert1(_dvs.size(), _dvs.size(), "Design variables must be initialized");
+        Assert1(_dvs->size(), _dvs->size(), "Design variables must be initialized");
         
-        x.resize(_dvs.size());
-        xmin.resize(_dvs.size());
-        xmax.resize(_dvs.size());
+        x.resize(_dvs->size(), 0.);
+        xmin.resize(_dvs->size());
+        xmax.resize(_dvs->size());
         
         std::fill(xmin.begin(), xmin.end(),      0.);
         std::fill(xmax.begin(), xmax.end(),    1.e0);
@@ -490,8 +498,10 @@ public:
         }
         else {
             
-            for (uint_t i=0; i<_dvs.size(); i++)
-                x[i] = _dvs[i]();
+            for (uint_t i=_dvs->local_begin(); i<_dvs->local_end(); i++)
+                x[i] = (*_dvs)[i]();
+            
+            _c.rho_sys->comm().sum(x);
         }
     }
     
@@ -506,8 +516,8 @@ public:
 
         std::cout << "New Evaluation" << std::endl;
         
-        Assert2(x.size() == _dvs.size(),
-                x.size(), _dvs.size(),
+        Assert2(x.size() == _dvs->size(),
+                x.size(), _dvs->size(),
                 "Incompatible design variable vector size.");
 
         libMesh::ExplicitSystem
@@ -529,9 +539,9 @@ public:
         // will be overwritten in \p rho_base.
         *rho_base = 1.;
         
-        for (uint_t i=0; i<_dvs.size(); i++) {
+        for (uint_t i=_dvs->local_begin(); i<_dvs->local_end(); i++) {
             
-            uint_t dof_id = _dvs.template get_parameter_for_dv<int>(i, "dof_id");
+            uint_t dof_id = _dvs->template get_parameter_for_dv<int>(i, "dof_id");
             
             if (dof_id >= first_local_rho && dof_id <  last_local_rho)
                 rho_base->set(dof_id, x[i]);
@@ -542,7 +552,7 @@ public:
         <scalar_t,
         typename TraitsType::assembled_vector_t,
         typename TraitsType::assembled_vector_t>
-        (_dvs, *rho_base, *_c.rho_sys->solution);
+        (*_dvs, *rho_base, *_c.rho_sys->solution);
         _c.rho_sys->solution->close();
         
         // this will copy the solution to libMesh::System::current_local_soluiton
@@ -600,11 +610,6 @@ public:
 
         _c.sys->update();
 
-        {
-            libMesh::ExodusII_IO writer(*_c.mesh);
-            writer.write_timestep("solution.exo", *_c.eq_sys, 1, 1.);
-        }
-
         // compliance is defined using the external work done \f$ c = x^T f \f$
         scalar_t
         vol    = 0.,
@@ -659,7 +664,7 @@ public:
                                      *_c.rho_sys->current_local_solution,  // filtered density
                                      *res,                                 // adjoint solution
                                      *_c.ex_init.filter,                   // geometric filter
-                                     _dvs,
+                                     *_dvs,
                                      obj_grad);
         }
         
@@ -677,7 +682,7 @@ public:
             volume.derivative(_c,
                               *_c.rho_sys->current_local_solution,
                               *_c.ex_init.filter,
-                              _dvs,
+                              *_dvs,
                               grads);
             for (uint_t i=0; i<grads.size(); i++)
                 grads[i] /= _volume;
@@ -695,15 +700,38 @@ public:
                        real_t                     &o,
                        std::vector<real_t>        &fvals) {
         
+        std::ostringstream oss;
+        oss << "output_optim.e-s." << std::setfill('0') << std::setw(5) << iter ;
+        
+        std::vector<bool> eval_grads(this->n_ineq(), false);
+        std::vector<real_t> f(this->n_ineq(), 0.), grads;
+        
+        this->evaluate(dvars, o, false, grads, f, eval_grads, grads);
+
+        _c.sys->time = iter;
+        libMesh::Nemesis_IO writer(*_c.mesh);
+        // "1" is the number of time-steps in the file,
+        // as opposed to the time-step number.
+        writer.write_timestep(oss.str(), *_c.eq_sys, 1, (real_t)iter);
+        
+        // also, save the design iteration to a text file
+        MAST::Optimization::Utility::write_dhistory_to_file(*this,
+                                                            _history,
+                                                            iter,
+                                                            dvars,
+                                                            o,
+                                                            f);
+
     }
     
 private:
     
     ElemOps<TraitsType>                                 &_e_ops;
     context_t                                           &_c;
-    MAST::Optimization::DesignParameterVector<scalar_t>  _dvs;
+    MAST::Optimization::DesignParameterVector<scalar_t> *_dvs;
     real_t                                               _volume;
     real_t                                               _vf;
+    std::ofstream                                        _history;
 };
 } // namespace Example6
 } // namespace Structural

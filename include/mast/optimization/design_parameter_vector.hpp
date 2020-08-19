@@ -26,6 +26,9 @@
 #include <mast/base/parameter_data.hpp>
 #include <mast/optimization/design_parameter.hpp>
 
+// TIMPI includes
+#include <libmesh/parallel.h>
+
 namespace MAST {
 namespace Optimization {
 
@@ -34,7 +37,11 @@ template <typename ScalarType>
 class DesignParameterVector {
     
 public:
-    DesignParameterVector() { }
+
+    DesignParameterVector(const libMesh::Parallel::Communicator  &comm):
+    _comm    (comm)
+    { }
+    
     
     virtual ~DesignParameterVector() {
         
@@ -47,16 +54,46 @@ public:
             delete it->second;
     }
     
-    inline uint_t size() const { return _parameters.size(); }
+    
+    inline uint_t size() const {
+        
+        Assert0(_rank_begin_index.size(),
+                "Data must be synchronized before call to size()");
+        
+        return _rank_end_index[_comm.size()-1];
+    }
+    
+    
+    inline uint_t local_begin() const {
+
+        Assert0(_rank_begin_index.size(),
+                "Data must be synchronized before call to size()");
+        
+        return _rank_begin_index[_comm.rank()];
+    }
+
+    
+    inline uint_t local_end() const {
+
+        Assert0(_rank_begin_index.size(),
+                "Data must be synchronized before call to size()");
+        
+        return _rank_end_index[_comm.rank()];
+    }
+
     
     inline MAST::Optimization::DesignParameter<ScalarType>&
     operator[](uint_t i) {
         
-        Assert2(i < _parameters.size(),
-                i, _parameters.size(),
-                "Invalid parameter index");
-        
-        return *_parameters[i];
+        Assert2(i >= _rank_begin_index[_comm.rank()],
+                i, _rank_begin_index[_comm.rank()],
+                "Invalid parameter index for rank");
+
+        Assert2(i < _rank_end_index[_comm.rank()],
+                i, _rank_end_index[_comm.rank()],
+                "Invalid parameter index for rank");
+
+        return *_parameters[i-_rank_begin_index[_comm.rank()]];
     }
 
     
@@ -69,12 +106,16 @@ public:
     
     inline const MAST::Optimization::DesignParameter<ScalarType>&
     operator[](uint_t i) const {
+
+        Assert2(i >= _rank_begin_index[_comm.rank()],
+                i, _rank_begin_index[_comm.rank()],
+                "Invalid parameter index for rank");
+
+        Assert2(i < _rank_end_index[_comm.rank()],
+                i, _rank_end_index[_comm.rank()],
+                "Invalid parameter index for rank");
         
-        Assert2(i < _parameters.size(),
-                i, _parameters.size(),
-                "Invalid parameter index");
-        
-        return *_parameters[i];
+        return *_parameters[i-_rank_begin_index[_comm.rank()]];
     }
 
     
@@ -158,13 +199,43 @@ public:
         return *it->second;
     }
 
+    inline void synchronize() {
+        
+        Assert0(!_rank_begin_index.size(), "Data already synchronized");
+        Assert0(_parameters.size(), "Parameters not initialized on this rank");
+
+        std::vector<int_t>
+        rank_dvs(_comm.size(), 0);
+        
+        _rank_begin_index.resize(_comm.size());
+        _rank_end_index.resize(_comm.size());
+
+        // initialize the number of DVs for the current rank
+        rank_dvs[_comm.rank()] = _parameters.size();
+        
+        // now obtain these values from each rank
+        _comm.sum(rank_dvs);
+        
+        // now identify the beginning IDs for each processor
+        _rank_begin_index[0] = 0;
+        _rank_end_index[0]   = rank_dvs[0];
+        
+        for (uint_t i=1; i<_comm.size(); i++) {
+
+            _rank_begin_index[i]  = _rank_begin_index[i-1] + rank_dvs[i-1];
+            _rank_end_index[i]    = _rank_end_index[i-1]   + rank_dvs[i];
+        }
+    }
     
 private:
     
+    const libMesh::Parallel::Communicator&                           _comm;
     std::vector<MAST::Optimization::DesignParameter<ScalarType>*>    _parameters;
     std::map<const MAST::Optimization::DesignParameter<ScalarType>*,
              MAST::Base::ParameterData*> _data;
     std::set<uint_t>                     _dv_index;
+    std::vector<uint_t>                  _rank_begin_index;
+    std::vector<uint_t>                  _rank_end_index;
 };
 
 } // namespace Optimization

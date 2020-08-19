@@ -90,6 +90,262 @@ struct Bracket3D {
     }
     
     
+    inline uint_t idx(const libMesh::ElemType type,
+                      const uint_t nx,
+                      const uint_t ny,
+                      const uint_t i,
+                      const uint_t j,
+                      const uint_t k)
+    {
+      switch(type)
+        {
+            case libMesh::HEX8:
+            {
+                return i + (nx+1)*(j + k*(ny+1));
+            }
+                
+            case libMesh::HEX27:
+            {
+                return i + (2*nx+1)*(j + k*(2*ny+1));
+            }
+                
+            default:
+                Error(false, "Invalid element type");
+        }
+
+      return libMesh::invalid_uint;
+    }
+
+    
+    inline void build_cube(libMesh::UnstructuredMesh & mesh,
+                           const uint_t nx,
+                           const uint_t ny,
+                           const uint_t nz,
+                           const real_t length,
+                           const real_t height,
+                           const real_t width,
+                           const libMesh::ElemType type) {
+        
+        Assert0(type == libMesh::HEX8 || type == libMesh::HEX27,
+                "Method only implemented for Hex8/Hex27");
+        
+        // Clear the mesh and start from scratch
+        mesh.clear();
+        
+        libMesh::BoundaryInfo & boundary_info = mesh.get_boundary_info();
+        
+        mesh.set_mesh_dimension(3);
+        mesh.set_spatial_dimension(3);
+        mesh.reserve_elem(nx*ny*nz);
+
+        if (type == libMesh::HEX8)
+            mesh.reserve_nodes( (nx+1)*(ny+1)*(nz+1) );
+        else if (type == libMesh::HEX27)
+            mesh.reserve_nodes( (2*nx+1)*(2*ny+1)*(2*nz+1) );
+
+        real_t
+        xmax    = length,
+        ymax    = height,
+        zmax    = width;
+        
+                
+
+        std::map<uint_t, libMesh::Node*> nodes;
+        
+        // Build the nodes.
+        uint_t
+        node_id = 0,
+        n       = 0;
+        switch (type)
+        {
+            case libMesh::HEX8: {
+
+                for (uint_t k=0; k<=nz; k++)
+                    for (uint_t j=0; j<=ny; j++)
+                        for (uint_t i=0; i<=nx; i++) {
+                            if ( i<=nx/10*4 || j>=ny/10*6) {
+                                nodes[node_id] =
+                                mesh.add_point(libMesh::Point(static_cast<real_t>(i)/static_cast<real_t>(nx)*length,
+                                                              static_cast<real_t>(j)/static_cast<real_t>(ny)*height,
+                                                              static_cast<real_t>(k)/static_cast<real_t>(nz)*width),
+                                               n++);
+                            }
+                            node_id++;
+                        }
+                
+                
+                break;
+            }
+
+            case libMesh::HEX27: {
+
+                for (uint_t k=0; k<=(2*nz); k++)
+                    for (uint_t j=0; j<=(2*ny); j++)
+                        for (uint_t i=0; i<=(2*nx); i++) {
+                            if ( i<=2*nx/10*4 || j>=2*ny/10*6) {
+                                nodes[node_id] =
+                                mesh.add_point(libMesh::Point(static_cast<real_t>(i)/static_cast<real_t>(2*nx)*length,
+                                                              static_cast<real_t>(j)/static_cast<real_t>(2*ny)*height,
+                                                              static_cast<real_t>(k)/static_cast<real_t>(2*nz)*width),
+                                               n++);
+                            }
+                            node_id++;
+                        }
+                
+                break;
+            }
+                
+                
+            default:
+                Assert0(false, "ERROR: Unrecognized 3D element type.");
+        }
+
+        // Build the elements.
+        uint_t
+        elem_id = 0;
+        switch (type)
+        {
+            case libMesh::HEX8:
+            {
+                for (uint_t k=0; k<nz; k++)
+                    for (uint_t j=0; j<ny; j++)
+                        for (uint_t i=0; i<nx; i++) {
+                            if (i < nx*4/10 || j>=ny*6/10) {
+                                
+                                libMesh::Elem
+                                *elem = mesh.add_elem(libMesh::Elem::build(libMesh::HEX8).release());
+                                elem->set_id(elem_id++);
+                                elem->set_node(0) = nodes[idx(type,nx,ny,i,j,k)      ];
+                                elem->set_node(1) = nodes[idx(type,nx,ny,i+1,j,k)    ];
+                                elem->set_node(2) = nodes[idx(type,nx,ny,i+1,j+1,k)  ];
+                                elem->set_node(3) = nodes[idx(type,nx,ny,i,j+1,k)    ];
+                                elem->set_node(4) = nodes[idx(type,nx,ny,i,j,k+1)    ];
+                                elem->set_node(5) = nodes[idx(type,nx,ny,i+1,j,k+1)  ];
+                                elem->set_node(6) = nodes[idx(type,nx,ny,i+1,j+1,k+1)];
+                                elem->set_node(7) = nodes[idx(type,nx,ny,i,j+1,k+1)  ];
+                                
+                                if (k == 0)
+                                    boundary_info.add_side(elem, 0, 0);
+                                
+                                if (k == (nz-1))
+                                    boundary_info.add_side(elem, 5, 5);
+                                
+                                if (j == 0)
+                                    boundary_info.add_side(elem, 1, 1);
+                                
+                                if (j == (ny-1))
+                                    boundary_info.add_side(elem, 3, 3);
+                                
+                                if (i == 0)
+                                    boundary_info.add_side(elem, 4, 4);
+                                
+                                if (i == (nx-1))
+                                    boundary_info.add_side(elem, 2, 2);
+                                
+                                if (i==nx*3/10 && j<ny*6/10)
+                                    boundary_info.add_side(elem, 2, 6);
+                                
+                                if (j==ny*6/10 && i>nx*3/10)
+                                    boundary_info.add_side(elem, 1, 7);
+                            }
+                        }
+                break;
+            }
+                
+                
+            case libMesh::HEX27: {
+                
+                for (uint_t k=0; k<(2*nz); k += 2)
+                    for (uint_t j=0; j<(2*ny); j += 2)
+                        for (uint_t i=0; i<(2*nx); i += 2)
+                        {
+                            libMesh::Elem
+                            *elem = mesh.add_elem(libMesh::Elem::build(libMesh::HEX27).release());
+                            elem->set_id(elem_id++);
+                            
+                            elem->set_node(0)  = nodes[idx(type,nx,ny,i,  j,  k)  ];
+                            elem->set_node(1)  = nodes[idx(type,nx,ny,i+2,j,  k)  ];
+                            elem->set_node(2)  = nodes[idx(type,nx,ny,i+2,j+2,k)  ];
+                            elem->set_node(3)  = nodes[idx(type,nx,ny,i,  j+2,k)  ];
+                            elem->set_node(4)  = nodes[idx(type,nx,ny,i,  j,  k+2)];
+                            elem->set_node(5)  = nodes[idx(type,nx,ny,i+2,j,  k+2)];
+                            elem->set_node(6)  = nodes[idx(type,nx,ny,i+2,j+2,k+2)];
+                            elem->set_node(7)  = nodes[idx(type,nx,ny,i,  j+2,k+2)];
+                            elem->set_node(8)  = nodes[idx(type,nx,ny,i+1,j,  k)  ];
+                            elem->set_node(9)  = nodes[idx(type,nx,ny,i+2,j+1,k)  ];
+                            elem->set_node(10) = nodes[idx(type,nx,ny,i+1,j+2,k)  ];
+                            elem->set_node(11) = nodes[idx(type,nx,ny,i,  j+1,k)  ];
+                            elem->set_node(12) = nodes[idx(type,nx,ny,i,  j,  k+1)];
+                            elem->set_node(13) = nodes[idx(type,nx,ny,i+2,j,  k+1)];
+                            elem->set_node(14) = nodes[idx(type,nx,ny,i+2,j+2,k+1)];
+                            elem->set_node(15) = nodes[idx(type,nx,ny,i,  j+2,k+1)];
+                            elem->set_node(16) = nodes[idx(type,nx,ny,i+1,j,  k+2)];
+                            elem->set_node(17) = nodes[idx(type,nx,ny,i+2,j+1,k+2)];
+                            elem->set_node(18) = nodes[idx(type,nx,ny,i+1,j+2,k+2)];
+                            elem->set_node(19) = nodes[idx(type,nx,ny,i,  j+1,k+2)];
+                            
+                            elem->set_node(20) = nodes[idx(type,nx,ny,i+1,j+1,k)  ];
+                            elem->set_node(21) = nodes[idx(type,nx,ny,i+1,j,  k+1)];
+                            elem->set_node(22) = nodes[idx(type,nx,ny,i+2,j+1,k+1)];
+                            elem->set_node(23) = nodes[idx(type,nx,ny,i+1,j+2,k+1)];
+                            elem->set_node(24) = nodes[idx(type,nx,ny,i,  j+1,k+1)];
+                            elem->set_node(25) = nodes[idx(type,nx,ny,i+1,j+1,k+2)];
+                            elem->set_node(26) = nodes[idx(type,nx,ny,i+1,j+1,k+1)];
+                            
+                            if (k == 0)
+                                boundary_info.add_side(elem, 0, 0);
+                            
+                            if (k == 2*(nz-1))
+                                boundary_info.add_side(elem, 5, 5);
+                            
+                            if (j == 0)
+                                boundary_info.add_side(elem, 1, 1);
+                            
+                            if (j == 2*(ny-1))
+                                boundary_info.add_side(elem, 3, 3);
+                            
+                            if (i == 0)
+                                boundary_info.add_side(elem, 4, 4);
+                            
+                            if (i == 2*(nx-1))
+                                boundary_info.add_side(elem, 2, 2);
+
+                            if (i==nx*4/10)
+                                boundary_info.add_side(elem, 2, 6);
+                            
+                            if (j==ny*6/10)
+                                boundary_info.add_side(elem, 1, 7);
+                        }
+                break;
+            }
+                
+            default:
+                Assert0(false, "ERROR: Unrecognized 3D element type.");
+        }
+        
+        // Add sideset names to boundary info (Z axis out of the screen)
+        boundary_info.sideset_name(0) = "back";
+        boundary_info.sideset_name(1) = "bottom";
+        boundary_info.sideset_name(2) = "right";
+        boundary_info.sideset_name(3) = "top";
+        boundary_info.sideset_name(4) = "left";
+        boundary_info.sideset_name(5) = "front";
+        boundary_info.sideset_name(6) = "facing_right";
+        boundary_info.sideset_name(7) = "facing_down";
+
+        // Add nodeset names to boundary info
+        boundary_info.nodeset_name(0) = "back";
+        boundary_info.nodeset_name(1) = "bottom";
+        boundary_info.nodeset_name(2) = "right";
+        boundary_info.nodeset_name(3) = "top";
+        boundary_info.nodeset_name(4) = "left";
+        boundary_info.nodeset_name(5) = "front";
+
+        // Done building the mesh.  Now prepare it for use.
+        mesh.prepare_for_use ();
+    }
+
+    
     
     template <typename Context>
     inline void
@@ -102,11 +358,12 @@ struct Bracket3D {
         width   = c.input("width",  "length of domain along z-axis", 0.3);
         
         uint_t
-        nx_divs = c.input("nx_divs", "number of elements along x-axis", 20),
-        ny_divs = c.input("ny_divs", "number of elements along y-axis", 20),
-        nz_divs = c.input("nz_divs", "number of elements along z-axis", 20);
+        nx_divs = c.input("nx_divs", "number of elements along x-axis", 10),
+        ny_divs = c.input("ny_divs", "number of elements along y-axis", 10),
+        nz_divs = c.input("nz_divs", "number of elements along z-axis", 10);
         
-        if (nx_divs%10 != 0 || ny_divs%10 != 0) libmesh_error();
+        if (nx_divs%10 != 0 || ny_divs%10 != 0)
+            Error(false, "number of divisions in x and y must be multiples of 10");
         
         std::string
         t = c.input("elem_type", "type of geometric element in the mesh", "hex8");
@@ -126,14 +383,12 @@ struct Bracket3D {
         //
         // initialize the mesh with one element
         //
-        libMesh::MeshTools::Generation::build_cube(mesh,
-                                                   nx_divs, ny_divs, nz_divs,
-                                                   0, length,
-                                                   0, height,
-                                                   0, width,
-                                                   e_type);
-        
-        _delete_elems_from_bracket_mesh(c, mesh);
+        build_cube(mesh,
+                   nx_divs, ny_divs, nz_divs,
+                   length,
+                   height,
+                   width,
+                   e_type);
     }
     
         
@@ -199,29 +454,21 @@ struct Bracket3D {
         real_t
         val     = 0.;
         
-        //
-        // all ranks will have DVs defined for all variables. So, we should be
-        // operating on a replicated mesh
-        //
-        Assert0(c.mesh->is_replicated(),
-                "Function currently assumes replicated mesh");
-                
         // iterate over all the element values
         libMesh::MeshBase::const_node_iterator
-        it  = c.mesh->nodes_begin(),
-        end = c.mesh->nodes_end();
+        it  = c.mesh->local_nodes_begin(),
+        end = c.mesh->local_nodes_end();
         
         //
         // maximum number of dvs is the number of nodes on the level set function
         // mesh. We will evaluate the actual number of dvs
         //
-        //dvs.reserve(c.mesh->n_elem());
 
         for ( ; it!=end; it++) {
             
             const libMesh::Node& n = **it;
             
-            dof_id                     = n.dof_number(sys_num, 0, 0);
+            dof_id = n.dof_number(sys_num, 0, 0);
             
             if ((n(1)-filter_radius) <= y_lim &&
                 (n(0)+filter_radius) >= length*(1.-frac)) {
@@ -244,102 +491,8 @@ struct Bracket3D {
             }
         }
         
+        dvs.synchronize();
         c.rho_sys->solution->close();
-    }
-    
-    
-    
-    template <typename Context>
-    inline void
-    _delete_elems_from_bracket_mesh(Context& c,
-                                    libMesh::MeshBase &mesh) {
-        
-        real_t
-        tol     = 1.e-12,
-        x       = -1.,
-        y       = -1.,
-        l_frac  = 0.4,
-        w_frac  = 0.4,
-        length  = c.input("length", "length of domain along x-axis", 0.3),
-        height  = c.input("height", "length of domain along y-axis", 0.3),
-        x_lim   = length * l_frac,
-        y_lim   = height * (1.-w_frac);
-        
-        //
-        // now, remove elements that are outside of the L-bracket domain
-        //
-        libMesh::MeshBase::element_iterator
-        e_it   = mesh.elements_begin(),
-        e_end  = mesh.elements_end();
-        
-        for ( ; e_it!=e_end; e_it++) {
-            
-            libMesh::Elem* elem = *e_it;
-            x = length;
-            y = 0.;
-            for (uint_t i=0; i<elem->n_nodes(); i++) {
-                const libMesh::Node& n = elem->node_ref(i);
-                if (x > n(0)) x = n(0);
-                if (y < n(1)) y = n(1);
-            }
-            
-            //
-            // delete element if the lowest x,y locations are outside of the bracket
-            // domain
-            //
-            if (x >= x_lim && y<= y_lim)
-                mesh.delete_elem(elem);
-        }
-        
-        mesh.prepare_for_use();
-        
-        //
-        // add the two additional boundaries to the boundary info so that
-        // we can apply loads on them
-        //
-        bool
-        facing_right = false,
-        facing_down  = false;
-        
-        e_it   = mesh.elements_begin();
-        e_end  = mesh.elements_end();
-        
-        for ( ; e_it != e_end; e_it++) {
-            
-            libMesh::Elem* elem = *e_it;
-            
-            if (!elem->on_boundary()) continue;
-            
-            for (uint_t i=0; i<elem->n_sides(); i++) {
-                
-                if (elem->neighbor_ptr(i)) continue;
-                
-                std::unique_ptr<libMesh::Elem> s(elem->side_ptr(i).release());
-                
-                const libMesh::Point p = s->centroid();
-                
-                facing_right = true;
-                facing_down  = true;
-                for (uint_t j=0; j<s->n_nodes(); j++) {
-                    const libMesh::Node& n = s->node_ref(j);
-                    
-                    if (n(0) < x_lim ||  n(1) > y_lim) {
-                        facing_right = false;
-                        facing_down  = false;
-                    }
-                    else if (std::fabs(n(0) - p(0)) > tol)
-                        facing_right = false;
-                    else if (std::fabs(n(1) - p(1)) > tol)
-                        facing_down = false;
-                }
-                
-                if (facing_right) mesh.boundary_info->add_side(elem, i, 6);
-                if (facing_down) mesh.boundary_info->add_side(elem, i, 7);
-            }
-        }
-        
-        mesh.boundary_info->sideset_name(6) = "facing_right";
-        mesh.boundary_info->sideset_name(7) = "facing_down";
     }
 };
 
