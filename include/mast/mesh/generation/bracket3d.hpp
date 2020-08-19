@@ -213,7 +213,8 @@ struct Bracket3D {
                             if (i < nx*4/10 || j>=ny*6/10) {
                                 
                                 libMesh::Elem
-                                *elem = mesh.add_elem(libMesh::Elem::build_with_id(libMesh::HEX8, elem_id++).release());
+                                *elem = mesh.add_elem(libMesh::Elem::build(libMesh::HEX8).release());
+                                elem->set_id(elem_id++);
                                 elem->set_node(0) = nodes[idx(type,nx,ny,i,j,k)      ];
                                 elem->set_node(1) = nodes[idx(type,nx,ny,i+1,j,k)    ];
                                 elem->set_node(2) = nodes[idx(type,nx,ny,i+1,j+1,k)  ];
