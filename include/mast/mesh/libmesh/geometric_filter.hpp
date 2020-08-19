@@ -368,12 +368,13 @@ public:
             
             for ( ; vec_it != vec_end; vec_it++) {
                 
-                if (dvs.is_design_parameter(map_it->first))
+                if (dvs.is_design_parameter_index(map_it->first))
                     o
                     << " : " << std::setw(8) << vec_it->first
                     << " (" << std::setw(8) << vec_it->second << " )";
                 else
-                    std::cout << " : " << map_it->first;
+                    std::cout
+                    << " : " << std::setw(8) << map_it->first;
             }
             std::cout << std::endl;
         }
@@ -518,7 +519,7 @@ private:
                 
                 std::vector<std::pair<size_t, real_t>>
                 indices_dists;
-                indices_dists.push_back(std::pair<size_t, real_t>(dof_1, 0.));
+                indices_dists.push_back(std::pair<size_t, real_t>(node->id(), 0.));
                 /*nanoflann::RadiusResultSet<real_t, size_t>
                 resultSet(_radius*_radius, indices_dists);
                 
