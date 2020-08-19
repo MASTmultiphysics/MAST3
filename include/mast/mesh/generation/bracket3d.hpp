@@ -260,7 +260,8 @@ struct Bracket3D {
                         for (uint_t i=0; i<(2*nx); i += 2)
                         {
                             libMesh::Elem
-                            *elem = mesh.add_elem(libMesh::Elem::build_with_id(libMesh::HEX27, elem_id++).release());
+                            *elem = mesh.add_elem(libMesh::Elem::build(libMesh::HEX27).release());
+                            elem->set_id(elem_id++);
                             
                             elem->set_node(0)  = nodes[idx(type,nx,ny,i,  j,  k)  ];
                             elem->set_node(1)  = nodes[idx(type,nx,ny,i+2,j,  k)  ];
