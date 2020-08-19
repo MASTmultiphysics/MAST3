@@ -452,13 +452,6 @@ struct Bracket3D {
         real_t
         val     = 0.;
         
-        //
-        // all ranks will have DVs defined for all variables. So, we should be
-        // operating on a replicated mesh
-        //
-        //Assert0(c.mesh->is_replicated(),
-        //        "Function currently assumes replicated mesh");
-                
         // iterate over all the element values
         libMesh::MeshBase::const_node_iterator
         it  = c.mesh->local_nodes_begin(),
@@ -468,13 +461,12 @@ struct Bracket3D {
         // maximum number of dvs is the number of nodes on the level set function
         // mesh. We will evaluate the actual number of dvs
         //
-        //dvs.reserve(c.mesh->n_elem());
 
         for ( ; it!=end; it++) {
             
             const libMesh::Node& n = **it;
             
-            dof_id                     = n.dof_number(sys_num, 0, 0);
+            dof_id = n.dof_number(sys_num, 0, 0);
             
             if ((n(1)-filter_radius) <= y_lim &&
                 (n(0)+filter_radius) >= length*(1.-frac)) {
