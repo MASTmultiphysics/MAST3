@@ -195,7 +195,7 @@ public:
         filter.compute_reverse_filtered_values(dvs, v, v_filtered);
         
         // copy the results back to sense
-        for (uint_t i=0; i<param_dof_ids.size(); i++)
+        for (uint_t i=dvs.local_begin(); i<dvs.local_end(); i++)
             sens[i] = v_filtered[param_dof_ids[i]];
         
         MAST::Numerics::Utility::comm_sum(c.rho_sys->comm(), sens);
