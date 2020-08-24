@@ -213,8 +213,10 @@ struct Bracket3D {
                             if (i < nx*4/10 || j>=ny*6/10) {
                                 
                                 libMesh::Elem
-                                *elem = mesh.add_elem(libMesh::Elem::build(libMesh::HEX8).release());
+                                *elem = libMesh::Elem::build(libMesh::HEX8).release();
                                 elem->set_id(elem_id++);
+                                mesh.add_elem(elem);
+                                
                                 elem->set_node(0) = nodes[idx(type,nx,ny,i,j,k)      ];
                                 elem->set_node(1) = nodes[idx(type,nx,ny,i+1,j,k)    ];
                                 elem->set_node(2) = nodes[idx(type,nx,ny,i+1,j+1,k)  ];
@@ -260,8 +262,9 @@ struct Bracket3D {
                         for (uint_t i=0; i<(2*nx); i += 2)
                         {
                             libMesh::Elem
-                            *elem = mesh.add_elem(libMesh::Elem::build(libMesh::HEX27).release());
+                            *elem = libMesh::Elem::build(libMesh::HEX27).release();
                             elem->set_id(elem_id++);
+                            mesh.add_elem(elem);
                             
                             elem->set_node(0)  = nodes[idx(type,nx,ny,i,  j,  k)  ];
                             elem->set_node(1)  = nodes[idx(type,nx,ny,i+2,j,  k)  ];
@@ -455,14 +458,29 @@ struct Bracket3D {
         val     = 0.;
         
         // iterate over all the element values
-        libMesh::MeshBase::const_node_iterator
-        it  = c.mesh->local_nodes_begin(),
-        end = c.mesh->local_nodes_end();
+        //libMesh::MeshBase::const_node_iterator
+        //it  = c.mesh->local_nodes_begin(),
+        //end = c.mesh->local_nodes_end();
+
+        libMesh::MeshBase::const_element_iterator
+        e_it  = c.mesh->local_elements_begin(),
+        e_end = c.mesh->local_elements_end();
+
+        std::set<const libMesh::Node*> nodes;
+        
+        for ( ; e_it != e_end; e_it++) {
+            const libMesh::Elem* e = *e_it;
+            for (uint_t i=0; i<e->n_nodes(); i++)
+                nodes.insert(e->node_ptr(i));
+        }
         
         //
         // maximum number of dvs is the number of nodes on the level set function
         // mesh. We will evaluate the actual number of dvs
         //
+        std::set<const libMesh::Node*>::const_iterator
+        it  =  nodes.begin(),
+        end =  nodes.end();
 
         for ( ; it!=end; it++) {
             
@@ -486,12 +504,15 @@ struct Bracket3D {
                 *dv = new MAST::Optimization::DesignParameter<ScalarType>(vf);
                 dv->set_point(n(0), n(1), n(2));
 
-                MAST::Base::ParameterData
-                &data = dvs.add_topology_parameter(*dv, dof_id);
+                if (dof_id >= c.rho_sys->solution->first_local_index() &&
+                    dof_id <  c.rho_sys->solution->last_local_index())
+                    dvs.add_topology_parameter(*dv, dof_id);
+                else
+                    dvs.add_ghosted_topology_parameter(*dv, dof_id);
             }
         }
         
-        dvs.synchronize();
+        dvs.synchronize(c.rho_sys->get_dof_map());
         c.rho_sys->solution->close();
     }
 };
