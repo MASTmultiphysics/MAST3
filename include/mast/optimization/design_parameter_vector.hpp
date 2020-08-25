@@ -388,15 +388,11 @@ public:
         }
         
         // now, populate the parameters map
-        for (uint_t i=0; i<_local_parameters.size(); i++) {
+        for (uint_t i=0; i<_local_parameters.size(); i++)
             _parameters[_local_parameters[i]->id()] = _local_parameters[i];
-            //libMesh::out << _local_parameters[i]->id() << std::endl;
-        }
         
-        for (uint_t i=0; i<_ghosted_parameters.size(); i++) {
-            //_parameters[_ghosted_parameters[i]->id()] = _ghosted_parameters[i];
-            //libMesh::out << _ghosted_parameters[i]->id() << std::endl;
-        }
+        for (uint_t i=0; i<_ghosted_parameters.size(); i++)
+            _parameters[_ghosted_parameters[i]->id()] = _ghosted_parameters[i];
 
         
         // we don't need these any more, so we clear them.
