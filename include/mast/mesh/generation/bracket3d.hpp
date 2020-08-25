@@ -451,8 +451,10 @@ struct Bracket3D {
         vf            = c.input("volume_fraction", "upper limit for the volume fraction", 0.2);
         
         uint_t
-        sys_num = c.rho_sys->number(),
-        dof_id  = 0;
+        sys_num   = c.rho_sys->number(),
+        first_dof = c.rho_sys->get_dof_map().first_dof(c.rho_sys->comm().rank()),
+        end_dof   = c.rho_sys->get_dof_map().end_dof(c.rho_sys->comm().rank()),
+        dof_id    = 0;
         
         real_t
         val     = 0.;
@@ -469,46 +471,46 @@ struct Bracket3D {
         std::set<const libMesh::Node*> nodes;
         
         for ( ; e_it != e_end; e_it++) {
+            
             const libMesh::Elem* e = *e_it;
-            for (uint_t i=0; i<e->n_nodes(); i++)
-                nodes.insert(e->node_ptr(i));
-        }
-        
-        //
-        // maximum number of dvs is the number of nodes on the level set function
-        // mesh. We will evaluate the actual number of dvs
-        //
-        std::set<const libMesh::Node*>::const_iterator
-        it  =  nodes.begin(),
-        end =  nodes.end();
+            
+            for (uint_t i=0; i<e->n_nodes(); i++) {
 
-        for ( ; it!=end; it++) {
-            
-            const libMesh::Node& n = **it;
-            
-            dof_id = n.dof_number(sys_num, 0, 0);
-            
-            if ((n(1)-filter_radius) <= y_lim &&
-                (n(0)+filter_radius) >= length*(1.-frac)) {
+                const libMesh::Node& n = *e->node_ptr(i);
                 
-                //
-                // set value at the constrained points to be solid material
-                //
-                if (dof_id >= c.rho_sys->solution->first_local_index() &&
-                    dof_id <  c.rho_sys->solution->last_local_index())
-                    c.rho_sys->solution->set(dof_id, 1.e0);
-            }
-            else {
+                // if we have alredy operated on this node, then
+                // we skip it
+                if (nodes.count(&n))
+                    continue;
                 
-                MAST::Optimization::DesignParameter<ScalarType>
-                *dv = new MAST::Optimization::DesignParameter<ScalarType>(vf);
-                dv->set_point(n(0), n(1), n(2));
-
-                if (dof_id >= c.rho_sys->solution->first_local_index() &&
-                    dof_id <  c.rho_sys->solution->last_local_index())
-                    dvs.add_topology_parameter(*dv, dof_id);
-                else
-                    dvs.add_ghosted_topology_parameter(*dv, dof_id);
+                // otherwise, we add it to the set of operated nodes and
+                // check if a design parameter should be computed for this
+                nodes.insert(&n);
+                
+                dof_id = n.dof_number(sys_num, 0, 0);
+                
+                if ((n(1)-filter_radius) <= y_lim &&
+                    (n(0)+filter_radius) >= length*(1.-frac)) {
+                    
+                    //
+                    // set value at the constrained points to be solid material
+                    //
+                    if (dof_id >= first_dof &&
+                        dof_id <  end_dof)
+                        c.rho_sys->solution->set(dof_id, 1.e0);
+                }
+                else {
+                    
+                    MAST::Optimization::DesignParameter<ScalarType>
+                    *dv = new MAST::Optimization::DesignParameter<ScalarType>(vf);
+                    dv->set_point(n(0), n(1), n(2));
+                    
+                    if (dof_id >= first_dof &&
+                        dof_id <  end_dof)
+                        dvs.add_topology_parameter(*dv, dof_id);
+                    else
+                        dvs.add_ghosted_topology_parameter(*dv, dof_id);
+                }
             }
         }
         
