@@ -155,8 +155,6 @@ public:
             
             density_accessor.init_dof_id_set(density_dofs);
             
-            dres_e.setZero(sol_accessor.n_dofs());
-
             it     = dv_id_map.begin();
             dv_idx = 0;
             
@@ -182,6 +180,8 @@ public:
                         }
                     }
                     
+                    dres_e.setZero(sol_accessor.n_dofs());
+
                     // first we compute the partial derivative of the
                     // residual wrt the parameter.
                     _e_ops->derivative(c,
@@ -215,7 +215,6 @@ public:
         it = dv_id_map.begin();
         dv_idx = 0;
         
-        //if (c.mesh->comm().rank() == 0)
         for ( ; it != end; it++)
             sens[it->first] = v_filtered[param_dof_ids[dv_idx++]];
         
