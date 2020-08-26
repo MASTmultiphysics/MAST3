@@ -26,8 +26,9 @@
 #include <mast/base/parameter_data.hpp>
 #include <mast/optimization/design_parameter.hpp>
 
-// TIMPI includes
+// libMesh includes
 #include <libmesh/parallel.h>
+#include <libmesh/dof_map.h>
 
 namespace MAST {
 namespace Optimization {
@@ -37,6 +38,9 @@ template <typename ScalarType>
 class DesignParameterVector {
     
 public:
+    
+    using dv_id_param_map_t = std::map<uint_t, MAST::Optimization::DesignParameter<ScalarType>*>;
+    
 
     DesignParameterVector(const libMesh::Parallel::Communicator  &comm):
     _comm    (comm)
@@ -45,13 +49,24 @@ public:
     
     virtual ~DesignParameterVector() {
         
-        typename std::map<const MAST::Optimization::DesignParameter<ScalarType>*,
-                          MAST::Base::ParameterData*>::iterator
-        it   = _data.begin(),
-        end  = _data.end();
-
-        for (; it != end; it++)
-            delete it->second;
+        {
+            typename std::map<const MAST::Optimization::DesignParameter<ScalarType>*,
+            MAST::Base::ParameterData*>::iterator
+            it   = _data.begin(),
+            end  = _data.end();
+            
+            for (; it != end; it++)
+                delete it->second;
+        }
+        
+        {
+            typename std::map<uint_t, MAST::Optimization::DesignParameter<ScalarType>*>::iterator
+            it   = _parameters.begin(),
+            end  = _parameters.end();
+            
+            for (; it != end; it++)
+                delete it->second;
+        }
     }
     
     
@@ -85,40 +100,41 @@ public:
     inline MAST::Optimization::DesignParameter<ScalarType>&
     operator[](uint_t i) {
         
-        Assert2(i >= _rank_begin_index[_comm.rank()],
-                i, _rank_begin_index[_comm.rank()],
-                "Invalid parameter index for rank");
+        typename std::map<uint_t, MAST::Optimization::DesignParameter<ScalarType>*>::iterator
+        it   = _parameters.find(i);
+        
+        Assert0(it != _parameters.end(), "Invalid parameter index for rank");
 
-        Assert2(i < _rank_end_index[_comm.rank()],
-                i, _rank_end_index[_comm.rank()],
-                "Invalid parameter index for rank");
-
-        return *_parameters[i-_rank_begin_index[_comm.rank()]];
+        return *it->second;
     }
 
     
+    
+    inline const MAST::Optimization::DesignParameter<ScalarType>&
+    operator[](uint_t i) const {
+
+        typename std::map<uint_t, MAST::Optimization::DesignParameter<ScalarType>*>::const_iterator
+        it   = _parameters.find(i);
+        
+        Assert0(it != _parameters.end(), "Invalid parameter index for rank");
+
+        return *it->second;
+    }
+
+    
+    inline const dv_id_param_map_t& get_dv_map() const {
+        
+        return _parameters;
+    }
+    
+
     inline bool
     is_design_parameter_index(const uint_t i) const {
         
         return _dv_index.count(i);
     }
     
-    
-    inline const MAST::Optimization::DesignParameter<ScalarType>&
-    operator[](uint_t i) const {
 
-        Assert2(i >= _rank_begin_index[_comm.rank()],
-                i, _rank_begin_index[_comm.rank()],
-                "Invalid parameter index for rank");
-
-        Assert2(i < _rank_end_index[_comm.rank()],
-                i, _rank_end_index[_comm.rank()],
-                "Invalid parameter index for rank");
-        
-        return *_parameters[i-_rank_begin_index[_comm.rank()]];
-    }
-
-    
     template <typename T>
     inline T get_parameter_for_dv(uint_t i, const std::string& nm) const {
         
@@ -136,7 +152,7 @@ public:
         
         Assert0(it == _data.end(), "Parameter already exists");
         
-        _parameters.push_back(&p);
+        _local_parameters.push_back(&p);
         
         MAST::Base::ParameterData* d = new MAST::Base::ParameterData;
         _data[&p] = d;
@@ -160,7 +176,30 @@ public:
         
         Assert0(it == _data.end(), "Parameter already exists");
         
-        _parameters.push_back(&p);
+        _local_parameters.push_back(&p);
+        
+        MAST::Base::ParameterData* d = new MAST::Base::ParameterData;
+        _data[&p] = d;
+
+        d->add<int>("dof_id") = id;
+        _dv_index.insert(id);
+
+        return *d;
+    }
+
+    
+    inline MAST::Base::ParameterData&
+    add_ghosted_topology_parameter(MAST::Optimization::DesignParameter<ScalarType>& p,
+                                   const uint_t id) {
+
+        // make sure this does not exist
+        typename std::map<const MAST::Optimization::DesignParameter<ScalarType>*,
+                          MAST::Base::ParameterData*>::iterator
+        it   = _data.find(&p);
+        
+        Assert0(it == _data.end(), "Parameter already exists");
+        
+        _ghosted_parameters.push_back(&p);
         
         MAST::Base::ParameterData* d = new MAST::Base::ParameterData;
         _data[&p] = d;
@@ -171,6 +210,7 @@ public:
         return *d;
     }
 
+    
     
     inline const MAST::Base::ParameterData&
     get_data_for_parameter(const MAST::Optimization::DesignParameter<ScalarType>& p) const {
@@ -199,10 +239,10 @@ public:
         return *it->second;
     }
 
-    inline void synchronize() {
+    inline void synchronize(const libMesh::DofMap &dof_map) {
         
         Assert0(!_rank_begin_index.size(), "Data already synchronized");
-        Assert0(_parameters.size(), "Parameters not initialized on this rank");
+        Assert0(_local_parameters.size(), "Parameters not initialized on this rank");
 
         std::vector<int_t>
         rank_dvs(_comm.size(), 0);
@@ -211,7 +251,7 @@ public:
         _rank_end_index.resize(_comm.size());
 
         // initialize the number of DVs for the current rank
-        rank_dvs[_comm.rank()] = _parameters.size();
+        rank_dvs[_comm.rank()] = _local_parameters.size();
         
         // now obtain these values from each rank
         _comm.sum(rank_dvs);
@@ -225,12 +265,147 @@ public:
             _rank_begin_index[i]  = _rank_begin_index[i-1] + rank_dvs[i-1];
             _rank_end_index[i]    = _rank_end_index[i-1]   + rank_dvs[i];
         }
+
+        // assign the DV Ids and populate the DofID map
+        uint_t
+        dof_id = 0,
+        owner  = 0;
+
+        std::map<uint_t, uint_t>
+        dof_id_to_dv_id_map;
+
+        std::map<uint_t, MAST::Optimization::DesignParameter<ScalarType>*>
+        dof_to_ghost_param_map;
+        
+        for (uint_t i=0; i<_local_parameters.size(); i++) {
+            
+            dof_id = this->get_data_for_parameter(*_local_parameters[i]).template get<int>("dof_id");
+            _local_parameters[i]->set_id(_rank_begin_index[_comm.rank()]+i);
+            dof_id_to_dv_id_map[dof_id] = _local_parameters[i]->id();
+        }
+            
+        
+        // ghosted dofs indices needed from each rank
+        std::vector<std::vector<uint_t>>
+        ghosted_indices_on_rank_send(_comm.size()),
+        ghosted_indices_on_rank_recv(_comm.size()),
+        ghosted_dv_id_on_rank_recv(_comm.size());
+        
+        // figure out the DV IDs for the ghosted parameters
+        for (uint_t i=0; i<_ghosted_parameters.size(); i++) {
+            
+            dof_id = this->get_data_for_parameter(*_ghosted_parameters[i]).template get<int>("dof_id");
+            owner  = dof_map.dof_owner(dof_id);
+            
+            dof_to_ghost_param_map[dof_id] = _ghosted_parameters[i];
+            ghosted_indices_on_rank_send[owner].push_back(dof_id);
+        }
+        
+        // now ask respective processors for the indices
+        for (uint_t i=0; i<_comm.size(); i++) {
+            
+            for (uint_t j=0; j<_comm.size(); j++) {
+                
+                if ( i != j) {
+                    
+                    // send to the j^th processor if it is my turn,
+                    // else, receive from the ith processor
+                    if (i == _comm.rank())
+                        _comm.send(j, ghosted_indices_on_rank_send[j]);
+                    else if (j == _comm.rank())
+                        _comm.receive(i, ghosted_indices_on_rank_recv[i]);
+                }
+            }
+        }
+        
+        // now that we have received all the dof indices, we are going to send
+        // back to the respective processor the DV id that corresponds to the
+        // dof indices.
+        
+
+        for (uint_t i=0; i<_comm.size(); i++) {
+            
+            for (uint_t k=0; k<ghosted_indices_on_rank_recv[i].size(); k++) {
+                
+                // make sure that the indices are all local
+                Assert2(ghosted_indices_on_rank_recv[i][k]
+                        >= dof_map.first_dof(_comm.rank()),
+                        ghosted_indices_on_rank_recv[i][k],
+                        dof_map.first_dof(_comm.rank()),
+                        "Requested dof does not belong to this processor");
+                Assert2(ghosted_indices_on_rank_recv[i][k]
+                        < dof_map.end_dof(_comm.rank()),
+                        ghosted_indices_on_rank_recv[i][k],
+                        dof_map.end_dof(_comm.rank()),
+                        "Requested dof does not belong to this processor");
+                
+                // now identify the DV Id number for these dofs
+                std::map<uint_t, uint_t>::const_iterator
+                it  = dof_id_to_dv_id_map.find(ghosted_indices_on_rank_recv[i][k]);
+                
+                Assert0(it != dof_id_to_dv_id_map.end(),
+                        "No DV Id found for this dof id");
+                
+                ghosted_indices_on_rank_recv[i][k] = it->second;
+            }
+        }
+        
+        // now we communicate this information back to the processors
+        for (uint_t i=0; i<_comm.size(); i++) {
+            
+            for (uint_t j=0; j<_comm.size(); j++) {
+                
+                if (( i == _comm.rank() && ghosted_indices_on_rank_recv[j].size()) ||
+                    ( j == _comm.rank() && ghosted_indices_on_rank_send[i].size())) {
+                    
+                    // send to the i^th processor if it is my turn,
+                    // else, receive from the j^th processor
+                    if (i == _comm.rank())
+                        _comm.send(j, ghosted_indices_on_rank_recv[j]);
+                    else if (j == _comm.rank()) {
+                        
+                        _comm.receive(i, ghosted_dv_id_on_rank_recv[i]);
+
+                        Assert2(ghosted_indices_on_rank_send[i].size() ==
+                                ghosted_dv_id_on_rank_recv[i].size(),
+                                ghosted_indices_on_rank_send[i].size(),
+                                ghosted_dv_id_on_rank_recv[i].size(),
+                                "Dof and DV ID map sizes must be same");
+                        
+                        uint_t
+                        dof_id = 0,
+                        dv_id  = 0;
+                        
+                        for (uint_t k=0; k<ghosted_dv_id_on_rank_recv[i].size(); k++) {
+
+                            dof_id = ghosted_indices_on_rank_send[i][k];
+                            dv_id  = ghosted_dv_id_on_rank_recv[i][k];
+                            dof_to_ghost_param_map[dof_id]->set_id(dv_id);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // now, populate the parameters map
+        for (uint_t i=0; i<_local_parameters.size(); i++)
+            _parameters[_local_parameters[i]->id()] = _local_parameters[i];
+        
+        for (uint_t i=0; i<_ghosted_parameters.size(); i++)
+            _parameters[_ghosted_parameters[i]->id()] = _ghosted_parameters[i];
+
+        
+        // we don't need these any more, so we clear them.
+        _local_parameters.clear();
+        _ghosted_parameters.clear();
     }
     
 private:
     
-    const libMesh::Parallel::Communicator&                           _comm;
-    std::vector<MAST::Optimization::DesignParameter<ScalarType>*>    _parameters;
+    const libMesh::Parallel::Communicator&                             _comm;
+    std::map<uint_t, MAST::Optimization::DesignParameter<ScalarType>*> _parameters;
+    std::vector<MAST::Optimization::DesignParameter<ScalarType>*>      _local_parameters;
+    std::vector<MAST::Optimization::DesignParameter<ScalarType>*>      _ghosted_parameters;
     std::map<const MAST::Optimization::DesignParameter<ScalarType>*,
              MAST::Base::ParameterData*> _data;
     std::set<uint_t>                     _dv_index;

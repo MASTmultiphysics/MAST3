@@ -273,10 +273,6 @@ public:
         
         const libMesh::DofMap
         &dof_map = _system.get_dof_map();
-
-        const uint_t
-        first_local_dof = _system.get_dof_map().first_dof(_system.comm().rank()),
-        last_local_dof  = _system.get_dof_map().end_dof(_system.comm().rank());
         
         std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>::const_iterator
         map_it   = _reverse_map.begin(),

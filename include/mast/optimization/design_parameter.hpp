@@ -34,12 +34,17 @@ public:
     using scalar_t = ScalarType;
     
     DesignParameter(ScalarType v = 0.):
-    MAST::Base::ScalarConstant<ScalarType>  (v) {
+    MAST::Base::ScalarConstant<ScalarType>  (v),
+    _id    (-1) {
 
         _point.setZero();
     }
     
     virtual ~DesignParameter() { }
+
+    inline void set_id(uint_t i) { _id = i;}
+
+    inline uint_t id() const { return _id;}
 
     inline void set_point(real_t     x,
                           real_t     y = 0.,
@@ -53,6 +58,9 @@ public:
     inline const Eigen::Matrix<real_t, 3, 1>& point() const { return _point;}
 
 private:
+    
+    // ID of the design parameter
+    uint_t                        _id;
     
     /// point to which this parameter is attached
     Eigen::Matrix<real_t, 3, 1>  _point;
