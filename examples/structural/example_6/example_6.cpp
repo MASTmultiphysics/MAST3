@@ -694,11 +694,6 @@ public:
         std::ostringstream oss;
         oss << "output_optim.e-s." << std::setfill('0') << std::setw(5) << iter ;
         
-        std::vector<bool> eval_grads(this->n_ineq(), false);
-        std::vector<real_t> f(this->n_ineq(), 0.), grads;
-        
-        this->evaluate(dvars, o, false, grads, f, eval_grads, grads);
-
         _c.sys->time = iter;
         libMesh::Nemesis_IO writer(*_c.mesh);
         // "1" is the number of time-steps in the file,
@@ -711,7 +706,7 @@ public:
                                                             iter,
                                                             dvars,
                                                             o,
-                                                            f);
+                                                            fvals);
 
     }
     
