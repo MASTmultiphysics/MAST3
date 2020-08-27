@@ -95,9 +95,6 @@ public:
         const uint_t
         n_density_dofs = c.rho_sys->n_dofs();
 
-        uint_t
-        dv_idx = 0;
-
         MAST::Numerics::Utility::setZero(sens);
         std::vector<ScalarType>
         v (n_density_dofs, ScalarType()),
@@ -118,25 +115,10 @@ public:
         elem_vector_t
         dres_e,
         drho;
-        
-        
-        // cache values for later use
-        const typename MAST::Optimization::DesignParameterVector<ScalarType>::dv_id_param_map_t
-        &dv_id_map = dvs.get_dv_map();
-        
-        std::vector<uint_t>
-        param_dof_ids;
-        param_dof_ids.reserve(dv_id_map.size());
-        
-        typename MAST::Optimization::DesignParameterVector<ScalarType>::dv_id_param_map_t::const_iterator
-        it   = dv_id_map.begin(),
-        end  = dv_id_map.end();
-                
-        for ( ; it != end; it++)
-            param_dof_ids.push_back(dvs.get_data_for_parameter(*it->second).template get<int>("dof_id"));
-        
-        std::set<uint_t> density_dofs;
-        
+
+        uint_t
+        idx = 0;
+
         libMesh::MeshBase::const_element_iterator
         el     = c.mesh->active_local_elements_begin(),
         end_el = c.mesh->active_local_elements_end();
@@ -153,70 +135,66 @@ public:
             density_accessor.init(*c.elem);
             adj_accessor.init(*c.elem);
             
-            density_accessor.init_dof_id_set(density_dofs);
-            
-            it     = dv_id_map.begin();
-            dv_idx = 0;
-            
-            for ( ; it != end; it++) {
+            const std::vector<libMesh::dof_id_type>
+            &density_dof_ids = density_accessor.dof_indices();
+
+            for (uint_t i=0; i<c.elem->n_nodes(); i++) {
                 
                 // this assumes that if the DV (which is associated with a node)
                 // is connected to this element, then the dof_indices for this
                 // element will contain this index. If not, then the contribution
                 // of this element to the sensitivity is zero.
-                if (density_dofs.count(param_dof_ids[dv_idx])) {
+                idx    = dvs.get_dv_id_for_topology_dof(density_dof_ids[i]);
+                const MAST::Optimization::DesignParameter<ScalarType>
+                &dv    = dvs[idx];
                 
-                    const std::vector<libMesh::dof_id_type>
-                    &density_dof_ids = density_accessor.dof_indices();
-                    
-                    // set a unit value of density sensitivity
-                    // for this dof
-                    drho.setZero(density_dof_ids.size());
-                    for (uint_t j=0; j<density_dof_ids.size(); j++) {
-                        
-                        if (density_dof_ids[j] == param_dof_ids[dv_idx]) {
-                            drho(j) = 1.;
-                            break;
-                        }
-                    }
-                    
-                    dres_e.setZero(sol_accessor.n_dofs());
-
-                    // first we compute the partial derivative of the
-                    // residual wrt the parameter.
-                    _e_ops->derivative(c,
-                                       *it->second,
-                                       sol_accessor,
-                                       density_accessor,
-                                       drho,
-                                       dres_e,
-                                       nullptr);
-                    
-                    // next, we compute the partial derivative derivative of
-                    // the output functional and add it to the sensitivity result
-                    v[param_dof_ids[dv_idx]] += _output_e_ops->derivative(c,
-                                                                          *it->second,
-                                                                          sol_accessor,
-                                                                          density_accessor,
-                                                                          drho);
-                    // finally, the adjoint vector is combined with the
-                    // residual sensitivity to compute the result.
-                    v[param_dof_ids[dv_idx]] += adj_accessor.dot(dres_e);
-                }
+                // set a unit value of density sensitivity
+                // for this dof
+                drho.setZero(density_dof_ids.size());
+                drho(i) = 1.;
                 
-                dv_idx++;
+                dres_e.setZero(sol_accessor.n_dofs());
+                
+                // first we compute the partial derivative of the
+                // residual wrt the parameter.
+                _e_ops->derivative(c,
+                                   dv,
+                                   sol_accessor,
+                                   density_accessor,
+                                   drho,
+                                   dres_e,
+                                   nullptr);
+                
+                // next, we compute the partial derivative derivative of
+                // the output functional and add it to the sensitivity result
+                v[density_dof_ids[i]] += _output_e_ops->derivative(c,
+                                                                   dv,
+                                                                   sol_accessor,
+                                                                   density_accessor,
+                                                                   drho);
+                // finally, the adjoint vector is combined with the
+                // residual sensitivity to compute the result.
+                v[density_dof_ids[i]] += adj_accessor.dot(dres_e);
             }
         }
         
         // Now, combine the sensitivty with the filtering data
         filter.compute_reverse_filtered_values(dvs, v, v_filtered);
         v_filtered = v;
-        // copy the results back to sense
-        it = dv_id_map.begin();
-        dv_idx = 0;
+
+        // copy the results back to sens
+        const typename MAST::Optimization::DesignParameterVector<ScalarType>::dv_id_param_map_t
+        &dv_id_map = dvs.get_dv_map();
         
-        for ( ; it != end; it++)
-            sens[it->first] = v_filtered[param_dof_ids[dv_idx++]];
+        typename MAST::Optimization::DesignParameterVector<ScalarType>::dv_id_param_map_t::const_iterator
+        it   = dv_id_map.begin(),
+        end  = dv_id_map.end();
+                
+        for ( ; it != end; it++) {
+            
+            idx = dvs.get_data_for_parameter(*it->second).template get<int>("dof_id");
+            sens[it->first] = v_filtered[idx];
+        }
         
         MAST::Numerics::Utility::comm_sum(c.rho_sys->comm(), sens);
     }

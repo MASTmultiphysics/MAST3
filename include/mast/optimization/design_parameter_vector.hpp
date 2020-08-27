@@ -128,6 +128,19 @@ public:
     }
     
 
+    inline uint_t get_dv_id_for_topology_dof(const uint_t id) const {
+    
+        std::map<uint_t, uint_t>::const_iterator
+        it  = _dof_id_to_dv_id_map.find(id);
+        
+        Assert1(it != _dof_id_to_dv_id_map.end(),
+                id, "dof ID not in this vector");
+        
+        return it->second;
+    }
+    
+    
+    
     inline bool
     is_design_parameter_index(const uint_t i) const {
         
@@ -271,9 +284,6 @@ public:
         dof_id = 0,
         owner  = 0;
 
-        std::map<uint_t, uint_t>
-        dof_id_to_dv_id_map;
-
         std::map<uint_t, MAST::Optimization::DesignParameter<ScalarType>*>
         dof_to_ghost_param_map;
         
@@ -281,7 +291,7 @@ public:
             
             dof_id = this->get_data_for_parameter(*_local_parameters[i]).template get<int>("dof_id");
             _local_parameters[i]->set_id(_rank_begin_index[_comm.rank()]+i);
-            dof_id_to_dv_id_map[dof_id] = _local_parameters[i]->id();
+            _dof_id_to_dv_id_map[dof_id] = _local_parameters[i]->id();
         }
             
         
@@ -341,9 +351,9 @@ public:
                 
                 // now identify the DV Id number for these dofs
                 std::map<uint_t, uint_t>::const_iterator
-                it  = dof_id_to_dv_id_map.find(ghosted_indices_on_rank_recv[i][k]);
+                it  = _dof_id_to_dv_id_map.find(ghosted_indices_on_rank_recv[i][k]);
                 
-                Assert0(it != dof_id_to_dv_id_map.end(),
+                Assert0(it != _dof_id_to_dv_id_map.end(),
                         "No DV Id found for this dof id");
                 
                 ghosted_indices_on_rank_recv[i][k] = it->second;
@@ -381,6 +391,9 @@ public:
                             dof_id = ghosted_indices_on_rank_send[i][k];
                             dv_id  = ghosted_dv_id_on_rank_recv[i][k];
                             dof_to_ghost_param_map[dof_id]->set_id(dv_id);
+                            
+                            // also store this information in the map
+                            _dof_id_to_dv_id_map[dof_id] = dv_id;
                         }
                     }
                 }
@@ -409,6 +422,7 @@ private:
     std::map<const MAST::Optimization::DesignParameter<ScalarType>*,
              MAST::Base::ParameterData*> _data;
     std::set<uint_t>                     _dv_index;
+    std::map<uint_t, uint_t>             _dof_id_to_dv_id_map;
     std::vector<uint_t>                  _rank_begin_index;
     std::vector<uint_t>                  _rank_end_index;
 };
