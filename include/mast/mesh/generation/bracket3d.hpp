@@ -459,11 +459,6 @@ struct Bracket3D {
         real_t
         val     = 0.;
         
-        // iterate over all the element values
-        //libMesh::MeshBase::const_node_iterator
-        //it  = c.mesh->local_nodes_begin(),
-        //end = c.mesh->local_nodes_end();
-
         libMesh::MeshBase::const_element_iterator
         e_it  = c.mesh->local_elements_begin(),
         e_end = c.mesh->local_elements_end();

@@ -539,13 +539,10 @@ public:
         // will be overwritten in \p rho_base.
         *rho_base = 1.;
         
-        for (uint_t i=_dvs->local_begin(); i<_dvs->local_end(); i++) {
-            
-            uint_t dof_id = _dvs->template get_parameter_for_dv<int>(i, "dof_id");
-            
-            if (dof_id >= first_local_rho && dof_id <  last_local_rho)
-                rho_base->set(dof_id, x[i]);
-        }
+
+        for (uint_t i=_dvs->local_begin(); i<_dvs->local_end(); i++)
+            rho_base->set(_dvs->get_data_for_parameter((*_dvs)[i]).template get<int>("dof_id"),
+                          x[i]);
         rho_base->close();
         
         _c.ex_init.filter->template compute_filtered_values
@@ -687,12 +684,6 @@ public:
             for (uint_t i=0; i<grads.size(); i++)
                 grads[i] /= _volume;
         }
-        
-        //
-        // also the stress data for plotting
-        //
-        //_Ef->set_penalty_val(stress_penalty);
-        //stress_assembly.update_stress_strain_data(stress, *_sys->solution);
     }
     
     inline void output(const uint_t                iter,
