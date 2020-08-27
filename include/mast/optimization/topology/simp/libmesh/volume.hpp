@@ -107,9 +107,6 @@ public:
         const uint_t
         n_density_dofs = c.rho_sys->n_dofs();
 
-        uint_t
-        dv_idx  = 0;
-
         MAST::Numerics::Utility::setZero(sens);
         std::vector<ScalarType>
         v (n_density_dofs, ScalarType()),
@@ -120,57 +117,34 @@ public:
         typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, VecType>
         density_accessor (*c.rho_sys, density);
 
-        // cache values for later use
-        const typename MAST::Optimization::DesignParameterVector<ScalarType>::dv_id_param_map_t
-        &dv_id_map = dvs.get_dv_map();
-        
-        std::vector<uint_t>
-        param_dof_ids;
-        param_dof_ids.reserve(dv_id_map.size());
-        
-        typename MAST::Optimization::DesignParameterVector<ScalarType>::dv_id_param_map_t::const_iterator
-        it   = dv_id_map.begin(),
-        end  = dv_id_map.end();
-                
-        for ( ; it != end; it++)
-            param_dof_ids.push_back(dvs.get_data_for_parameter(*it->second).template get<int>("dof_id"));
-
-        std::set<uint_t> density_dofs;
-        
         libMesh::MeshBase::const_element_iterator
         el     = c.mesh->active_local_elements_begin(),
         end_el = c.mesh->active_local_elements_end();
         
         // first compute the sensitivity information assuming unfiltered
         // density variables.
+        real_t
+        e_vol = 0.;
+        
         for ( ; el != end_el; ++el) {
             
             // set element in the context, which will be used for
             // the initialization routines
             c.elem = *el;
+            e_vol  = c.elem->volume();
             
             density_accessor.init(*c.elem);
-            density_accessor.init_dof_id_set(density_dofs);
 
-            it     = dv_id_map.begin();
-            dv_idx = 0;
+            const std::vector<libMesh::dof_id_type>
+            &density_dof_ids = density_accessor.dof_indices();
 
-            for ( ; it != end; it++) {
-                
-                // this assumes that if the DV (which is associated with a node)
-                // is connected to this element, then the dof_indices for this
-                // element will contain this index. If not, then the contribution
-                // of this element to the sensitivity is zero.
-                if (density_dofs.count(param_dof_ids[dv_idx])) {
-                
-                    // each density coefficient shoudl appear only once
-                    // for each element. So, if the dof was found for this
-                    // element, then we will simply set the element sensitivity
-                    // to be the averaged value
-                    v[param_dof_ids[dv_idx]]  +=  c.elem->volume()/(1. * c.elem->n_nodes());
-                }
-                
-                dv_idx++;
+            for (uint_t i=0; i<c.elem->n_nodes(); i++) {
+
+                // each density coefficient shoudl appear only once
+                // for each element. So, if the dof was found for this
+                // element, then we will simply set the element sensitivity
+                // to be the averaged value
+                v[density_dof_ids[i]]  +=  e_vol/(1. * c.elem->n_nodes());
             }
         }
         
@@ -178,12 +152,22 @@ public:
         filter.compute_reverse_filtered_values(dvs, v, v_filtered);
         v_filtered = v;
         
-        // copy the results back to sense
-        it = dv_id_map.begin();
-        dv_idx = 0;
+        // copy the results back to sens
+        const typename MAST::Optimization::DesignParameterVector<ScalarType>::dv_id_param_map_t
+        &dv_id_map = dvs.get_dv_map();
+        
+        typename MAST::Optimization::DesignParameterVector<ScalarType>::dv_id_param_map_t::const_iterator
+        it   = dv_id_map.begin(),
+        end  = dv_id_map.end();
 
-        for ( ; it != end; it++)
-            sens[it->first] = v_filtered[param_dof_ids[dv_idx++]];
+        uint_t
+        idx  = 0;
+
+        for ( ; it != end; it++) {
+            
+            idx = dvs.get_data_for_parameter(*it->second).template get<int>("dof_id");
+            sens[it->first] = v_filtered[idx];
+        }
 
         MAST::Numerics::Utility::comm_sum(c.rho_sys->comm(), sens);
     }

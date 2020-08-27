@@ -182,7 +182,7 @@ public:
         filter.compute_reverse_filtered_values(dvs, v, v_filtered);
         v_filtered = v;
 
-        // copy the results back to sense
+        // copy the results back to sens
         const typename MAST::Optimization::DesignParameterVector<ScalarType>::dv_id_param_map_t
         &dv_id_map = dvs.get_dv_map();
         
