@@ -107,6 +107,9 @@ public:
         const uint_t
         n_density_dofs = c.rho_sys->n_dofs();
 
+        uint_t
+        dv_idx  = 0;
+
         MAST::Numerics::Utility::setZero(sens);
         std::vector<ScalarType>
         v (n_density_dofs, ScalarType()),
@@ -117,13 +120,21 @@ public:
         typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, VecType>
         density_accessor (*c.rho_sys, density);
 
-        std::vector<uint_t>
-        param_dof_ids(dvs.size());
-        
         // cache values for later use
-        for (uint_t i=dvs.local_begin(); i<dvs.local_end(); i++)
-            param_dof_ids[i] = dvs.get_data_for_parameter(dvs[i]).template get<int>("dof_id");
+        const typename MAST::Optimization::DesignParameterVector<ScalarType>::dv_id_param_map_t
+        &dv_id_map = dvs.get_dv_map();
         
+        std::vector<uint_t>
+        param_dof_ids;
+        param_dof_ids.reserve(dv_id_map.size());
+        
+        typename MAST::Optimization::DesignParameterVector<ScalarType>::dv_id_param_map_t::const_iterator
+        it   = dv_id_map.begin(),
+        end  = dv_id_map.end();
+                
+        for ( ; it != end; it++)
+            param_dof_ids.push_back(dvs.get_data_for_parameter(*it->second).template get<int>("dof_id"));
+
         std::set<uint_t> density_dofs;
         
         libMesh::MeshBase::const_element_iterator
@@ -141,29 +152,38 @@ public:
             density_accessor.init(*c.elem);
             density_accessor.init_dof_id_set(density_dofs);
 
-            for (uint_t i=dvs.local_begin(); i<dvs.local_end(); i++) {
+            it     = dv_id_map.begin();
+            dv_idx = 0;
+
+            for ( ; it != end; it++) {
                 
                 // this assumes that if the DV (which is associated with a node)
                 // is connected to this element, then the dof_indices for this
                 // element will contain this index. If not, then the contribution
                 // of this element to the sensitivity is zero.
-                if (density_dofs.count(param_dof_ids[i])) {
+                if (density_dofs.count(param_dof_ids[dv_idx])) {
                 
                     // each density coefficient shoudl appear only once
                     // for each element. So, if the dof was found for this
                     // element, then we will simply set the element sensitivity
                     // to be the averaged value
-                    v[param_dof_ids[i]]  +=  c.elem->volume()/(1. * c.elem->n_nodes());
+                    v[param_dof_ids[dv_idx]]  +=  c.elem->volume()/(1. * c.elem->n_nodes());
                 }
+                
+                dv_idx++;
             }
         }
         
         // Now, combine the sensitivty with the filtering data
         filter.compute_reverse_filtered_values(dvs, v, v_filtered);
-
+        v_filtered = v;
+        
         // copy the results back to sense
-        for (uint_t i=dvs.local_begin(); i<dvs.local_end(); i++)
-            sens[i] = v_filtered[param_dof_ids[i]];
+        it = dv_id_map.begin();
+        dv_idx = 0;
+
+        for ( ; it != end; it++)
+            sens[it->first] = v_filtered[param_dof_ids[dv_idx++]];
 
         MAST::Numerics::Utility::comm_sum(c.rho_sys->comm(), sens);
     }

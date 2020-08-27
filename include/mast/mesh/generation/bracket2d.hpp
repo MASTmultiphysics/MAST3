@@ -89,6 +89,216 @@ struct Bracket2D {
     }
     
     
+    inline uint_t idx(const libMesh::ElemType type,
+                      const uint_t nx,
+                      const uint_t i,
+                      const uint_t j)
+    {
+      switch(type)
+        {
+            case libMesh::QUAD4:
+            {
+                return i + (nx+1)*j;
+            }
+                
+            case libMesh::QUAD9:
+            {
+                return i + (2*nx+1)*j;
+            }
+                
+            default:
+                Error(false, "Invalid element type");
+        }
+
+      return libMesh::invalid_uint;
+    }
+
+    
+    
+    inline void build_mesh(libMesh::UnstructuredMesh & mesh,
+                           const uint_t nx,
+                           const uint_t ny,
+                           const real_t length,
+                           const real_t height,
+                           const libMesh::ElemType type) {
+        
+        Assert0(type == libMesh::QUAD4 || type == libMesh::QUAD9,
+                "Method only implemented for Quad4/Quad9");
+        
+        // Clear the mesh and start from scratch
+        mesh.clear();
+        
+        libMesh::BoundaryInfo & boundary_info = mesh.get_boundary_info();
+        
+        mesh.set_mesh_dimension(3);
+        mesh.set_spatial_dimension(3);
+        mesh.reserve_elem(nx*ny);
+
+        if (type == libMesh::QUAD4)
+            mesh.reserve_nodes( (nx+1)*(ny+1));
+        else if (type == libMesh::QUAD9)
+            mesh.reserve_nodes( (2*nx+1)*(2*ny+1));
+
+        real_t
+        xmax    = length,
+        ymax    = height;
+        
+
+        std::map<uint_t, libMesh::Node*> nodes;
+        
+        // Build the nodes.
+        uint_t
+        node_id = 0,
+        n       = 0;
+        switch (type)
+        {
+            case libMesh::QUAD4: {
+
+                for (uint_t j=0; j<=ny; j++)
+                    for (uint_t i=0; i<=nx; i++) {
+                        if ( i<=nx/10*4 || j>=ny/10*6) {
+                            nodes[node_id] =
+                            mesh.add_point(libMesh::Point(static_cast<real_t>(i)/static_cast<real_t>(nx)*length,
+                                                          static_cast<real_t>(j)/static_cast<real_t>(ny)*height,
+                                                          0.),
+                                           n++);
+                        }
+                        node_id++;
+                    }
+                
+                
+                break;
+            }
+
+            case libMesh::QUAD9: {
+
+                for (uint_t j=0; j<=(2*ny); j++)
+                    for (uint_t i=0; i<=(2*nx); i++) {
+                        if ( i<=2*nx/10*4 || j>=2*ny/10*6) {
+                            nodes[node_id] =
+                            mesh.add_point(libMesh::Point(static_cast<real_t>(i)/static_cast<real_t>(2*nx)*length,
+                                                          static_cast<real_t>(j)/static_cast<real_t>(2*ny)*height,
+                                                          0.),
+                                           n++);
+                        }
+                        node_id++;
+                    }
+                
+                break;
+            }
+                
+                
+            default:
+                Assert0(false, "ERROR: Unrecognized 2D element type.");
+        }
+
+        // Build the elements.
+        uint_t
+        elem_id = 0;
+        switch (type) {
+                
+            case libMesh::QUAD4: {
+                
+                for (uint_t j=0; j<ny; j++)
+                    for (uint_t i=0; i<nx; i++) {
+                        if (i < nx*4/10 || j>=ny*6/10) {
+                            
+                            libMesh::Elem
+                            *elem = libMesh::Elem::build(libMesh::QUAD4).release();
+                            elem->set_id(elem_id++);
+                            mesh.add_elem(elem);
+                            
+                            elem->set_node(0) = nodes[idx(type,nx,i,j)      ];
+                            elem->set_node(1) = nodes[idx(type,nx,i+1,j)    ];
+                            elem->set_node(2) = nodes[idx(type,nx,i+1,j+1)  ];
+                            elem->set_node(3) = nodes[idx(type,nx,i,j+1)    ];
+                            
+                            if (j == 0)
+                                boundary_info.add_side(elem, 0, 0);
+                            
+                            if (j == (ny-1))
+                                boundary_info.add_side(elem, 2, 2);
+                            
+                            if (i == 0)
+                                boundary_info.add_side(elem, 3, 3);
+                            
+                            if (i == (nx-1))
+                                boundary_info.add_side(elem, 1, 1);
+                            
+                            if (i==nx*3/10 && j<ny*6/10)
+                                boundary_info.add_side(elem, 1, 4);
+                            
+                            if (j==ny*6/10 && i>nx*3/10)
+                                boundary_info.add_side(elem, 0, 5);
+                        }
+                    }
+                break;
+            }
+                
+                
+            case libMesh::QUAD9: {
+                
+                for (uint_t j=0; j<(2*ny); j += 2)
+                    for (uint_t i=0; i<(2*nx); i += 2) {
+                        
+                        libMesh::Elem
+                        *elem = libMesh::Elem::build(libMesh::QUAD9).release();
+                        elem->set_id(elem_id++);
+                        mesh.add_elem(elem);
+                        
+                        elem->set_node(0)  = nodes[idx(type,nx,i,  j)  ];
+                        elem->set_node(1)  = nodes[idx(type,nx,i+2,j)  ];
+                        elem->set_node(2)  = nodes[idx(type,nx,i+2,j+2)  ];
+                        elem->set_node(3)  = nodes[idx(type,nx,i,  j+2)  ];
+                        elem->set_node(4)  = nodes[idx(type,nx,i+1,j)  ];
+                        elem->set_node(5)  = nodes[idx(type,nx,i+2,j+1)  ];
+                        elem->set_node(6)  = nodes[idx(type,nx,i+1,j+2)  ];
+                        elem->set_node(7)  = nodes[idx(type,nx,i,  j+1)  ];
+                        elem->set_node(8)  = nodes[idx(type,nx,i+1,j+1)  ];
+                        
+                        if (j == 0)
+                            boundary_info.add_side(elem, 0, 0);
+                        
+                        if (j == 2*(ny-1))
+                            boundary_info.add_side(elem, 2, 2);
+                        
+                        if (i == 0)
+                            boundary_info.add_side(elem, 3, 3);
+                        
+                        if (i == 2*(nx-1))
+                            boundary_info.add_side(elem, 1, 1);
+                        
+                        if (i==nx*4/10)
+                            boundary_info.add_side(elem, 1, 4);
+                        
+                        if (j==ny*6/10)
+                            boundary_info.add_side(elem, 0, 5);
+                    }
+                break;
+            }
+                
+            default:
+                Assert0(false, "ERROR: Unrecognized 2D element type.");
+        }
+        
+        // Add sideset names to boundary info (Z axis out of the screen)
+        boundary_info.sideset_name(0) = "bottom";
+        boundary_info.sideset_name(1) = "right";
+        boundary_info.sideset_name(2) = "top";
+        boundary_info.sideset_name(3) = "left";
+        boundary_info.sideset_name(4) = "facing_right";
+        boundary_info.sideset_name(5) = "facing_down";
+
+        // Add nodeset names to boundary info
+        boundary_info.nodeset_name(0) = "bottom";
+        boundary_info.nodeset_name(1) = "right";
+        boundary_info.nodeset_name(2) = "top";
+        boundary_info.nodeset_name(3) = "left";
+
+        // Done building the mesh.  Now prepare it for use.
+        mesh.prepare_for_use ();
+    }
+
     
     template <typename Context>
     inline void
@@ -117,19 +327,15 @@ struct Bracket2D {
         //
         if (c.fe_order > 1 && e_type == libMesh::QUAD4)
             e_type = libMesh::QUAD9;
-        else if (c.fe_order > 1 && e_type == libMesh::TRI3)
-            e_type = libMesh::TRI6;
         
         //
         // initialize the mesh with one element
         //
-        libMesh::MeshTools::Generation::build_square(mesh,
-                                                     nx_divs, ny_divs,
-                                                     0, length,
-                                                     0, height,
-                                                     e_type);
-        
-        _delete_elems_from_bracket_mesh(c, mesh);
+        build_mesh(mesh,
+                   nx_divs, ny_divs,
+                   length,
+                   height,
+                   e_type);
     }
     
     
@@ -310,8 +516,8 @@ struct Bracket2D {
         
         real_t
         tol           = 1.e-12,
-        l_frac        = 0.4,//_input("length_fraction", "fraction of length along x-axis that is in the bracket", 0.4),
-        h_frac        = 0.4,//_input( "height_fraction", "fraction of length along y-axis that is in the bracket", 0.4),
+        l_frac        = 0.4,
+        h_frac        = 0.4,
         length        = c.input("length", "length of domain along x-axis", 0.3),
         height        = c.input("height", "length of domain along y-axis", 0.3),
         x_lim         = length * l_frac,
@@ -323,157 +529,68 @@ struct Bracket2D {
                                 "upper limit for the volume fraction", 0.2);
         
         uint_t
-        sys_num = c.rho_sys->number(),
-        dof_id  = 0;
+        sys_num   = c.rho_sys->number(),
+        first_dof = c.rho_sys->get_dof_map().first_dof(c.rho_sys->comm().rank()),
+        end_dof   = c.rho_sys->get_dof_map().end_dof(c.rho_sys->comm().rank()),
+        dof_id    = 0;
         
         real_t
         val     = 0.;
         
-        //
-        // all ranks will have DVs defined for all variables. So, we should be
-        // operating on a replicated mesh
-        //
-        //Assert0(c.mesh->is_replicated(),
-        //        "Function currently assumes replicated mesh");
-                
-        // iterate over all the element values
-        libMesh::MeshBase::const_node_iterator
-        it  = c.mesh->local_nodes_begin(),
-        end = c.mesh->local_nodes_end();
+        libMesh::MeshBase::const_element_iterator
+        e_it  = c.mesh->local_elements_begin(),
+        e_end = c.mesh->local_elements_end();
         
-        //
-        // maximum number of dvs is the number of nodes on the level set function
-        // mesh. We will evaluate the actual number of dvs
-        //
-        //dvs.reserve(c.mesh->n_elem());
-        
-        for ( ; it!=end; it++) {
-            
-            const libMesh::Node& n = **it;
-            
-            dof_id                     = n.dof_number(sys_num, 0, 0);
-            
-            if ((n(1)-filter_radius) <= y_lim &&
-                (n(0)+filter_radius) >= length*(1.-frac)) {
-                
-                //
-                // set value at the constrained points to be solid material
-                //
-                if (dof_id >= c.rho_sys->solution->first_local_index() &&
-                    dof_id <  c.rho_sys->solution->last_local_index())
-                    c.rho_sys->solution->set(dof_id, 1.e0);
-            }
-            else {
-                
-                MAST::Optimization::DesignParameter<ScalarType>
-                *dv = new MAST::Optimization::DesignParameter<ScalarType>(vf);
-                dv->set_point(n(0), n(1), n(2));
-
-                MAST::Base::ParameterData
-                &data = dvs.add_topology_parameter(*dv, dof_id);
-                
-                //data.add<bool>("topology", true);
-            }
-        }
-        
-        c.rho_sys->solution->close();
-    }
-    
-    
-    
-    template <typename Context>
-    inline void
-    _delete_elems_from_bracket_mesh(Context& c,
-                                    libMesh::MeshBase &mesh) {
-        
-        real_t
-        tol     = 1.e-12,
-        x       = -1.,
-        y       = -1.,
-        l_frac  = 0.4,
-        w_frac  = 0.4,
-        length  = c.input("length", "length of domain along x-axis", 0.3),
-        height  = c.input("height", "length of domain along y-axis", 0.3),
-        x_lim   = length * l_frac,
-        y_lim   = height * (1.-w_frac);
-        
-        //
-        // now, remove elements that are outside of the L-bracket domain
-        //
-        libMesh::MeshBase::element_iterator
-        e_it   = mesh.local_elements_begin(),
-        e_end  = mesh.local_elements_end();
-        
-        for ( ; e_it!=e_end; e_it++) {
-            
-            libMesh::Elem* elem = *e_it;
-            x = length;
-            y = 0.;
-            for (uint_t i=0; i<elem->n_nodes(); i++) {
-                const libMesh::Node& n = elem->node_ref(i);
-                if (x > n(0)) x = n(0);
-                if (y < n(1)) y = n(1);
-            }
-            
-            //
-            // delete element if the lowest x,y locations are outside of the bracket
-            // domain
-            //
-            if (x >= x_lim && y<= y_lim)
-                mesh.delete_elem(elem);
-        }
-        
-        mesh.prepare_for_use();
-        
-        //
-        // add the two additional boundaries to the boundary info so that
-        // we can apply loads on them
-        //
-        bool
-        facing_right = false,
-        facing_down  = false;
-        
-        e_it   = mesh.local_elements_begin();
-        e_end  = mesh.local_elements_end();
+        std::set<const libMesh::Node*> nodes;
         
         for ( ; e_it != e_end; e_it++) {
             
-            libMesh::Elem* elem = *e_it;
+            const libMesh::Elem* e = *e_it;
             
-            if (!elem->on_boundary()) continue;
-            
-            for (uint_t i=0; i<elem->n_sides(); i++) {
+            for (uint_t i=0; i<e->n_nodes(); i++) {
                 
-                if (elem->neighbor_ptr(i)) continue;
+                const libMesh::Node& n = *e->node_ptr(i);
                 
-                std::unique_ptr<libMesh::Elem> s(elem->side_ptr(i).release());
+                // if we have alredy operated on this node, then
+                // we skip it
+                if (nodes.count(&n))
+                    continue;
                 
-                const libMesh::Point p = s->centroid();
-                
-                facing_right = true;
-                facing_down  = true;
-                for (uint_t j=0; j<s->n_nodes(); j++) {
-                    const libMesh::Node& n = s->node_ref(j);
+                // otherwise, we add it to the set of operated nodes and
+                // check if a design parameter should be computed for this
+                nodes.insert(&n);
+
+                dof_id = n.dof_number(sys_num, 0, 0);
+
+                if ((n(1)-filter_radius) <= y_lim &&
+                    (n(0)+filter_radius) >= length*(1.-frac)) {
                     
-                    if (n(0) < x_lim ||  n(1) > y_lim) {
-                        facing_right = false;
-                        facing_down  = false;
-                    }
-                    else if (std::fabs(n(0) - p(0)) > tol)
-                        facing_right = false;
-                    else if (std::fabs(n(1) - p(1)) > tol)
-                        facing_down = false;
+                    //
+                    // set value at the constrained points to be solid material
+                    //
+                    if (dof_id >= first_dof &&
+                        dof_id <  end_dof)
+                        c.rho_sys->solution->set(dof_id, 1.e0);
                 }
-                
-                if (facing_right) mesh.boundary_info->add_side(elem, i, 4);
-                if (facing_down) mesh.boundary_info->add_side(elem, i, 5);
+                else {
+                    
+                    MAST::Optimization::DesignParameter<ScalarType>
+                    *dv = new MAST::Optimization::DesignParameter<ScalarType>(vf);
+                    dv->set_point(n(0), n(1), n(2));
+                    
+                    if (dof_id >= first_dof &&
+                        dof_id <  end_dof)
+                        dvs.add_topology_parameter(*dv, dof_id);
+                    else
+                        dvs.add_ghosted_topology_parameter(*dv, dof_id);
+                }
             }
         }
-        
-        mesh.boundary_info->sideset_name(4) = "facing_right";
-        mesh.boundary_info->sideset_name(5) = "facing_down";
+
+        dvs.synchronize(c.rho_sys->get_dof_map());
+        c.rho_sys->solution->close();
     }
-    
+
     
     
     /*template <typename Context>

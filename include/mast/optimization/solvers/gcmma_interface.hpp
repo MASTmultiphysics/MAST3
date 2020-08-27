@@ -27,6 +27,7 @@
 #include <mast/base/mast_config.h>
 #include <mast/base/mast_data_types.h>
 #include <mast/base/exceptions.hpp>
+#include <mast/optimization/utility/design_history.hpp>
 
 // libMesh includes
 #include <libmesh/parallel.h>
@@ -261,7 +262,7 @@ public:
              *  at XVAL. The result should be put in F0VAL,DF0DX,FVAL,DFDX.
              */
             std::fill(eval_grads.begin(), eval_grads.end(), true);
-            _feval->evaluate(XVAL,
+            _evaluate_wrapper(XVAL,
                              F0VAL, true, DF0DX,
                              FVAL, eval_grads, DFDX);
             if (ITER == 1)
@@ -300,7 +301,7 @@ public:
                  *  The result should be put in F0NEW and FNEW.
                  */
                 std::fill(eval_grads.begin(), eval_grads.end(), false);
-                _feval->evaluate(XMMA,
+                _evaluate_wrapper(XMMA,
                                  F0NEW, false, DF0DX,
                                  FNEW, eval_grads, DFDX);
                 
@@ -316,7 +317,7 @@ public:
                     for (uint_t i=0; i<XMMA.size(); i++)
                         XMMA_new[i] = XOLD1[i] + frac*(XMMA[i]-XOLD1[i]);
                     
-                    _feval->evaluate(XMMA_new,
+                    _evaluate_wrapper(XMMA_new,
                                      F0NEW, false, DF0DX,
                                      FNEW, eval_grads, DFDX);
                     frac *= frac;
@@ -469,7 +470,7 @@ private:
     }
     
     inline void
-    _evaluate_wrapper(const std::vector<real_t> &x,
+    _evaluate_wrapper(std::vector<real_t>       &x,
                       real_t                    &obj,
                       bool                      eval_obj_grad,
                       std::vector<real_t>       &obj_grad,
@@ -480,7 +481,7 @@ private:
         // rank 0 will broadcase the DV values to all ranks
         _comm.broadcast(x, 0/*, true*/);
         _comm.broadcast(eval_obj_grad, 0);
-        _comm.broadcast(eval_grads, 0/*, true*/);
+        //_comm.broadcast(eval_grads, 0/*, true*/);
         
         _feval->evaluate(x,
                          obj,
