@@ -390,8 +390,20 @@ private:
         
     public:
         NanoflannMeshAdaptor (const libMesh::MeshBase & mesh) :
-        _mesh(mesh)
-        {}
+        _mesh(mesh) {
+            
+            nodes.reserve(mesh.n_local_nodes());
+            
+            libMesh::MeshBase::const_node_iterator
+            it   = mesh.local_nodes_begin(),
+            end  = mesh.local_nodes_end();
+            
+            for ( ; it != end; it++) {
+                
+                nodes.push_back(*it);
+                node_id_to_vec_index[(*it)->id()] = nodes.size()-1;
+            }
+        }
         
         /**
          * libMesh \p Point coordinate type
@@ -438,11 +450,11 @@ private:
         {
             Assert2(dim < (int) Dim, dim, (int) Dim,
                     "Incompatible dimension");
-            Assert2(idx < _mesh.n_nodes(), idx, _mesh.n_nodes(),
+            Assert2(idx < _mesh.n_local_nodes(), idx, _mesh.n_nodes(),
                     "Invalid node index");
             Assert1(dim < 3, dim, "Invalid dimension");
             
-            return _mesh.point(idx)(dim);
+            return (*nodes[idx])(dim);
         }
         
         /**
@@ -453,6 +465,9 @@ private:
          */
         template <class BBOX>
         inline bool kdtree_get_bbox(BBOX & /* bb */) const { return false; }
+        
+        std::vector<libMesh::Node*> nodes;
+        std::map<uint_t, uint_t>    node_id_to_vec_index;
     };
     
     inline void _init2() {
@@ -476,7 +491,7 @@ private:
         kd_tree_t kd_tree(3, mesh_adaptor, nanoflann::KDTreeSingleIndexAdaptorParams(/*max leaf=*/10));
         
         // Construct the tree
-        //kd_tree.buildIndex();
+        kd_tree.buildIndex();
         
         real_t
         d_12 = 0.,
@@ -515,7 +530,8 @@ private:
                 
                 std::vector<std::pair<size_t, real_t>>
                 indices_dists;
-                indices_dists.push_back(std::pair<size_t, real_t>(node->id(), 0.));
+                indices_dists.push_back(std::pair<size_t, real_t>
+                                        (mesh_adaptor.node_id_to_vec_index[node->id()], 0.));
                 /*nanoflann::RadiusResultSet<real_t, size_t>
                 resultSet(_radius*_radius, indices_dists);
                 
@@ -533,7 +549,7 @@ private:
                             "Node distance must be <= search radius");
                     
                     sum  += _radius - d_12;
-                    dof_2 = mesh.node_ptr(indices_dists[r].first)->dof_number(_system.number(), 0, 0);
+                    dof_2 = mesh_adaptor.nodes[indices_dists[r].first]->dof_number(_system.number(), 0, 0);
                     
                     _filter_map[dof_1].push_back(std::pair<uint_t, real_t>(dof_2, _radius - d_12));
 
