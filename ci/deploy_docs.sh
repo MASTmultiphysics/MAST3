@@ -15,7 +15,7 @@ cd ${TRAVIS_BUILD_DIR}/website || exit
 # Transfer to main hosting if on master branch.
 if [ "${TRAVIS_BRANCH}" = "master" ]; then
   echo "DEPLOY: Deploying master documentation to https://mast3.mast-multiphysics.com" || exit
-  rsync -e "ssh -o StrictHostKeyChecking=no" -r --delete-after --quiet . ${WEBSITE_HOST_USER}@${WEBSITE_HOST_ADDRESS}:mast3.mast-multiphysics.com || exit
+  rsync -e "ssh -o StrictHostKeyChecking=no" --exclude ".well-known" -r --delete-after --quiet . ${WEBSITE_HOST_USER}@${WEBSITE_HOST_ADDRESS}:mast3.mast-multiphysics.com || exit
 fi
 
 # Transfer temporary version of docs for all builds originating within the primary
