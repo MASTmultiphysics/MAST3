@@ -470,6 +470,26 @@ private:
         std::map<uint_t, uint_t>    node_id_to_vec_index;
     };
     
+    // Declare a type templated on NanoflannMeshAdaptor
+    typedef nanoflann::L2_Simple_Adaptor<real_t, NanoflannMeshAdaptor<3> > adatper_t;
+    // Declare a KDTree type based on NanoflannMeshAdaptor
+    typedef nanoflann::KDTreeSingleIndexAdaptor<adatper_t, NanoflannMeshAdaptor<3>, 3> kd_tree_t;
+    
+    struct PointData {
+        PointData():
+        dof_index         (-1),
+        local_mesh_index  (-1),
+        rank              (-1),
+        point             ({0., 0., 0.})
+        { }
+        
+        uint_t              dof_index;
+        uint_t              local_mesh_index;
+        uint_t              rank;
+        std::vector<real_t> point;
+    };
+    
+
     inline void _init2() {
         
         libMesh::MeshBase& mesh = _system.get_mesh();
@@ -480,18 +500,36 @@ private:
         // which was inspired by nanoflann example in libMesh source:
         // contrib/nanoflann/examples/pointcloud_adaptor_example.cpp
         
-        // Declare a type templated on NanoflannMeshAdaptor
-        typedef nanoflann::L2_Simple_Adaptor<real_t, NanoflannMeshAdaptor<3> > adatper_t;
-        
-        // Declare a KDTree type based on NanoflannMeshAdaptor
-        typedef nanoflann::KDTreeSingleIndexAdaptor<adatper_t, NanoflannMeshAdaptor<3>, 3> kd_tree_t;
-        
         // Build adaptor and tree objects
         NanoflannMeshAdaptor<3> mesh_adaptor(mesh);
         kd_tree_t kd_tree(3, mesh_adaptor, nanoflann::KDTreeSingleIndexAdaptorParams(/*max leaf=*/10));
         
         // Construct the tree
         kd_tree.buildIndex();
+        
+        // synchronize with the notes
+        // stores the bounding box for each rank
+        std::vector<real_t>
+        rank_boxes(6, 0.);
+        
+        // limits of x
+        rank_boxes[0] = kd_tree.root_bbox[0].low;
+        rank_boxes[1] = kd_tree.root_bbox[0].high;
+        // limits of y
+        rank_boxes[2] = kd_tree.root_bbox[1].low;
+        rank_boxes[3] = kd_tree.root_bbox[1].high;
+        // limits of z
+        rank_boxes[4] = kd_tree.root_bbox[2].low;
+        rank_boxes[5] = kd_tree.root_bbox[2].high;
+
+        // this will modify rank_boxes with such that each block if 6 values is
+        // the box limit coordinates from each rank
+        mesh.comm().allgather(rank_boxes);
+        
+        Assert2(rank_boxes.size() == mesh.comm().size()*6,
+                rank_boxes.size(), mesh.comm().size()*6,
+                "Invalid vector dimension after allgather()");
+        
         
         real_t
         d_12 = 0.,
@@ -502,21 +540,195 @@ private:
         const libMesh::DofMap
         &dof_map = _system.get_dof_map();
 
+        std::vector<PointData>
+        point_data;
+        
         const uint_t
-        first_local_dof = _system.get_dof_map().first_dof(_system.comm().rank()),
-        last_local_dof  = _system.get_dof_map().end_dof(_system.comm().rank());
+        first_local_dof = dof_map.first_dof(_system.comm().rank()),
+        last_local_dof  = dof_map.end_dof(_system.comm().rank());
 
         uint_t
         dof_1,
-        dof_2;
+        dof_2,
+        size  = mesh.comm().size(),
+        rank  = mesh.comm().rank();
+        
+        std::map<const libMesh::Node*, real_t>
+        node_sum;
         
         libMesh::MeshBase::const_node_iterator
         node_it      =  mesh.local_nodes_begin(),
         node_end     =  mesh.local_nodes_end();
         
+        std::vector<std::vector<const libMesh::Node*>>
+        remote_node_dependency(size);
+        
+        for (; node_it != node_end; node_it++) {
+
+            const libMesh::Node* node = *node_it;
+
+            // check if this node is near the bbox of each rank
+            for (uint_t i=0; i<size; i++) {
+                
+                if (i == rank) continue;
+                
+                
+                if (// within _radius of x-box on rank i
+                    (*node)(0) >= rank_boxes[6*i+0]-_radius &&
+                    (*node)(0) <= rank_boxes[6*i+1]+_radius &&
+                    // within _radius of y-box on rank i
+                    (*node)(1) >= rank_boxes[6*i+2]-_radius &&
+                    (*node)(1) <= rank_boxes[6*i+3]+_radius &&
+                    // within _radius of z-box on rank i
+                    (*node)(2) >= rank_boxes[6*i+4]-_radius &&
+                    (*node)(2) <= rank_boxes[6*i+5]+_radius) {
+                    
+                    remote_node_dependency[i].push_back(node);
+                }
+            }
+        }
+        
+        
+        // now communicate with all processors about the filtered nodes
+        std::vector<real_t>
+        coords_send(size);
+
+        std::vector<std::vector<real_t>>
+        coords_recv(size),
+        filter_data_node_loc_send(size),
+        filter_data_node_loc_recv(size);
+        
+        std::vector<std::vector<uint_t>>
+        // this stores the number of indices that each node in coords_send will depend on
+        filter_data_n_indices_send(size),
+        filter_data_n_indices_recv(size),
+        // this stores the system dof_indices of nodes that the nodes in coord_send will
+        // depend on.
+        filter_data_dof_index_send(size),
+        filter_data_dof_index_recv(size);
+
+
+        for (uint_t i=0; i<size; i++) {
+            
+            for (uint_t j=0; j<size; j++) {
+                
+                if ( i != j) {
+                    
+                    if (i == rank) {
+                        
+                        // here, we pack the (x,y,z) coordinates of nodes that the
+                        // ith processor wants the jth processor to check
+                        coords_send.resize(remote_node_dependency[j].size()*3, 0.);
+                        
+                        for (uint_t k=0; k<remote_node_dependency[j].size(); k++) {
+                            
+                            coords_send[k*3 + 0] = (*remote_node_dependency[j][k])(0);
+                            coords_send[k*3 + 1] = (*remote_node_dependency[j][k])(1);
+                            coords_send[k*3 + 2] = (*remote_node_dependency[j][k])(2);
+                        }
+                        
+                        // send information from i to j
+                        mesh.comm().send(j, coords_send);
+
+                        // clear the vector, since we dont need it
+                        coords_send.clear();
+                    }
+                    else if (j == rank) {
+                        
+                        coords_recv[i].clear();
+                        // get information from i
+                        mesh.comm().receive(i, coords_recv[i]);
+                        
+                        Assert1(coords_recv[i].size()%3 == 0,
+                                coords_recv[i].size(),
+                                "coordinates must be a multiple of 3");
+                    }
+                }
+            }
+        }
+        
+        // now process the data that other processors need from us
+        for (uint_t i=0; i<size; i++) {
+            
+            // nothing to be done if i = rank.
+            if (i == rank) continue;
+            
+            // three coordinates per node, so number of nodes that ith processor
+            // asked for is size/3.
+            uint_t
+            n_nodes = coords_recv[i].size()/3;
+
+            // initialize this to the number of nodes received from the processor
+            filter_data_n_indices_send[i].reserve(coords_recv[i].size());
+            // we use a conservative estimate of 27 nodes connected to each node
+            filter_data_dof_index_send[i].reserve(coords_recv[i].size()*27);
+            filter_data_node_loc_send[i].reserve (coords_recv[i].size()*27*3);
+            
+            // prepare data for rank i
+            for (uint_t j=0; j<n_nodes; j++) {
+                
+                std::vector<std::pair<size_t, real_t>>
+                indices_dists;
+                nanoflann::RadiusResultSet<real_t, size_t>
+                resultSet(_radius*_radius, indices_dists);
+                
+                kd_tree.findNeighbors(resultSet, &coords_recv[i][j*3], nanoflann::SearchParams());
+
+                // add the information from this search result to the information for this node
+                filter_data_n_indices_send[i].push_back(indices_dists.size());
+                
+                for (unsigned r=0; r<indices_dists.size(); ++r) {
+                    
+                    const libMesh::Node* nd = mesh_adaptor.nodes[indices_dists[r].first];
+                    
+                    // location of the node
+                    filter_data_node_loc_send[i].push_back((*nd)(0));
+                    filter_data_node_loc_send[i].push_back((*nd)(1));
+                    filter_data_node_loc_send[i].push_back((*nd)(2));
+                    // dof-index of the node
+                    filter_data_dof_index_send[i].push_back(nd->dof_number(_system.number(), 0, 0));
+                }
+            }
+        }
+        
+
+        // now that all the information is ready, we will communicate it from
+        // j to i processor
+        for (uint_t i=0; i<size; i++) {
+            
+            for (uint_t j=0; j<size; j++) {
+                
+                if (i != j) {
+                    
+                    if (j == rank) {
+                        
+                        // send information from j to i
+                        mesh.comm().send(i, filter_data_n_indices_send[i]);
+                        mesh.comm().send(i, filter_data_dof_index_send[i]);
+                        mesh.comm().send(i, filter_data_node_loc_send[i]);
+                        
+                        // now clear the data since we dont need it any more
+                        filter_data_n_indices_send[i].clear();
+                        filter_data_dof_index_send[i].clear();
+                        filter_data_node_loc_send[i].clear();
+                    }
+                    else if (i == rank) {
+                        
+                        // get information from j
+                        mesh.comm().receive(j, filter_data_n_indices_recv[j]);
+                        mesh.comm().receive(j, filter_data_dof_index_recv[j]);
+                        mesh.comm().receive(j, filter_data_node_loc_recv[j]);
+                    }
+                }
+            }
+        }
+
+        // now, we search the local nodes and add to it the information from remote couplings
         // For every node in the mesh, search the KDtree and find any
         // nodes at _radius distance from the current
         // node being searched... this will be added to the .
+        node_it      =  mesh.local_nodes_begin();
+            
         for (; node_it != node_end; node_it++) {
             
             const libMesh::Node* node = *node_it;
@@ -532,10 +744,10 @@ private:
                 indices_dists;
                 indices_dists.push_back(std::pair<size_t, real_t>
                                         (mesh_adaptor.node_id_to_vec_index[node->id()], 0.));
-                /*nanoflann::RadiusResultSet<real_t, size_t>
+                nanoflann::RadiusResultSet<real_t, size_t>
                 resultSet(_radius*_radius, indices_dists);
                 
-                kd_tree.findNeighbors(resultSet, query_pt, nanoflann::SearchParams());*/
+                kd_tree.findNeighbors(resultSet, query_pt, nanoflann::SearchParams());
                 
                 sum       = 0.;
                 
@@ -551,7 +763,8 @@ private:
                     sum  += _radius - d_12;
                     dof_2 = mesh_adaptor.nodes[indices_dists[r].first]->dof_number(_system.number(), 0, 0);
                     
-                    _filter_map[dof_1].push_back(std::pair<uint_t, real_t>(dof_2, _radius - d_12));
+                    _filter_map[dof_1].push_back(std::pair<uint_t, real_t>
+                                                 (dof_2, _radius - d_12));
 
                     // add this dof to the local send list
                     if (dof_2 < first_local_dof ||
@@ -561,15 +774,94 @@ private:
                 
                 Assert1(sum > 0., sum, "Weight must be > 0.");
                 
-                // with the coefficients computed for dof_1, divide each coefficient
-                // with the sum
-                std::vector<std::pair<uint_t, real_t>>& vec = _filter_map[dof_1];
-                for (uint_t i=0; i<vec.size(); i++) {
+                // record this for later use
+                node_sum[node] = sum;
+            }
+        }
+
+        
+        // also, check the information from remote processors and include them
+        // in the map and send list.
+        uint_t
+        idx            = 0,
+        n_remote_nodes = 0;
+        
+        for (uint_t i=0; i<size; i++) {
+
+            idx = 0;
+            
+            // number of nodes for which we asked i^th rank to search
+            for (uint_t j=0; j<remote_node_dependency[i].size(); j++) {
+
+                const libMesh::Node*
+                node = remote_node_dependency[i][j];
+
+                dof_1  = node->dof_number(_system.number(), 0, 0);
+                
+                // check the number of nodes on the remote node that this
+                // node's filtered values will depend on
+                n_remote_nodes = filter_data_n_indices_recv[i][j];
+                
+                // sum from the local nodes for the geometric filter for
+                // the present node
+                sum = node_sum[node];
+                
+                // now, we will add this information to the respective map
+                for (uint_t k=0; k<n_remote_nodes; k++) {
                     
-                    vec[i].second /= sum;
-                    Assert1(vec[i].second <= 1., vec[i].second,
-                            "Normalized weight must be <= 1.");
+                    // dof id of this remote node
+                    dof_2  = filter_data_dof_index_recv[i][idx];
+                    
+                    // distance between the present and remote node
+                    d_12 =
+                    sqrt(pow((*node)(0) - filter_data_node_loc_recv[i][idx*3+0], 2)+
+                         pow((*node)(1) - filter_data_node_loc_recv[i][idx*3+1], 2)+
+                         pow((*node)(2) - filter_data_node_loc_recv[i][idx*3+2], 2));
+                    
+                    // contribution to the sum
+                    sum += _radius - d_12;
+                    
+                    // add information to dof_1 node about this remote node
+                    _filter_map[dof_1].push_back(std::pair<uint_t, real_t>
+                                                 (dof_2, _radius - d_12));
+                    
+                    // add this dof to the local send list
+                    send_list.insert(dof_2);
+                    
+                    // increment the counter for the next data
+                    idx++;
                 }
+                
+                // update the value of the sum for this node
+                node_sum[node] = sum;
+            }
+        }
+
+        // now normalize the weights with respect to the sum
+        // with the coefficients computed for dof_1, divide each coefficient
+        // with the sum
+        node_it      =  mesh.local_nodes_begin();
+            
+        for (; node_it != node_end; node_it++) {
+            
+            // node for which the normalization is being done
+            const libMesh::Node* node = *node_it;
+
+            // dof_id for this node
+            dof_1 = node->dof_number(_system.number(), 0, 0);
+
+            // filter coefficients for this node
+            std::vector<std::pair<uint_t, real_t>>& vec = _filter_map[dof_1];
+            
+            // sum from the local nodes for the geometric filter for
+            // the present node
+            sum = node_sum[node];
+            
+            for (uint_t i=0; i<vec.size(); i++) {
+                
+                vec[i].second /= sum;
+                Assert1(vec[i].second <= 1., vec[i].second,
+                        "Normalized weight must be <= 1.");
             }
         }
 
