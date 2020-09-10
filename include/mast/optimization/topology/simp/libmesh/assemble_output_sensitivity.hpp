@@ -140,10 +140,14 @@ public:
 
             for (uint_t i=0; i<c.elem->n_nodes(); i++) {
                 
+                if (!dvs.is_design_parameter_dof_id(density_dof_ids[i]))
+                    continue;
+
                 // this assumes that if the DV (which is associated with a node)
                 // is connected to this element, then the dof_indices for this
                 // element will contain this index. If not, then the contribution
                 // of this element to the sensitivity is zero.
+                
                 idx    = dvs.get_dv_id_for_topology_dof(density_dof_ids[i]);
                 const MAST::Optimization::DesignParameter<ScalarType>
                 &dv    = dvs[idx];

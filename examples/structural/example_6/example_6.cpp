@@ -104,7 +104,7 @@ public:
         filter_r = input("filter_radius",
                          "radius of geometric filter for level set field", 0.015);
         filter = new MAST::Mesh::libMeshWrapper::GeometricFilter(*rho_sys, filter_r);
-        //rho_sys->reinit();
+        eq_sys->reinit();
 
         // create and attach the null space to the matrix
         MAST::Physics::Elasticity::libMeshWrapper::NullSpace
@@ -731,7 +731,7 @@ int main(int argc, char** argv) {
     libMesh::LibMeshInit init(argc, argv);
     MAST::Utility::GetPotWrapper input(argc, argv);
     
-    using model_t     = MAST::Mesh::Generation::Bracket3D;
+    using model_t     = MAST::Mesh::Generation::Bracket2D;
     
     using traits_t    = MAST::Examples::Structural::Example6::Traits<real_t, real_t, real_t, model_t>;
     using elem_ops_t  = MAST::Examples::Structural::Example6::ElemOps<traits_t>;

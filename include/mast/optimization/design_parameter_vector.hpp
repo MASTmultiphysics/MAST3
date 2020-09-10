@@ -142,6 +142,13 @@ public:
     
     
     inline bool
+    is_design_parameter_dof_id(const uint_t i) const {
+        
+        return _dof_id_to_dv_id_map.count(i);
+    }
+
+
+    inline bool
     is_design_parameter_index(const uint_t i) const {
         
         return _dv_index.count(i);
