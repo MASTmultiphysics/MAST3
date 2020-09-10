@@ -79,6 +79,9 @@ public:
         new MAST::Mesh::libMeshWrapper::GeometricFilterAugmentSendList(_forward_send_list);
         
         _system.get_dof_map().attach_extra_send_list_object(*_augment_send_list);
+        
+        // now we tell the function to
+        _system.get_dof_map().reinit_send_list(_system.get_mesh());
     }
     
     
@@ -340,7 +343,7 @@ public:
      */
     template <typename ScalarType>
     inline void
-    print(const MAST::Optimization::DesignParameterVector<ScalarType> &dvs,
+    print(//const MAST::Optimization::DesignParameterVector<ScalarType> &dvs,
           std::ostream         &o) const {
         
         o << "Filter radius: " << _radius << std::endl;
@@ -364,13 +367,14 @@ public:
             
             for ( ; vec_it != vec_end; vec_it++) {
                 
-                if (dvs.is_design_parameter_index(map_it->first))
+                //if (dvs.is_design_parameter_index(map_it->first))
                     o
                     << " : " << std::setw(8) << vec_it->first
                     << " (" << std::setw(8) << vec_it->second << " )";
-                else
-                    std::cout
-                    << " : " << std::setw(8) << map_it->first;
+                o << " [ " << _system.get_dof_map().semilocal_index(vec_it->first) << " ] ";
+                //else
+                //    std::cout
+                //    << " : " << std::setw(8) << map_it->first;
             }
             std::cout << std::endl;
         }
@@ -524,7 +528,7 @@ private:
 
         // this will modify rank_boxes with such that each block if 6 values is
         // the box limit coordinates from each rank
-        mesh.comm().allgather(rank_boxes);
+        mesh.comm().allgather(rank_boxes, true);
         
         Assert2(rank_boxes.size() == mesh.comm().size()*6,
                 rank_boxes.size(), mesh.comm().size()*6,
@@ -544,14 +548,14 @@ private:
         point_data;
         
         const uint_t
-        first_local_dof = dof_map.first_dof(_system.comm().rank()),
-        last_local_dof  = dof_map.end_dof(_system.comm().rank());
+        size            = mesh.comm().size(),
+        rank            = mesh.comm().rank(),
+        first_local_dof = dof_map.first_dof(rank),
+        last_local_dof  = dof_map.end_dof(rank);
 
         uint_t
         dof_1,
-        dof_2,
-        size  = mesh.comm().size(),
-        rank  = mesh.comm().rank();
+        dof_2;
         
         std::map<const libMesh::Node*, real_t>
         node_sum;
@@ -936,9 +940,7 @@ private:
             dof_1 = (*node_it_1)->dof_number(_system.number(), 0, 0);
 
             // only local dofs are processed.
-            if (/*dof_1 >= first_local_dof &&
-                dof_1 <  last_local_dof*/
-                dof_map.semilocal_index(dof_1)) {
+            if (dof_map.semilocal_index(dof_1)) {
                 
                 node_it_2 = mesh.nodes_begin();
                 sum       = 0.;
