@@ -17,8 +17,8 @@
 * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#ifndef __mast_linear_thermoelasticity_energy_h__
-#define __mast_linear_thermoelasticity_energy_h__
+#ifndef __mast_linear_thermoelasticity_load_h__
+#define __mast_linear_thermoelasticity_load_h__
 
 // MAST includes
 #include <mast/physics/elasticity/linear_elastic_strain_operator.hpp>
@@ -34,7 +34,7 @@ template <typename FEVarType,
           typename SectionPropertyType,
           uint_t Dim,
           typename ContextType>
-class ThermoelasticEnergy {
+class ThermoelasticLoad {
     
 public:
 
@@ -46,12 +46,13 @@ public:
     static const uint_t
     n_strain               = MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<Dim>::value;
 
-    ThermoelasticEnergy():
+    ThermoelasticLoad():
     _property    (nullptr),
+    _temperature (nullptr),
     _fe_var_data (nullptr)
     { }
     
-    virtual ~ThermoelasticEnergy() { }
+    virtual ~ThermoelasticLoad() { }
 
     inline void
     set_section_property(const SectionPropertyType& p) {
@@ -60,6 +61,8 @@ public:
         
         _property = &p;
     }
+
+    inline void set_temparature(const TemperatureFieldType& dt) { _temperature = &dt;}
 
     inline void set_fe_var_data(const FEVarType& fe_data)
     {
@@ -80,7 +83,8 @@ public:
         
         Assert0(_fe_var_data, "FE data not initialized.");
         Assert0(_property, "Section property not initialized");
-        
+        Assert0(_temperature, "Temperature not initialized");
+
         const typename FEVarType::fe_shape_deriv_t
         &fe = _fe_var_data->get_fe_shape_data();
         
@@ -132,7 +136,8 @@ public:
         
         Assert0(_fe_var_data, "FE data not initialized.");
         Assert0(_property, "Section property not initialized");
-        
+        Assert0(_temperature, "Temperature not initialized");
+
         const typename FEVarType::fe_shape_deriv_t
         &fe = _fe_var_data->get_fe_shape_data();
 
@@ -200,4 +205,4 @@ private:
 }  // namespace Physics
 }  // namespace MAST
 
-#endif // __mast_linear_thermoelasticity_energy_h__
+#endif // __mast_linear_thermoelasticity_load_h__
