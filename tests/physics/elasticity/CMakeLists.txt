@@ -3,6 +3,7 @@ target_sources(mast_catch_tests
                ${CMAKE_CURRENT_LIST_DIR}/flat_shell_face_pressure_load_complex_step_sensitivity.cpp
                ${CMAKE_CURRENT_LIST_DIR}/isotropic_stiffness.cpp
                ${CMAKE_CURRENT_LIST_DIR}/linear_strain_energy.cpp
+               ${CMAKE_CURRENT_LIST_DIR}/linear_thermoelastic_load.cpp
                ${CMAKE_CURRENT_LIST_DIR}/mindlin_plate_strain_energy_complex_step_sensitivity.cpp
                ${CMAKE_CURRENT_LIST_DIR}/plate_bending_section_property_complex_step_sensitivity.cpp
                ${CMAKE_CURRENT_LIST_DIR}/pressure_load.cpp
@@ -19,13 +20,21 @@ set_tests_properties(LinearElasticStrainEnergy
         FIXTURES_SETUP     LinearElasticStrainEnergy)
 
 
+#Linear thermoelastic load kernel
+add_test(NAME LinearThermoelasticLoad
+         COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "linear_thermoelastic_load")
+set_tests_properties(LinearThermoelasticLoad
+        PROPERTIES
+        LABELS "SEQ"
+        FIXTURES_SETUP     LinearThermoelasticLoad)
+
+
 #Linear pressure load kernel
 add_test(NAME LinearPressureLoad
          COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "linear_pressure_load")
 set_tests_properties(LinearPressureLoad
         PROPERTIES
         LABELS "SEQ"
-        #FIXTURES_REQUIRED  "Element_Property_Card_1D_Structural;libMesh_Mesh_Generation_1d"
         FIXTURES_SETUP     LinearPressureLoad)
 
 #Flat shellface pressure load kernel
@@ -34,7 +43,6 @@ add_test(NAME FlatShellFaceLinearPressureLoad
 set_tests_properties(FlatShellFaceLinearPressureLoad
         PROPERTIES
         LABELS "SEQ"
-        #FIXTURES_REQUIRED  "Element_Property_Card_1D_Structural;libMesh_Mesh_Generation_1d"
         FIXTURES_SETUP     FlatShellFaceLinearPressureLoad)
 
 
@@ -44,7 +52,6 @@ add_test(NAME IsotropicLinearMaterial
 set_tests_properties(IsotropicLinearMaterial
         PROPERTIES
         LABELS "SEQ"
-        #FIXTURES_REQUIRED  "Element_Property_Card_1D_Structural;libMesh_Mesh_Generation_1d"
         FIXTURES_SETUP     IsotropicLinearMaterial)
 
 
