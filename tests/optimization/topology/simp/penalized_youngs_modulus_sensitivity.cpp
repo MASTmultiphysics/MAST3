@@ -22,7 +22,7 @@
 
 // MAST includes
 #include <mast/optimization/topology/simp/penalized_density.hpp>
-#include <mast/optimization/topology/simp/penalized_youngs_modulus.hpp>
+#include <mast/optimization/topology/simp/penalized_scalar.hpp>
 
 // Test includes
 #include <test_helpers.h>
@@ -57,7 +57,7 @@ struct DensityField {
 inline void test_penalized_youngs_modulus_sensitivity()  {
 
     using density_r_t  = MAST::Optimization::Topology::SIMP::PenalizedDensity<real_t, DensityField<real_t>>;
-    using youngs_mod_r_t  = MAST::Optimization::Topology::SIMP::PenalizedYoungsModulus<real_t, density_r_t>;
+    using youngs_mod_r_t  = MAST::Optimization::Topology::SIMP::PenalizedScalar<real_t, density_r_t>;
 
     Context c;
     DensityField<real_t> field;
@@ -68,7 +68,7 @@ inline void test_penalized_youngs_modulus_sensitivity()  {
     
     youngs_mod_r_t modulus;
     modulus.set_density(density);
-    modulus.set_modulus(72.e9, 72.e2);
+    modulus.set_scalar(72.e9, 72.e2);
     
     real_t
     E       = modulus.value(c),
@@ -80,7 +80,7 @@ inline void test_penalized_youngs_modulus_sensitivity()  {
     {
         using density_cs_t = MAST::Optimization::Topology::SIMP::PenalizedDensity<complex_t, DensityField<complex_t>>;
 
-        using youngs_mod_cs_t = MAST::Optimization::Topology::SIMP::PenalizedYoungsModulus<complex_t, density_cs_t>;
+        using youngs_mod_cs_t = MAST::Optimization::Topology::SIMP::PenalizedScalar<complex_t, density_cs_t>;
         
         DensityField<complex_t> field_cs;
         field_cs.v += complex_t(0., ComplexStepDelta);
@@ -91,7 +91,7 @@ inline void test_penalized_youngs_modulus_sensitivity()  {
         
         youngs_mod_cs_t modulus_cs;
         modulus_cs.set_density(density_cs);
-        modulus_cs.set_modulus(72.e9, 72.e2);
+        modulus_cs.set_scalar(72.e9, 72.e2);
 
         dE_cs = field_cs.dv * modulus_cs.value(c).imag()/ComplexStepDelta;
 
@@ -103,7 +103,7 @@ inline void test_penalized_youngs_modulus_sensitivity()  {
     // automatic differentiation
     {
         using density_ad_t = MAST::Optimization::Topology::SIMP::PenalizedDensity<adouble_tl_t, DensityField<adouble_tl_t>>;
-        using youngs_mod_ad_t = MAST::Optimization::Topology::SIMP::PenalizedYoungsModulus<adouble_tl_t, density_ad_t>;
+        using youngs_mod_ad_t = MAST::Optimization::Topology::SIMP::PenalizedScalar<adouble_tl_t, density_ad_t>;
 
         DensityField<adouble_tl_t> field_ad;
         field_ad.v.setADValue(&field_ad.dv);
@@ -114,7 +114,7 @@ inline void test_penalized_youngs_modulus_sensitivity()  {
         
         youngs_mod_ad_t modulus_ad;
         modulus_ad.set_density(density_ad);
-        modulus_ad.set_modulus(72.e9, 72.e2);
+        modulus_ad.set_scalar(72.e9, 72.e2);
 
         dE_ad = *modulus_ad.value(c).getADValue();
 
