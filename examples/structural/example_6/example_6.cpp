@@ -30,7 +30,7 @@
 #include <mast/physics/elasticity/pressure_load.hpp>
 #include <mast/physics/elasticity/libmesh/mat_null_space.hpp>
 #include <mast/optimization/topology/simp/penalized_density.hpp>
-#include <mast/optimization/topology/simp/penalized_youngs_modulus.hpp>
+#include <mast/optimization/topology/simp/penalized_scalar.hpp>
 #include <mast/optimization/topology/simp/libmesh/residual_and_jacobian.hpp>
 #include <mast/optimization/topology/simp/libmesh/assemble_output_sensitivity.hpp>
 #include <mast/optimization/topology/simp/libmesh/volume.hpp>
@@ -212,7 +212,7 @@ struct Traits {
     using density_fe_var_t  = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, 1, dim, context_t, fe_shape_t>;
     using density_field_t   = typename MAST::FEBasis::ScalarFieldWrapper<scalar_t, density_fe_var_t>;
     using density_t         = typename MAST::Optimization::Topology::SIMP::PenalizedDensity<SolScalarType, density_field_t>;
-    using modulus_t         = typename MAST::Optimization::Topology::SIMP::PenalizedYoungsModulus<SolScalarType, density_t>;
+    using modulus_t         = typename MAST::Optimization::Topology::SIMP::PenalizedScalar<SolScalarType, density_t>;
     using nu_t              = typename MAST::Base::ScalarConstant<SolScalarType>;
     using press_t           = typename ModelType::template pressure_t<scalar_t>;
     using area_t            = typename MAST::Base::ScalarConstant<SolScalarType>;
@@ -302,7 +302,7 @@ public:
         density->set_penalty(c.ex_init.penalty);
         density->set_density_field(*_density_field);
         E->set_density(*density);
-        E->set_modulus(72.e9, 72.e2);
+        E->set_scalar(72.e9, 72.e2);
         
         _prop->set_modulus_and_nu(*E, *nu);
         _energy   = new typename TraitsType::energy_t;
