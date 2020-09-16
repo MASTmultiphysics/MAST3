@@ -17,8 +17,8 @@
 * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#ifndef __mast_simp_penalized_youngs_modulus_h__
-#define __mast_simp_penalized_youngs_modulus_h__
+#ifndef __mast_simp_penalized_scalar_h__
+#define __mast_simp_penalized_scalar_h__
 
 // MAST includes
 #include <mast/base/mast_data_types.h>
@@ -30,26 +30,26 @@ namespace Topology {
 namespace SIMP {
 
 template <typename ScalarType, typename PenalizedDensityType>
-class PenalizedYoungsModulus {
+class PenalizedScalar {
     
 public:
     
     using scalar_t = ScalarType;
     
-    PenalizedYoungsModulus():
-    _E0     (0.),
-    _E_min  (0.),
+    PenalizedScalar():
+    _v0     (0.),
+    _v_min  (0.),
     _d      (nullptr)
     { }
     
-    virtual ~PenalizedYoungsModulus() {}
+    virtual ~PenalizedScalar() {}
     
     inline void set_density(const PenalizedDensityType &d) { _d = &d;}
     
-    inline void set_modulus(const ScalarType E0,
-                            const ScalarType Emin) {
-        _E0    = E0;
-        _E_min = Emin;
+    inline void set_scalar(const ScalarType v0,
+                           const ScalarType vmin) {
+        _v0    = v0;
+        _v_min = vmin;
     }
     
     template <typename ContextType>
@@ -57,7 +57,7 @@ public:
         
         Assert0(_d,  "Density field not initialized");
         
-        return _E_min + _E0 * _d->value(c);
+        return _v_min + _v0 * _d->value(c);
     }
 
     template <typename ContextType, typename ScalarFieldType>
@@ -66,14 +66,14 @@ public:
         
         Assert0( _d, "Density field not initialized");
         
-        return _E0 * _d->derivative(c, f);
+        return _v0 * _d->derivative(c, f);
     }
 
     
 private:
     
-    ScalarType                   _E0;
-    ScalarType                   _E_min;
+    ScalarType                   _v0;
+    ScalarType                   _v_min;
     const PenalizedDensityType  *_d;
 };
 } // namespace SIMP
@@ -81,4 +81,4 @@ private:
 } // namespace Optimization
 } // namespace MAST
 
-#endif  // __mast_simp_penalized_youngs_modulus_h__
+#endif  // __mast_simp_penalized_scalar_h__

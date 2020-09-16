@@ -122,7 +122,7 @@ public:
             <scalar_t, scalar_t, FEVarType, Dim>(*_fe_var_data, i, epsilon, Bxmat);
             stress = mat * dt_vec;
             Bxmat.vector_mult_transpose(vec, stress);
-            res += (fe.detJxW(i) * dt * alpha) * vec;
+            res -= (fe.detJxW(i) * dt * alpha) * vec;
             
             // nothing to be done for Jacobian due to linear term
             // if (jac) { }
@@ -178,7 +178,7 @@ public:
 
             stress = mat*dt_vec * (dalphadp*dt + alpha*dtdp) + dmat*dt_vec * alpha*dt;
             Bxmat.vector_mult_transpose(vec, stress);
-            res += fe.detJxW(i) * vec;
+            res -= fe.detJxW(i) * vec;
 
             // nothing to be done for Jacobian due to linear term
             // if (jac) { }

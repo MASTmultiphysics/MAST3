@@ -81,7 +81,7 @@ public:
     }
     
     template <typename Vec2Type>
-    inline ScalarType dot(const Vec2Type& v) {
+    inline ScalarType dot(const Vec2Type& v) const {
         
         Assert2(this->size() == v.size(),
                 this->size(), v.size(),
