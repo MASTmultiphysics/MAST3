@@ -731,7 +731,7 @@ int main(int argc, char** argv) {
     libMesh::LibMeshInit init(argc, argv);
     MAST::Utility::GetPotWrapper input(argc, argv);
     
-    using model_t     = MAST::Mesh::Generation::Bracket2D;
+    using model_t     = MAST::Mesh::Generation::Bracket3D;
     
     using traits_t    = MAST::Examples::Structural::Example6::Traits<real_t, real_t, real_t, model_t>;
     using elem_ops_t  = MAST::Examples::Structural::Example6::ElemOps<traits_t>;
