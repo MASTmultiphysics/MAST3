@@ -100,6 +100,9 @@ public:
         
         eq_sys->init();
         
+        mesh->print_info(std::cout);
+        eq_sys->print_info(std::cout);
+
         real_t
         filter_r = input("filter_radius",
                          "radius of geometric filter for level set field", 0.015);
@@ -112,9 +115,6 @@ public:
         
         Mat m = dynamic_cast<libMesh::PetscMatrix<real_t>*>(sys->matrix)->mat();
         null_sp.attach_to_matrix(m);
-        
-        mesh->print_info(std::cout);
-        eq_sys->print_info(std::cout);
         
         penalty  = input("rho_penalty",
                          "SIMP modulus of elasticity penalty", 3.);
