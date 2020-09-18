@@ -37,7 +37,8 @@
 #include <libmesh/boundary_info.h>
 #include <libmesh/dirichlet_boundaries.h>
 #include <libmesh/zero_function.h>
-
+#include <libmesh/mesh_refinement.h>
+#include <libmesh/mesh_modification.h>
 
 
 namespace MAST {
@@ -363,7 +364,8 @@ struct Bracket3D {
         uint_t
         nx_divs = c.input("nx_divs", "number of elements along x-axis", 10),
         ny_divs = c.input("ny_divs", "number of elements along y-axis", 10),
-        nz_divs = c.input("nz_divs", "number of elements along z-axis", 10);
+        nz_divs = c.input("nz_divs", "number of elements along z-axis", 10),
+        n_refine= c.input("n_uniform_refinement", "number of times the mesh is uniformly refined", 0);
         
         if (nx_divs%10 != 0 || ny_divs%10 != 0)
             Error(false, "number of divisions in x and y must be multiples of 10");
@@ -392,6 +394,13 @@ struct Bracket3D {
                    height,
                    width,
                    e_type);
+        
+        // we now uniformly refine this mesh
+        if (n_refine) {
+            
+            libMesh::MeshRefinement(mesh).uniformly_refine(n_refine);
+            libMesh::MeshTools::Modification::flatten(mesh);
+        }
     }
     
         
