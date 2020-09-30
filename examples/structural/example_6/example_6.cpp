@@ -42,6 +42,7 @@
 #include <mast/solvers/petsc/linear_solver.hpp>
 
 // topology optimization benchmark cases
+#include <mast/mesh/generation/truss2d.hpp>
 #include <mast/mesh/generation/bracket2d.hpp>
 #include <mast/mesh/generation/bracket3d.hpp>
 
@@ -726,20 +727,16 @@ private:
 
 #ifndef MAST_TESTING
 
-int main(int argc, char** argv) {
+template <typename ModelType>
+void run(libMesh::LibMeshInit& init, MAST::Utility::GetPotWrapper& input) {
     
-    libMesh::LibMeshInit init(argc, argv);
-    MAST::Utility::GetPotWrapper input(argc, argv);
-    
-    using model_t     = MAST::Mesh::Generation::Bracket3D;
-    
-    using traits_t    = MAST::Examples::Structural::Example6::Traits<real_t, real_t, real_t, model_t>;
+    using traits_t    = MAST::Examples::Structural::Example6::Traits<real_t, real_t, real_t, ModelType>;
     using elem_ops_t  = MAST::Examples::Structural::Example6::ElemOps<traits_t>;
     using func_eval_t = MAST::Examples::Structural::Example6::FunctionEvaluation<traits_t>;
 
-    traits_t::ex_init_t ex_init(init.comm(), input);
+    typename traits_t::ex_init_t ex_init(init.comm(), input);
 
-    traits_t::context_t  c(ex_init);
+    typename traits_t::context_t  c(ex_init);
     elem_ops_t           e_ops(c);
     func_eval_t          f_eval(e_ops, c);
     
@@ -751,7 +748,24 @@ int main(int argc, char** argv) {
     
     // optimize
     optimizer.optimize();
+}
+
+int main(int argc, char** argv) {
     
+    libMesh::LibMeshInit init(argc, argv);
+    MAST::Utility::GetPotWrapper input(argc, argv);
+
+    std::string
+    nm = input("model", "model to run for topology optimization: bracket2d/bracket3d/truss2d", "bracket2d");
+    
+    if (nm == "bracket2d")
+        run<MAST::Mesh::Generation::Bracket2D>(init, input);
+    if (nm == "bracket3d")
+        run<MAST::Mesh::Generation::Bracket3D>(init, input);
+    if (nm == "truss2d")
+        run<MAST::Mesh::Generation::Truss2D>(init, input);
+    else
+        std::cout << "Invalid model" << std::endl;
     
     // END_TRANSLATE
     return 0;
