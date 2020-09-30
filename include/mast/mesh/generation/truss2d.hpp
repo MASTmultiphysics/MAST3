@@ -266,12 +266,6 @@ struct Truss2D {
                         if (i == 2*(nx-1))
                             boundary_info.add_side(elem, 1, 1);
                         
-                        if (i==nx*4/10)
-                            boundary_info.add_side(elem, 1, 4);
-                        
-                        if (j==ny*6/10)
-                            boundary_info.add_side(elem, 0, 5);
-                        
                         if (j == 0 && i <= dirichletlength_fraction * 2*nx)
                             boundary_info.add_side(elem, 0, 6);
 
@@ -397,7 +391,7 @@ struct Truss2D {
         tol           = 1.e-12,
         length        = c.input("length", "length of domain along x-axis", 0.24),
         height        = c.input("height", "length of domain along y-axis", 0.04),
-        frac          = c.input("loadlength_fraction", "fraction of boundary length on which pressure will act", 0.125),
+        frac          = c.input("loadlength_fraction", "fraction of boundary length on which pressure will act", 0.2),
         filter_radius = c.input("filter_radius", "radius of geometric filter for level set field", 0.008),
         vf            = c.input("volume_fraction", "upper limit for the volume fraction", 0.2);
         
