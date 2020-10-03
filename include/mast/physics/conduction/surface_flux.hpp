@@ -1,0 +1,217 @@
+/*
+* MAST: Multidisciplinary-design Adaptation and Sensitivity Toolkit
+* Copyright (C) 2013-2020  Manav Bhatia and MAST authors
+*
+* This library is free software; you can redistribute it and/or
+* modify it under the terms of the GNU Lesser General Public
+* License as published by the Free Software Foundation; either
+* version 2.1 of the License, or (at your option) any later version.
+*
+* This library is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+* Lesser General Public License for more details.
+*
+* You should have received a copy of the GNU Lesser General Public
+* License along with this library; if not, write to the Free Software
+* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+*/
+
+#ifndef __mast_conduction_surface_flux_load_h__
+#define __mast_conduction_surface_flux_load_h__
+
+// MAST includes
+#include <mast/base/mast_data_types.h>
+#include <mast/base/exceptions.hpp>
+
+namespace MAST {
+namespace Physics {
+namespace Conduction {
+
+template <typename ScalarType,
+          typename SectionAreaType,
+          typename FluxFieldType,
+          typename ContextType,
+          uint_t Dim>
+typename std::enable_if<Dim<3, ScalarType>::type
+flux_multiplier(const FluxFieldType    *f,
+                const SectionAreaType  *s,
+                ContextType            &c) {
+    Assert0(f, "Invalid pointer");
+    Assert0(s, "Invalid pointer");
+    return f->value(c) * s->value(c);
+}
+
+template <typename ScalarType,
+          typename SectionAreaType,
+          typename FluxFieldType,
+          typename ContextType,
+          uint_t Dim>
+typename std::enable_if<Dim==3, ScalarType>::type
+flux_multiplier(const FluxFieldType    *f,
+                const SectionAreaType  *s,
+                ContextType            &c) {
+    Assert0(f, "Invalid pointer");
+    Assert0(!s, "Pointer must be nullptr");
+    return f->value(c);
+}
+
+template <typename ScalarType,
+          typename SectionAreaType,
+          typename FluxFieldType,
+          typename ContextType,
+          typename ScalarFieldType,
+          uint_t Dim>
+typename std::enable_if<Dim<3, ScalarType>::type
+flux_multiplier(const FluxFieldType    *f,
+                const SectionAreaType  *s,
+                ContextType            &c,
+                const ScalarFieldType  &p) {
+    Assert0(f, "Invalid pointer");
+    Assert0(s, "Invalid pointer");
+    return (f->value(c) * s->derivative(p, c) +
+            s->value(c) * f->derivative(p, c));
+}
+
+template <typename ScalarType,
+          typename SectionAreaType,
+          typename FluxFieldType,
+          typename ContextType,
+          typename ScalarFieldType,
+          uint_t Dim>
+typename std::enable_if<Dim==3, ScalarType>::type
+flux_derivative_multiplier(const FluxFieldType    *f,
+                           const SectionAreaType  *s,
+                           ContextType            &c,
+                           const ScalarFieldType  &p) {
+    
+    Assert0(f, "Invalid pointer");
+    Assert0(!s, "Pointer must be nullptr");
+    return f->derivative(c);
+}
+
+
+/*!
+ * This class implements the discrete evaluation of the conduction (Laplace operator) kernel defined as
+ * \f[ \int_{\Omega_e} \frac{\partial \phi}{\partial x_i} k \frac{\partial T}{\partial x_i}, \f]
+ * where, \f$ \phi\f$ is the variation and \f$ T \f$ is the temperature. Note that currently this assumes
+ * a linear isotropic coefficient of conductance.
+ *
+ * Template parameter:
+ *    - \p FEVarType : Class that provides the interpolation and spatial derivative of solution at quadrature points.
+ *    - \p FluxFieldType : Class that provides the flux value at quadrature point
+ *    - \p SectionAreaType : Class that provides the section thickness for 2D elements and section area for 1D
+ *    elements at quadrature points. For 3D elements
+ *    - \p Dim : Spatial dimension of the element
+ *    - \p ContextType : Class that provides the context object where member variable \p qp
+ *    is set to the current quadrature point during the quadrature loop.
+ */
+template <typename FEVarType,
+          typename FluxFieldType,
+          typename SectionAreaType,
+          uint_t Dim,
+          typename ContextType>
+class SurfaceFluxLoad {
+
+public:
+
+    using scalar_t         = typename FEVarType::scalar_t;
+    using basis_scalar_t   = typename FEVarType::fe_shape_deriv_t::scalar_t;
+    using vector_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
+    using matrix_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
+
+    SurfaceFluxLoad():
+    _section       (nullptr),
+    _pressure      (nullptr),
+    _fe_var_data   (nullptr)
+    { }
+    
+    virtual ~SurfaceFluxLoad() { }
+    
+    inline void set_section_area(const SectionAreaType& s) {
+        
+        Assert1(Dim < 3, Dim, "SectionAreaType only used for 1D and 2D elements");
+        
+        _section = &s;
+    }
+    
+    inline void set_flux(const FluxFieldType& f) { _flux = &f;}
+    
+    inline void set_fe_var_data(const FEVarType& fe) { _fe_var_data = &fe;}
+
+    inline uint_t n_dofs() const {
+
+        Assert0(_fe_var_data, "FE data not initialized.");
+
+        return Dim*_fe_var_data->get_fe_shape_data().n_basis();
+    }
+
+    inline void
+    compute(ContextType& c,
+            vector_t& res,
+            matrix_t* jac = nullptr) const {
+        
+        Assert0(_fe_var_data, "FE data not initialized.");
+        Assert0(Dim==3 || _section, "Section property not initialized");
+        Assert0(_pressure, "Pressure not initialized");
+        
+        const typename FEVarType::fe_shape_deriv_t
+        &fe = _fe_var_data->get_fe_shape_data();
+        
+        for (uint_t i=0; i<fe.n_q_points(); i++) {
+            
+            c.qp       = i;
+            scalar_t p = flux_multiplier<ScalarType,
+                                         SectionAreaType,
+                                         FluxFieldType,
+                                         ContextType,
+                                         Dim>(_pressure, _section, c);
+            
+            for (uint_t k=0; k<fe.n_basis(); k++)
+            res(k) -= fe.detJxW(i) * fe.phi(i, k) * p;
+        }
+    }
+
+    
+    
+    template <typename ScalarFieldType>
+    inline void derivative(ContextType& c,
+                           const ScalarFieldType& f,
+                           vector_t& res,
+                           matrix_t* jac = nullptr) const {
+        
+        Assert0(_fe_var_data, "FE data not initialized.");
+        Assert0(Dim==3 || _section, "Section property not initialized");
+        Assert0(_pressure, "Pressure not initialized");
+        
+        const typename FEVarType::fe_shape_deriv_t
+        &fe = _fe_var_data->get_fe_shape_data();
+        
+        for (uint_t i=0; i<fe.n_q_points(); i++) {
+            
+            c.qp       = i;
+            scalar_t p =
+            flux_derivative_multiplier<ScalarType,
+                                       SectionAreaType,
+                                       FluxFieldType,
+                                       ContextType,
+                                       Dim>(_pressure, _section, c, f);
+            
+            for (uint_t k=0; k<fe.n_basis(); k++)
+            res(k) -= fe.detJxW(i) * fe.phi(i, k) * p;
+        }
+    }
+    
+private:
+
+    const SectionAreaType      *_section;
+    const FluxFieldType        *_flux;
+    const FEVarType            *_fe_var_data;
+};
+
+} // namespace Conduction
+} // namespace Physics
+} // namespace MAST
+
+
+#endif // __mast_conduction_surface_flux_load_h__
