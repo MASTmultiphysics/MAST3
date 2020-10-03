@@ -26,14 +26,28 @@
 namespace MAST {
 namespace Physics {
 namespace Conduction {
-namespace ConductionKernel {
+//namespace ConductionKernel {
+
+
+template <typename FEVarType,
+          typename SectionPropertyType,
+          uint_t Dim,
+          typename ContextType,
+          bool IsotropicMaterial = SectionPropertyType::is_isotropic,
+          bool LinearMaterial    = SectionPropertyType::is_linear>
+class ConductionKernel { };
 
 
 template <typename FEVarType,
           typename SectionPropertyType,
           uint_t Dim,
           typename ContextType>
-class ConductionKernel {
+class ConductionKernel<FEVarType,
+                       SectionPropertyType,
+                       Dim,
+                       ContextType,
+                       true,
+                       true> {
     
 public:
 
@@ -68,7 +82,7 @@ public:
 
         Assert0(_fe_var_data, "FE data not initialized.");
 
-        return Dim*_fe_var_data->get_fe_shape_data().n_basis();
+        return _fe_var_data->get_fe_shape_data().n_basis();
     }
     
     inline void compute(ContextType& c,
@@ -82,21 +96,19 @@ public:
         &fe = _fe_var_data->get_fe_shape_data();
         
         typename Eigen::Matrix<scalar_t, Dim, 1>
-        epsilon,
-        flux;
+        grad;
         vector_t
-        vec     = vector_t::Zero(Dim*fe.n_basis());
+        vec     = vector_t::Zero(fe.n_basis());
         
         typename SectionPropertyType::value_t
         mat;
         
         matrix_t
-        mat1 = matrix_t::Zero(1, Dim*fe.n_basis()),
-        mat2 = matrix_t::Zero(Dim*fe.n_basis(), Dim*fe.n_basis());
+        mat2 = matrix_t::Zero(fe.n_basis(), fe.n_basis());
 
         MAST::Numerics::FEMOperatorMatrix<scalar_t>
         Bxmat;
-        Bxmat.reinit(1, Dim, fe.n_basis());
+        Bxmat.reinit(Dim, 1, fe.n_basis());
 
         
         for (uint_t i=0; i<fe.n_q_points(); i++) {
@@ -105,16 +117,14 @@ public:
             
             _property->value(c, mat);
             MAST::Physics::Conduction::GradientOperator::gradient_operator
-            <scalar_t, scalar_t, FEVarType, Dim>(*_fe_var_data, i, epsilon, Bxmat);
-            flux = mat * epsilon;
-            Bxmat.vector_mult_transpose(vec, flux);
-            res += fe.detJxW(i) * vec;
+            <scalar_t, scalar_t, FEVarType, Dim>(*_fe_var_data, i, grad, Bxmat);
+            Bxmat.vector_mult_transpose(vec, grad);
+            res += fe.detJxW(i) * mat * vec;
             
             if (jac) {
                 
-                Bxmat.left_multiply(mat1, mat);
-                Bxmat.right_multiply_transpose(mat2, mat1);
-                (*jac) += fe.detJxW(i) * mat2;
+                Bxmat.right_multiply_transpose(mat2, Bxmat);
+                (*jac) += fe.detJxW(i) * mat * mat2;
             }
         }
     }
@@ -132,20 +142,18 @@ public:
         &fe = _fe_var_data->get_fe_shape_data();
 
         typename Eigen::Matrix<scalar_t, Dim, 1>
-        epsilon,
-        flux;
+        grad;
         vector_t
-        vec     = vector_t::Zero(Dim*fe.n_basis());
+        vec     = vector_t::Zero(fe.n_basis());
 
         typename SectionPropertyType::value_t
         mat;
         matrix_t
-        mat1 = matrix_t::Zero(1, Dim*fe.n_basis()),
-        mat2 = matrix_t::Zero(Dim*fe.n_basis(), Dim*fe.n_basis());
+        mat2 = matrix_t::Zero(fe.n_basis(), fe.n_basis());
 
         MAST::Numerics::FEMOperatorMatrix<scalar_t>
         Bxmat;
-        Bxmat.reinit(1, Dim, fe.n_basis());
+        Bxmat.reinit(Dim, 1, fe.n_basis());
 
         
         for (uint_t i=0; i<fe.n_q_points(); i++) {
@@ -154,16 +162,14 @@ public:
             
             _property->derivative(c, f, mat);
             MAST::Physics::Conduction::GradientOperator::gradient_operator
-            <scalar_t, scalar_t, FEVarType, Dim>(*_fe_var_data, i, epsilon, Bxmat);
-            flux = mat * epsilon;
-            Bxmat.vector_mult_transpose(vec, flux);
-            res += fe.detJxW(i) * vec;
+            <scalar_t, scalar_t, FEVarType, Dim>(*_fe_var_data, i, grad, Bxmat);
+            Bxmat.vector_mult_transpose(vec, grad);
+            res += fe.detJxW(i) * mat * vec;
             
             if (jac) {
                 
-                Bxmat.left_multiply(mat1, mat);
-                Bxmat.right_multiply_transpose(mat2, mat1);
-                (*jac) += fe.detJxW(i) * mat2;
+                Bxmat.right_multiply_transpose(mat2, Bxmat);
+                (*jac) += fe.detJxW(i) * mat * mat2;
             }
         }
     }
@@ -176,7 +182,7 @@ private:
     const FEVarType                 *_fe_var_data;
 };
 
-}  // namespace ConductionKernel
+//}  // namespace ConductionKernel
 }  // namespace Conduction
 }  // namespace Physics
 }  // namespace MAST
