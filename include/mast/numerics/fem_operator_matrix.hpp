@@ -504,16 +504,16 @@ right_multiply_transpose(T& r, const MAST::Numerics::FEMOperatorMatrix<ScalarTyp
     
     for (uint_t i=0; i<_n_discrete_vars; i++) // row of result
         for (uint_t j=0; j<m._n_discrete_vars; j++) // column of result
-            for (uint_t k=0; k<_n_interpolated_vars; k++) {
-                index_i = i*_n_interpolated_vars+k;
+            for (uint_t k=0; k<_n_interpolated_vars; k++) {// same number of interpolated vars in both
+                index_i = i*_n_interpolated_vars+k; // column major index of shape function
                 index_j = j*m._n_interpolated_vars+k;
                 if (_var_shape_functions[index_i] &&
                     m._var_shape_functions[index_j]) { // if shape function exists for both
                     const ScalarType
                     *n1 = _var_shape_functions[index_i],
                     *n2 = m._var_shape_functions[index_j];
-                    for (uint_t i_n1=0; i_n1<_n_interpolated_vars; i_n1++)
-                        for (uint_t i_n2=0; i_n2<m._n_interpolated_vars; i_n2++)
+                    for (uint_t i_n1=0; i_n1<_n_dofs_per_var; i_n1++)
+                        for (uint_t i_n2=0; i_n2<m._n_dofs_per_var; i_n2++)
                             r (i*_n_dofs_per_var+i_n1,
                                j*m._n_dofs_per_var+i_n2) += n1[i_n1] * n2[i_n2];
                 }
