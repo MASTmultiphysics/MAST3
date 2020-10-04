@@ -94,8 +94,8 @@ flux_derivative_multiplier(const FluxFieldType    *f,
 
 /*!
  * This class implements the discrete evaluation of the conduction (Laplace operator) kernel defined as
- * \f[ - \int_{\Gamma_e} \phi q_n, \f]
- * where, \f$ \phi\f$ is the variation and \f$ q_n \f$ is the boundar ynormal flux.
+ * \f[ - \int_{\Gamma_e} \phi q_n~d\Gamma, \f]
+ * where, \f$ \phi\f$ is the variation and \f$ q_n \f$ is the boundary normal flux.
  *
  * Template parameter:
  *    - \p FEVarType : Class that provides the interpolation and spatial derivative of solution at quadrature points.
@@ -152,7 +152,7 @@ public:
 
     /*!
      * Computes the residual of variational term
-     * \f[ - \int_{\Gamma_e} \phi q_n, \f] and returns it
+     * \f[ - \int_{\Gamma_e} \phi q_n~d\Gamma, \f] and returns it
      *  in \p res. The Jacobian for this term is zero. Note that this method does
      *  not zero these two quantities and adds the contribution from this element to the
      *  vector and matrix provided in the function arguments.
@@ -186,7 +186,7 @@ public:
     
     /*!
      * Computes the derivative of residual of variational term with respect to parameter \f$ \alpha \f$
-     *  \f[ - \int_{\Gamma_e} \phi \frac{\partial q_n}{\partial \alpha}, \f] and returns it
+     *  \f[ - \int_{\Gamma_e} \phi \frac{\partial q_n}{\partial \alpha}~d\Gamma, \f] and returns it
      *  in \p res. The Jacobian and its derivative for this term is zero.
      *  Note that this method does not zero these two quantities and adds the contribution from this
      *  element to the vector and matrix provided in the function arguments.
