@@ -94,16 +94,16 @@ flux_derivative_multiplier(const FluxFieldType    *f,
 
 /*!
  * This class implements the discrete evaluation of the conduction (Laplace operator) kernel defined as
- * \f[ \int_{\Omega_e} \frac{\partial \phi}{\partial x_i} k \frac{\partial T}{\partial x_i}, \f]
- * where, \f$ \phi\f$ is the variation and \f$ T \f$ is the temperature. Note that currently this assumes
- * a linear isotropic coefficient of conductance.
+ * \f[ - \int_{\Gamma_e} \phi q_n, \f]
+ * where, \f$ \phi\f$ is the variation and \f$ q_n \f$ is the boundar ynormal flux.
  *
  * Template parameter:
  *    - \p FEVarType : Class that provides the interpolation and spatial derivative of solution at quadrature points.
  *    - \p FluxFieldType : Class that provides the flux value at quadrature point
  *    - \p SectionAreaType : Class that provides the section thickness for 2D elements and section area for 1D
- *    elements at quadrature points. For 3D elements
- *    - \p Dim : Spatial dimension of the element
+ *    elements at quadrature points. 3D elements do not require a section area objcet, and this template parameter
+ *    - can be \p void.
+ *    - \p Dim : Spatial dimension of the element.
  *    - \p ContextType : Class that provides the context object where member variable \p qp
  *    is set to the current quadrature point during the quadrature loop.
  */
@@ -129,6 +129,9 @@ public:
     
     virtual ~SurfaceFluxLoad() { }
     
+    /*!
+     * Provides the section area through the object \p s. Not needed for 3D elements.
+     */
     inline void set_section_area(const SectionAreaType& s) {
         
         Assert1(Dim < 3, Dim, "SectionAreaType only used for 1D and 2D elements");
@@ -147,6 +150,13 @@ public:
         return _fe_var_data->get_fe_shape_data().n_basis();
     }
 
+    /*!
+     * Computes the residual of variational term
+     * \f[ - \int_{\Gamma_e} \phi q_n, \f] and returns it
+     *  in \p res. The Jacobian for this term is zero. Note that this method does
+     *  not zero these two quantities and adds the contribution from this element to the
+     *  vector and matrix provided in the function arguments.
+     */
     inline void
     compute(ContextType& c,
             vector_t& res,
@@ -174,7 +184,13 @@ public:
     }
 
     
-    
+    /*!
+     * Computes the derivative of residual of variational term with respect to parameter \f$ \alpha \f$
+     *  \f[ - \int_{\Gamma_e} \phi \frac{\partial q_n}{\partial \alpha}, \f] and returns it
+     *  in \p res. The Jacobian and its derivative for this term is zero.
+     *  Note that this method does not zero these two quantities and adds the contribution from this
+     *  element to the vector and matrix provided in the function arguments.
+     */
     template <typename ScalarFieldType>
     inline void derivative(ContextType& c,
                            const ScalarFieldType& f,
