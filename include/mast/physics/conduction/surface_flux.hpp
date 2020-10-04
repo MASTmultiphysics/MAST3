@@ -63,14 +63,15 @@ template <typename ScalarType,
           typename ScalarFieldType,
           uint_t Dim>
 typename std::enable_if<Dim<3, ScalarType>::type
-flux_multiplier(const FluxFieldType    *f,
-                const SectionAreaType  *s,
-                ContextType            &c,
-                const ScalarFieldType  &p) {
+flux_derivative_multiplier(const FluxFieldType    *f,
+                           const SectionAreaType  *s,
+                           ContextType            &c,
+                           const ScalarFieldType  &p) {
+    
     Assert0(f, "Invalid pointer");
     Assert0(s, "Invalid pointer");
-    return (f->value(c) * s->derivative(p, c) +
-            s->value(c) * f->derivative(p, c));
+    return (f->value(c) * s->derivative(c, p) +
+            s->value(c) * f->derivative(c, p));
 }
 
 template <typename ScalarType,
@@ -122,7 +123,7 @@ public:
 
     SurfaceFluxLoad():
     _section       (nullptr),
-    _pressure      (nullptr),
+    _flux          (nullptr),
     _fe_var_data   (nullptr)
     { }
     
@@ -143,7 +144,7 @@ public:
 
         Assert0(_fe_var_data, "FE data not initialized.");
 
-        return Dim*_fe_var_data->get_fe_shape_data().n_basis();
+        return _fe_var_data->get_fe_shape_data().n_basis();
     }
 
     inline void
@@ -153,7 +154,7 @@ public:
         
         Assert0(_fe_var_data, "FE data not initialized.");
         Assert0(Dim==3 || _section, "Section property not initialized");
-        Assert0(_pressure, "Pressure not initialized");
+        Assert0(_flux, "Flux not initialized");
         
         const typename FEVarType::fe_shape_deriv_t
         &fe = _fe_var_data->get_fe_shape_data();
@@ -161,11 +162,11 @@ public:
         for (uint_t i=0; i<fe.n_q_points(); i++) {
             
             c.qp       = i;
-            scalar_t p = flux_multiplier<ScalarType,
+            scalar_t p = flux_multiplier<scalar_t,
                                          SectionAreaType,
                                          FluxFieldType,
                                          ContextType,
-                                         Dim>(_pressure, _section, c);
+                                         Dim>(_flux, _section, c);
             
             for (uint_t k=0; k<fe.n_basis(); k++)
             res(k) -= fe.detJxW(i) * fe.phi(i, k) * p;
@@ -182,7 +183,7 @@ public:
         
         Assert0(_fe_var_data, "FE data not initialized.");
         Assert0(Dim==3 || _section, "Section property not initialized");
-        Assert0(_pressure, "Pressure not initialized");
+        Assert0(_flux, "Flux not initialized");
         
         const typename FEVarType::fe_shape_deriv_t
         &fe = _fe_var_data->get_fe_shape_data();
@@ -191,11 +192,12 @@ public:
             
             c.qp       = i;
             scalar_t p =
-            flux_derivative_multiplier<ScalarType,
+            flux_derivative_multiplier<scalar_t,
                                        SectionAreaType,
                                        FluxFieldType,
                                        ContextType,
-                                       Dim>(_pressure, _section, c, f);
+                                       ScalarFieldType,
+                                       Dim>(_flux, _section, c, f);
             
             for (uint_t k=0; k<fe.n_basis(); k++)
             res(k) -= fe.detJxW(i) * fe.phi(i, k) * p;
