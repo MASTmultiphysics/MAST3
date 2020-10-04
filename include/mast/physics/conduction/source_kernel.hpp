@@ -17,8 +17,8 @@
 * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#ifndef __mast_conduction_surface_flux_load_h__
-#define __mast_conduction_surface_flux_load_h__
+#ifndef __mast_conduction_source_load_h__
+#define __mast_conduction_source_load_h__
 
 // MAST includes
 #include <mast/base/mast_data_types.h>
@@ -30,13 +30,13 @@ namespace Conduction {
 
 template <typename ScalarType,
           typename SectionAreaType,
-          typename FluxFieldType,
+          typename SourceLoadFieldType,
           typename ContextType,
           uint_t Dim>
 typename std::enable_if<Dim<3, ScalarType>::type
-flux_multiplier(const FluxFieldType    *f,
-                const SectionAreaType  *s,
-                ContextType            &c) {
+source_load_multiplier(const SourceLoadFieldType    *f,
+                       const SectionAreaType  *s,
+                       ContextType            &c) {
     Assert0(f, "Invalid pointer");
     Assert0(s, "Invalid pointer");
     return f->value(c) * s->value(c);
@@ -44,13 +44,13 @@ flux_multiplier(const FluxFieldType    *f,
 
 template <typename ScalarType,
           typename SectionAreaType,
-          typename FluxFieldType,
+          typename SourceLoadFieldType,
           typename ContextType,
           uint_t Dim>
 typename std::enable_if<Dim==3, ScalarType>::type
-flux_multiplier(const FluxFieldType    *f,
-                const SectionAreaType  *s,
-                ContextType            &c) {
+source_load_multiplier(const SourceLoadFieldType    *f,
+                       const SectionAreaType  *s,
+                       ContextType            &c) {
     Assert0(f, "Invalid pointer");
     Assert0(!s, "Pointer must be nullptr");
     return f->value(c);
@@ -58,15 +58,15 @@ flux_multiplier(const FluxFieldType    *f,
 
 template <typename ScalarType,
           typename SectionAreaType,
-          typename FluxFieldType,
+          typename SourceLoadFieldType,
           typename ContextType,
           typename ScalarFieldType,
           uint_t Dim>
 typename std::enable_if<Dim<3, ScalarType>::type
-flux_derivative_multiplier(const FluxFieldType    *f,
-                           const SectionAreaType  *s,
-                           ContextType            &c,
-                           const ScalarFieldType  &p) {
+source_load_derivative_multiplier(const SourceLoadFieldType    *f,
+                                  const SectionAreaType  *s,
+                                  ContextType            &c,
+                                  const ScalarFieldType  &p) {
     
     Assert0(f, "Invalid pointer");
     Assert0(s, "Invalid pointer");
@@ -76,15 +76,15 @@ flux_derivative_multiplier(const FluxFieldType    *f,
 
 template <typename ScalarType,
           typename SectionAreaType,
-          typename FluxFieldType,
+          typename SourceLoadFieldType,
           typename ContextType,
           typename ScalarFieldType,
           uint_t Dim>
 typename std::enable_if<Dim==3, ScalarType>::type
-flux_derivative_multiplier(const FluxFieldType    *f,
-                           const SectionAreaType  *s,
-                           ContextType            &c,
-                           const ScalarFieldType  &p) {
+source_load_derivative_multiplier(const SourceLoadFieldType    *f,
+                                  const SectionAreaType  *s,
+                                  ContextType            &c,
+                                  const ScalarFieldType  &p) {
     
     Assert0(f, "Invalid pointer");
     Assert0(!s, "Pointer must be nullptr");
@@ -94,12 +94,12 @@ flux_derivative_multiplier(const FluxFieldType    *f,
 
 /*!
  * This class implements the discrete evaluation of the conduction (Laplace operator) kernel defined as
- * \f[ - \int_{\Gamma_e} \phi q_n~d\Gamma, \f]
- * where, \f$ \phi\f$ is the variation and \f$ q_n \f$ is the boundary normal flux.
+ * \f[ - \int_{\Omega_e} \phi q_v~d\Omega, \f]
+ * where, \f$ \phi\f$ is the variation and \f$ q_v \f$ is the source load value.
  *
  * Template parameter:
  *    - \p FEVarType : Class that provides the interpolation and spatial derivative of solution at quadrature points.
- *    - \p FluxFieldType : Class that provides the flux value at quadrature point
+ *    - \p SourceLoadFieldType : Class that provides the load value at quadrature point
  *    - \p SectionAreaType : Class that provides the section thickness for 2D elements and section area for 1D
  *    elements at quadrature points. 3D elements do not require a section area objcet, and this template parameter
  *    - can be \p void.
@@ -108,11 +108,11 @@ flux_derivative_multiplier(const FluxFieldType    *f,
  *    is set to the current quadrature point during the quadrature loop.
  */
 template <typename FEVarType,
-          typename FluxFieldType,
+          typename SourceLoadFieldType,
           typename SectionAreaType,
           uint_t Dim,
           typename ContextType>
-class SurfaceFluxLoad {
+class SourceHeatLoad {
 
 public:
 
@@ -121,13 +121,13 @@ public:
     using vector_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using matrix_t         = typename Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
 
-    SurfaceFluxLoad():
+    SourceHeatLoad():
     _section       (nullptr),
-    _flux          (nullptr),
+    _load          (nullptr),
     _fe_var_data   (nullptr)
     { }
     
-    virtual ~SurfaceFluxLoad() { }
+    virtual ~SourceHeatLoad() { }
     
     /*!
      * Provides the section area through the object \p s. Not needed for 3D elements.
@@ -139,7 +139,7 @@ public:
         _section = &s;
     }
     
-    inline void set_flux(const FluxFieldType& f) { _flux = &f;}
+    inline void set_source(const SourceLoadFieldType& s) { _load = &s;}
     
     inline void set_fe_var_data(const FEVarType& fe) { _fe_var_data = &fe;}
 
@@ -152,7 +152,7 @@ public:
 
     /*!
      * Computes the residual of variational term
-     * \f[ - \int_{\Gamma_e} \phi q_n~d\Gamma, \f] and returns it
+     * \f[ - \int_{\Omega_e} \phi q_v~d\Omega, \f] and returns it
      *  in \p res. The Jacobian for this term is zero. Note that this method does
      *  not zero these two quantities and adds the contribution from this element to the
      *  vector and matrix provided in the function arguments.
@@ -164,7 +164,7 @@ public:
         
         Assert0(_fe_var_data, "FE data not initialized.");
         Assert0(Dim==3 || _section, "Section property not initialized");
-        Assert0(_flux, "Flux not initialized");
+        Assert0(_load, "Source load not initialized");
         
         const typename FEVarType::fe_shape_deriv_t
         &fe = _fe_var_data->get_fe_shape_data();
@@ -172,11 +172,11 @@ public:
         for (uint_t i=0; i<fe.n_q_points(); i++) {
             
             c.qp       = i;
-            scalar_t p = flux_multiplier<scalar_t,
-                                         SectionAreaType,
-                                         FluxFieldType,
-                                         ContextType,
-                                         Dim>(_flux, _section, c);
+            scalar_t p = source_load_multiplier<scalar_t,
+                                                SectionAreaType,
+                                                SourceLoadFieldType,
+                                                ContextType,
+                                                Dim>(_load, _section, c);
             
             for (uint_t k=0; k<fe.n_basis(); k++)
             res(k) -= fe.detJxW(i) * fe.phi(i, k) * p;
@@ -186,7 +186,7 @@ public:
     
     /*!
      * Computes the derivative of residual of variational term with respect to parameter \f$ \alpha \f$
-     *  \f[ - \int_{\Gamma_e} \phi \frac{\partial q_n}{\partial \alpha}~d\Gamma, \f] and returns it
+     *  \f[ - \int_{\Omega_e} \phi \frac{\partial q_v}{\partial \alpha}~d\Omega, \f] and returns it
      *  in \p res. The Jacobian and its derivative for this term is zero.
      *  Note that this method does not zero these two quantities and adds the contribution from this
      *  element to the vector and matrix provided in the function arguments.
@@ -199,7 +199,7 @@ public:
         
         Assert0(_fe_var_data, "FE data not initialized.");
         Assert0(Dim==3 || _section, "Section property not initialized");
-        Assert0(_flux, "Flux not initialized");
+        Assert0(_load, "Source load not initialized");
         
         const typename FEVarType::fe_shape_deriv_t
         &fe = _fe_var_data->get_fe_shape_data();
@@ -208,12 +208,12 @@ public:
             
             c.qp       = i;
             scalar_t p =
-            flux_derivative_multiplier<scalar_t,
-                                       SectionAreaType,
-                                       FluxFieldType,
-                                       ContextType,
-                                       ScalarFieldType,
-                                       Dim>(_flux, _section, c, f);
+            source_load_derivative_multiplier<scalar_t,
+                                              SectionAreaType,
+                                              SourceLoadFieldType,
+                                              ContextType,
+                                              ScalarFieldType,
+                                              Dim>(_load, _section, c, f);
             
             for (uint_t k=0; k<fe.n_basis(); k++)
             res(k) -= fe.detJxW(i) * fe.phi(i, k) * p;
@@ -223,7 +223,7 @@ public:
 private:
 
     const SectionAreaType      *_section;
-    const FluxFieldType        *_flux;
+    const SourceLoadFieldType  *_load;
     const FEVarType            *_fe_var_data;
 };
 
@@ -232,4 +232,4 @@ private:
 } // namespace MAST
 
 
-#endif // __mast_conduction_surface_flux_load_h__
+#endif // __mast_conduction_source_load_h__

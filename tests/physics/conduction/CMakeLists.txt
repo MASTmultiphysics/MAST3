@@ -1,7 +1,8 @@
 target_sources(mast_catch_tests
                PRIVATE
+               ${CMAKE_CURRENT_LIST_DIR}/flux_load.cpp
                ${CMAKE_CURRENT_LIST_DIR}/linear_conduction_kernel.cpp
-               ${CMAKE_CURRENT_LIST_DIR}/flux_load.cpp)
+               ${CMAKE_CURRENT_LIST_DIR}/source_kernel.cpp)
 
 #Linear conduction kernel
 add_test(NAME LinearConductionKernel
@@ -18,3 +19,11 @@ set_tests_properties(SurfaceFluxLoad
         PROPERTIES
         LABELS "SEQ"
         FIXTURES_SETUP     SurfaceFluxLoad)
+
+#Source load kernel
+add_test(NAME SourceLoad
+         COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "source_load")
+set_tests_properties(SourceLoad
+        PROPERTIES
+        LABELS "SEQ"
+        FIXTURES_SETUP     SourceLoad)
