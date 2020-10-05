@@ -703,12 +703,11 @@ public:
         writer.write_timestep(oss.str(), *_c.eq_sys, 1, (real_t)iter);
         
         // also, save the design iteration to a text file
-        MAST::Optimization::Utility::write_dhistory_to_file(*this,
-                                                            _history,
-                                                            iter,
-                                                            dvars,
-                                                            o,
-                                                            fvals);
+        MAST::Optimization::Utility::write_obj_constr_history_to_file(*this,
+                                                                      _history,
+                                                                      iter,
+                                                                      o,
+                                                                      fvals);
 
     }
     
