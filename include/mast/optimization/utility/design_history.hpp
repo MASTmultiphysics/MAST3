@@ -36,6 +36,23 @@ namespace MAST {
 namespace Optimization {
 namespace Utility {
 
+/*!
+ * Prints the design iteration data to stream \p out. The template parameter \p FuncEvalType is the class that
+ * provides the method
+ *    - \p FuncEvalType::n_vars() : returns number of design variables
+ *    - \p FuncEvalType::n_eq() : returns number of equality constraints
+ *    - \p FuncEvalType::n_ineq() : returns number of inequality constraints
+ *    - \p FuncEvalType::tol() : returns tolerance for identifying constraint as active
+ *
+ *  function arguments are
+ *    - \p feval : object of type \p FuncEvalType that provides the relevant functions noted above
+ *    - \p out : Stream to which the output will be written
+ *    - \p iter : current iteration number
+ *    - \p x : current design variable vector
+ *    - \p obj : current objective function values.
+ *    - \p fval : current constraint function values. It is assumed that the equality constraint values are included before
+ *    the inequality constraint values.
+ */
 template <typename FuncEvalType>
 inline void
 write_dhistory_to_screen(const FuncEvalType          &feval,
@@ -121,6 +138,81 @@ write_dhistory_to_screen(const FuncEvalType          &feval,
 }
 
 
+/*!
+ * Prints the objective function and constraint values from design iterations stream \p output. Note that design variables are not
+ * included. If the design variables are needed then write_dhistory_to_file() must be used instead.
+ * The template parameter \p FuncEvalType is the class that provides the method
+ *    - \p FuncEvalType::n_vars() : returns number of design variables
+ *    - \p FuncEvalType::n_eq() : returns number of equality constraints
+ *    - \p FuncEvalType::n_ineq() : returns number of inequality constraints
+ *
+ *  function arguments are
+ *    - \p feval : object of type \p FuncEvalType that provides the relevant functions noted above
+ *    - \p output : Stream to which the output will be written
+ *    - \p iter : current iteration number
+ *    - \p obj : current objective function values.
+ *    - \p fval : current constraint function values. It is assumed that the equality constraint values are included before
+ *    the inequality constraint values.
+ */
+template <typename FuncEvalType>
+inline void
+write_obj_constr_history_to_file(const FuncEvalType          &feval,
+                                 std::ostream                &output,
+                                 const uint_t                 iter,
+                                 const real_t                &obj,
+                                 const std::vector<real_t>   &fval) {
+    
+    // write header for the first iteration
+    if (iter == 0) {
+
+        // number of desing variables
+        output
+        << std::setw(10) << "n_dv" << std::setw(10) << feval.n_vars() << std::endl;
+        output
+        << std::setw(10) << "n_eq" << std::setw(10) << feval.n_eq() << std::endl;
+        output
+        << std::setw(10) << "n_ineq" << std::setw(10) << feval.n_ineq() << std::endl;
+
+        output << std::setw(10) << "Iter";
+        output << std::setw(20) << "Obj";
+        for (unsigned int i=0; i<fval.size(); i++) {
+            std::stringstream f; f << "f_" << i;
+            output << std::setw(20) << f.str();
+        }
+        output << std::endl;
+    }
+    
+    output << std::setw(10) << iter;
+    output << std::setw(20) << obj;
+    for (unsigned int i=0; i < fval.size(); i++)
+        output << std::setw(20) << fval[i];
+    output << std::endl;
+}
+
+
+
+/*!
+ * Prints the design iteration data to stream \p output in a format that can be read back to initialize a problem from a design history.
+ * The template parameter \p FuncEvalType is the class that provides the method
+ *    - \p FuncEvalType::n_vars() : returns number of design variables
+ *    - \p FuncEvalType::n_eq() : returns number of equality constraints
+ *    - \p FuncEvalType::n_ineq() : returns number of inequality constraints
+ *  function arguments are
+ *    - \p feval : object of type \p FuncEvalType that provides the relevant functions noted above
+ *    - \p output : Stream to which the output will be written
+ *    - \p iter : current iteration number
+ *    - \p x : current design variable vector
+ *    - \p obj : current objective function values.
+ *    - \p fval : current constraint function values. It is assumed that the equality constraint values are included before
+ *    the inequality constraint values.
+ *
+ *  Following the initial header information, the data is written in a tabular format where each row corresponds to a design
+ *  iteration and the columns are arranged with:
+ *     -  all design variables,
+ *     - all equality constraints,
+ *     - objective function,
+ *     - all inequality constraints.
+ */
 template <typename FuncEvalType>
 inline void
 write_dhistory_to_file(const FuncEvalType          &feval,
@@ -164,6 +256,19 @@ write_dhistory_to_file(const FuncEvalType          &feval,
 }
 
 
+/*!
+ * Initializes the design variable vector \p dv from \p iter iteration stored in \p file . This assumes that the file was written
+ * by the function write_dhistory_to_file(). The template parameter \p FuncEvalType is the class that provides the method
+ *    - \p FuncEvalType::n_vars() : returns number of design variables
+ *    - \p FuncEvalType::n_eq() : returns number of equality constraints
+ *    - \p FuncEvalType::n_ineq() : returns number of inequality constraints
+ *
+ *  function arguments are
+ *    - \p feval : object of type \p FuncEvalType that provides the relevant functions noted above
+ *    - \p file : Name of file from which the data will be read
+ *    - \p iter : iteration number that will be read from \p file
+ *    - \p dv : vector into which the design variables will be initialized
+ */
 template <typename FuncEvalType>
 inline void initialize_dv_from_output_file(const FuncEvalType      &f_eval,
                                            const std::string       &file,
