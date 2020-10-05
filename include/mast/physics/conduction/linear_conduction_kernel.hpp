@@ -30,11 +30,11 @@ namespace Conduction {
 
 
 template <typename FEVarType,
-typename SectionPropertyType,
-uint_t Dim,
-typename ContextType,
-bool IsotropicMaterial = SectionPropertyType::is_isotropic,
-bool LinearMaterial    = SectionPropertyType::is_linear>
+          typename SectionPropertyType,
+          uint_t Dim,
+          typename ContextType,
+          bool IsotropicMaterial = SectionPropertyType::is_isotropic,
+          bool LinearMaterial    = SectionPropertyType::is_linear>
 class ConductionKernel { };
 
 
@@ -52,15 +52,15 @@ class ConductionKernel { };
  *    is set to the current quadrature point during the quadrature loop.
  */
 template <typename FEVarType,
-typename SectionPropertyType,
-uint_t Dim,
-typename ContextType>
+          typename SectionPropertyType,
+          uint_t Dim,
+          typename ContextType>
 class ConductionKernel<FEVarType,
-SectionPropertyType,
-Dim,
-ContextType,
-true,
-true> {
+                       SectionPropertyType,
+                       Dim,
+                       ContextType,
+                       true,
+                       true> {
     
 public:
     
