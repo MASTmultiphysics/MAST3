@@ -56,9 +56,8 @@ public:
                 "Number of unknowns should be equal to one");
 
         // make sure all variable types are LAGRANGE
-        for (uint_t i=0; i<_dim; i++)
-            Assert0(_sys.variable_type(i).family == libMesh::LAGRANGE,
-                    "Variables are expected to be LAGRANGE");
+        Assert0(_sys.variable_type(0).family == libMesh::LAGRANGE,
+                "Variables are expected to be LAGRANGE");
 
         // now initialize
         _init();
