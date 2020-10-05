@@ -110,7 +110,7 @@ public:
         eq_sys->reinit();
 
         // create and attach the null space to the matrix
-        MAST::Physics::Elasticity::libMeshWrapper::NullSpace
+        MAST::Physics::Conduction::libMeshWrapper::NullSpace
         null_sp(*sys, ModelType::dim);
         
         Mat m = dynamic_cast<libMesh::PetscMatrix<real_t>*>(sys->matrix)->mat();
@@ -242,7 +242,7 @@ public:
     density         (nullptr),
     k               (nullptr),
     qv              (nullptr),
-    qn              (nullptr),
+    //qn              (nullptr),
     area            (nullptr),
     _fe_data        (nullptr),
     _fe_side_data   (nullptr),
@@ -329,7 +329,7 @@ public:
         
         delete area;
         delete qv;
-        delete qn;
+        //delete qn;
         delete k;
         delete density;
 
@@ -458,7 +458,7 @@ public:
     _dvs          (new MAST::Optimization::DesignParameterVector<scalar_t>(c.rho_sys->comm())),
     _volume       (_c.ex_init.model->reference_volume(_c.ex_init)),
     _vf           (_c.ex_init.input("volume_fraction",
-                                    "upper limit for the volume fraction", 0.2)) {
+                                    "upper limit for the volume fraction", 0.3)) {
         
         // initialize the design variable vector
         _c.ex_init.model->init_simp_dvs(_c.ex_init, *_dvs);
