@@ -71,7 +71,7 @@ public:
 
 
         libMesh::MeshTools::Generation::build_square(*mesh,
-                                                     2, 2,
+                                                     5, 5,
                                                      0.0, 10.0,
                                                      0.0, 10.0,
                                                      libMesh::QUAD9);
@@ -79,7 +79,7 @@ public:
         sys->add_variable("T", libMesh::FEType(fe_order, fe_family));
 
         sys->get_dof_map().add_dirichlet_boundary
-        (libMesh::DirichletBoundary({3}, {0}, libMesh::ZeroFunction<real_t>()));
+        (libMesh::DirichletBoundary({0, 1, 2, 3}, {0}, libMesh::ZeroFunction<real_t>()));
         
         eq_sys->init();
 
@@ -426,7 +426,7 @@ int main(int argc, const char** argv) {
     libMesh::ExodusII_IO writer(*c.mesh);
     {
         for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, sol(i));
-        writer.write_timestep("solution.exo", *c.eq_sys, 1, 1.);
+        writer.write_timestep("solution.exo", *c.eq_sys, 1, 0.);
     }
 
     // compute the solution sensitivity wrt k
@@ -438,7 +438,7 @@ int main(int argc, const char** argv) {
     // write solution as first time-step
     {
         for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
-        writer.write_timestep("solution.exo", *c.eq_sys, 2, 2.);
+        writer.write_timestep("solution.exo", *c.eq_sys, 2, 1.);
     }
     dsol -= sol_c.imag()/ComplexStepDelta;
     std::cout << dsol.norm() << std::endl;
@@ -452,7 +452,7 @@ int main(int argc, const char** argv) {
     // write solution as first time-step
     {
         for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
-        writer.write_timestep("solution.exo", *c.eq_sys, 4, 4.);
+        writer.write_timestep("solution.exo", *c.eq_sys, 3, 2.);
     }
     dsol -= sol_c.imag()/ComplexStepDelta;
     std::cout << dsol.norm() << std::endl;
@@ -466,7 +466,7 @@ int main(int argc, const char** argv) {
     // write solution as first time-step
     {
         for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
-        writer.write_timestep("solution.exo", *c.eq_sys, 5, 5.);
+        writer.write_timestep("solution.exo", *c.eq_sys, 4, 3.);
     }
     dsol -= sol_c.imag()/ComplexStepDelta;
     std::cout << dsol.norm() << std::endl;
