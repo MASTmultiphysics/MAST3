@@ -43,10 +43,8 @@
 #include <mast/solvers/petsc/linear_solver.hpp>
 
 // topology optimization benchmark cases
-#include <mast/mesh/generation/truss2d.hpp>
-#include <mast/mesh/generation/truss3d.hpp>
-#include <mast/mesh/generation/bracket2d.hpp>
-#include <mast/mesh/generation/bracket3d.hpp>
+#include <mast/mesh/generation/heat_sink2d.hpp>
+#include <mast/mesh/generation/heat_sink3d.hpp>
 
 // libMesh includes
 #include <libmesh/distributed_mesh.h>
@@ -619,10 +617,9 @@ public:
 
         _c.sys->update();
 
-        // compliance is defined using the external work done \f$ c = x^T f \f$
         scalar_t
-        vol    = 0.,
-        comp   = _c.sys->solution->dot(*res);
+        vol        = 0.,
+        temp_sum   = _c.sys->solution->sum();
         
         //////////////////////////////////////////////////////////////////////
         // evaluate the functions
@@ -636,11 +633,9 @@ public:
         std::cout << "volume: " << vol << std::endl;
         
         // evaluate the output based on specified problem type
-        //nonlinear_assembly.calculate_output(*_sys->current_local_solution, false, compliance);
-        //comp      = compliance.output_total();
-        obj       = comp;
+        obj       = temp_sum;
         fvals[0]  = vol/_volume - _vf; // vol/vol0 - a <=
-        std::cout << "compliance: " << comp << std::endl;
+        std::cout << "Sum_i Temperature: " << temp_sum << std::endl;
         
 
         //////////////////////////////////////////////////////////////////////
@@ -650,31 +645,38 @@ public:
             
             MAST::Optimization::Topology::SIMP::libMeshWrapper::AssembleOutputSensitivity
             <scalar_t, ElemOps<TraitsType>, ElemOps<TraitsType>>
-            compliance_sens;
+            temp_sum_sens;
             
-            compliance_sens.set_elem_ops(_e_ops, _e_ops);
+            temp_sum_sens.set_elem_ops(_e_ops, _e_ops);
 
-            // the adjoint solution for compliance is the negative of displacement. We copy the
-            // negative of solution in vector \p res.
-            res.reset(_c.sys->current_local_solution->clone().release());
-            res->scale(-1.);
+            // the adjoint solution for sum of temperature is obtained using a RHS vector
+            // of unit values.
+            // \f[ K^T \lambda = - \{1\} \f]
+            //
+            (*res) = 1.;
+            res->close();
             
-            // This solves for the sensitivity of compliance, \f$ c=x^T f \f$, with respect to
-            // a parameter \f$ \alpha \f$.
-            // \f{eqnarray*}{ \frac{dc}{d\alpha}
-            //    & = & \frac{\partial c}{\partial \alpha} + \frac{\partial c}{\partial x}
-            //     \frac{dx}{d\alpha} \\
-            //    & = & \frac{\partial c}{\partial \alpha} +
-            //     \lambda^T \frac{\partial R(x)}{\partial \alpha}
+            std::unique_ptr<libMesh::NumericVector<real_t>>
+            adj(_c.sys->current_local_solution->zero_clone().release());
+            Vec
+            adj_v = dynamic_cast<libMesh::PetscVector<real_t>*>(adj.get())->vec();
+            b     = dynamic_cast<libMesh::PetscVector<real_t>*>(res.get())->vec();
+            linear_solver.solve(adj_v, b);
+
+            // This solves for the sensitivity of sum of temperature,
+            // \f$ T_s=\sum_{i=1}^N T_i \f$, with respect to a parameter \f$ \alpha \f$.
+            // \f{eqnarray*}{ \frac{dT_s)}{d\alpha}
+            //    & = & \frac{\partial T_s}{\partial \alpha} + \frac{\partial T_s}{\partial T}
+            //     \frac{dT}{d\alpha} \\
+            //    & = & 0 + \lambda^T \frac{\partial R(x)}{\partial \alpha}
             // \f}
-            // Note that the adjoint solution for compliance is \f$ \lambda = -x \f$.
-            compliance_sens.assemble(_c,
-                                     *_c.sys->current_local_solution,      // solution
-                                     *_c.rho_sys->current_local_solution,  // filtered density
-                                     *res,                                 // adjoint solution
-                                     *_c.ex_init.filter,                   // geometric filter
-                                     *_dvs,
-                                     obj_grad);
+            temp_sum_sens.assemble(_c,
+                                   *_c.sys->current_local_solution,      // solution
+                                   *_c.rho_sys->current_local_solution,  // filtered density
+                                   *adj,                                 // adjoint solution
+                                   *_c.ex_init.filter,                   // geometric filter
+                                   *_dvs,
+                                   obj_grad);
         }
         
         
@@ -766,16 +768,12 @@ int main(int argc, char** argv) {
     MAST::Utility::GetPotWrapper input(argc, argv);
 
     std::string
-    nm = input("model", "model to run for topology optimization: bracket2d/bracket3d/truss2d/truss3d", "bracket2d");
+    nm = input("model", "model to run for topology optimization: heat_sink2d/heat_sink3d", "heat_sink2d");
     
-    if (nm == "bracket2d")
-        run<MAST::Mesh::Generation::Bracket2D>(init, input);
-    if (nm == "bracket3d")
-        run<MAST::Mesh::Generation::Bracket3D>(init, input);
-    if (nm == "truss2d")
-        run<MAST::Mesh::Generation::Truss2D>(init, input);
-    if (nm == "truss3d")
-        run<MAST::Mesh::Generation::Truss3D>(init, input);
+    if (nm == "heat_sink2d")
+        run<MAST::Mesh::Generation::HeatSink2D>(init, input);
+    //if (nm == "heat_sink3d")
+    //    run<MAST::Mesh::Generation::HeatSink3D>(init, input);
     else
         std::cout << "Invalid model" << std::endl;
     
