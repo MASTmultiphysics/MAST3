@@ -63,7 +63,7 @@ public:
     fe_family (libMesh::LAGRANGE),
     mesh      (new libMesh::ReplicatedMesh(comm)),
     eq_sys    (new libMesh::EquationSystems(*mesh)),
-    sys       (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("structural")),
+    sys       (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("conduction")),
     elem      (nullptr),
     qp        (-1),
     p_side_id (1) {
