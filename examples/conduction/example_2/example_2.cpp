@@ -603,19 +603,20 @@ public:
             temp_sum_sens.set_elem_ops(_e_ops, _e_ops);
 
             // the adjoint solution for sum of temperature is obtained using a RHS vector
-            // of unit values.
-            // \f[ K^T \lambda = - \{1\} \f]
+            // of unit values scaled by the number of degrees-of-freedom, \f$ N \f$.
+            // \f[ K^T \lambda = - \{1\}/N \f]
             //
             (*res) = -1./(1.*n_dofs);
-            res->close();
             
             std::unique_ptr<libMesh::NumericVector<real_t>>
-            adj(_c.sys->current_local_solution->zero_clone().release());
+            adj(_c.sys->solution->zero_clone().release()),
+            adj_localized(_c.sys->current_local_solution->zero_clone().release());
             Vec
             adj_v = dynamic_cast<libMesh::PetscVector<real_t>*>(adj.get())->vec();
             b     = dynamic_cast<libMesh::PetscVector<real_t>*>(res.get())->vec();
             linear_solver.solve(adj_v, b);
-
+            adj->localize(*adj_localized, _c.sys->get_dof_map().get_send_list());
+            
             // This solves for the sensitivity of sum of temperature,
             // \f$ T_s=\sum_{i=1}^N T_i \f$, with respect to a parameter \f$ \alpha \f$.
             // \f{eqnarray*}{ \frac{dT_s)}{d\alpha}
@@ -626,7 +627,7 @@ public:
             temp_sum_sens.assemble(_c,
                                    *_c.sys->current_local_solution,      // solution
                                    *_c.rho_sys->current_local_solution,  // filtered density
-                                   *adj,                                 // adjoint solution
+                                   *adj_localized,                       // adjoint solution
                                    *_c.ex_init.filter,                   // geometric filter
                                    *_dvs,
                                    obj_grad);
