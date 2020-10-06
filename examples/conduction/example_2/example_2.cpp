@@ -206,7 +206,7 @@ struct Traits {
     using fe_shape_t        = typename MAST::FEBasis::Evaluation::FEShapeDerivative<BasisScalarType, NodalScalarType, dim, dim, fe_basis_t>;
     using fe_data_t         = typename MAST::FEBasis::libMeshWrapper::FEData<dim, fe_basis_t, fe_shape_t>;
     using fe_side_data_t    = typename MAST::FEBasis::libMeshWrapper::FESideData<dim, fe_basis_t, fe_shape_t>;
-    using fe_var_t          = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, dim, dim, context_t, fe_shape_t>;
+    using fe_var_t          = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, 1, dim, context_t, fe_shape_t>;
     using density_fe_var_t  = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, 1, dim, context_t, fe_shape_t>;
     using density_field_t   = typename MAST::FEBasis::ScalarFieldWrapper<scalar_t, density_fe_var_t>;
     using density_t         = typename MAST::Optimization::Topology::SIMP::PenalizedDensity<SolScalarType, density_field_t>;
@@ -302,7 +302,7 @@ public:
         density->set_penalty(c.ex_init.penalty);
         density->set_density_field(*_density_field);
         k->set_density(*density);
-        k->set_scalar(1.e-3, 1.0);
+        k->set_scalar(1.0, 1.e-3);
         
         _prop->set_conductance(*k);
         _conduction   = new typename TraitsType::conduction_t;
@@ -653,7 +653,7 @@ public:
             // of unit values.
             // \f[ K^T \lambda = - \{1\} \f]
             //
-            (*res) = 1.;
+            (*res) = -1.;
             res->close();
             
             std::unique_ptr<libMesh::NumericVector<real_t>>
