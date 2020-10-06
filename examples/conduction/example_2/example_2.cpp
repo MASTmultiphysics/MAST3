@@ -22,13 +22,11 @@
 #include <mast/base/scalar_constant.hpp>
 #include <mast/fe/eval/fe_basis_derivatives.hpp>
 #include <mast/fe/libmesh/fe_data.hpp>
-#include <mast/fe/libmesh/fe_side_data.hpp>
 #include <mast/fe/fe_var_data.hpp>
 #include <mast/fe/scalar_field_wrapper.hpp>
 #include <mast/physics/conduction/material_conductance.hpp>
 #include <mast/physics/conduction/linear_conduction_kernel.hpp>
 #include <mast/physics/conduction/source_kernel.hpp>
-//#include <mast/physics/conduction/surface_flux.hpp>
 #include <mast/physics/conduction/libmesh/mat_null_space.hpp>
 #include <mast/optimization/topology/simp/penalized_density.hpp>
 #include <mast/optimization/topology/simp/penalized_scalar.hpp>
@@ -83,7 +81,6 @@ public:
     sys       (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("conduction")),
     rho_sys   (&eq_sys->add_system<libMesh::ExplicitSystem>("density")),
     filter    (nullptr),
-    qn_side_id(-1),
     penalty   (0.) {
         
         model->init_analysis_mesh(*this, *mesh);
@@ -138,7 +135,6 @@ public:
     libMesh::NonlinearImplicitSystem            *sys;
     libMesh::ExplicitSystem                     *rho_sys;
     MAST::Mesh::libMeshWrapper::GeometricFilter *filter;
-    uint_t                                       qn_side_id;
     real_t                                       penalty;
 };
 
@@ -174,8 +170,6 @@ public:
     inline bool elem_is_hex() const  {return (elem->type() == libMesh::HEX8 ||
                                               elem->type() == libMesh::HEX20 ||
                                               elem->type() == libMesh::HEX27);}
-    /*inline bool if_compute_flux_load_on_side(const uint_t s)
-    { return ex_init.mesh->boundary_info->has_boundary_id(elem, s, ex_init.qn_side_id);}*/
     
     
     InitExample<model_t>                &ex_init;
@@ -205,19 +199,16 @@ struct Traits {
     using fe_basis_t        = typename MAST::FEBasis::libMeshWrapper::FEBasis<BasisScalarType, dim>;
     using fe_shape_t        = typename MAST::FEBasis::Evaluation::FEShapeDerivative<BasisScalarType, NodalScalarType, dim, dim, fe_basis_t>;
     using fe_data_t         = typename MAST::FEBasis::libMeshWrapper::FEData<dim, fe_basis_t, fe_shape_t>;
-    using fe_side_data_t    = typename MAST::FEBasis::libMeshWrapper::FESideData<dim, fe_basis_t, fe_shape_t>;
     using fe_var_t          = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, 1, dim, context_t, fe_shape_t>;
     using density_fe_var_t  = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, 1, dim, context_t, fe_shape_t>;
     using density_field_t   = typename MAST::FEBasis::ScalarFieldWrapper<scalar_t, density_fe_var_t>;
     using density_t         = typename MAST::Optimization::Topology::SIMP::PenalizedDensity<SolScalarType, density_field_t>;
     using conductance_t     = typename MAST::Optimization::Topology::SIMP::PenalizedScalar<SolScalarType, density_t>;
     using source_t          = typename MAST::Base::ScalarConstant<SolScalarType>;
-    //using flux_t            = typename MAST::Base::ScalarConstant<SolScalarType>;
     using area_t            = typename MAST::Base::ScalarConstant<SolScalarType>;
     using prop_t            = typename MAST::Physics::Conduction::IsotropicMaterialConductance<SolScalarType, conductance_t, context_t>;
     using conduction_t      = typename MAST::Physics::Conduction::ConductionKernel<fe_var_t, prop_t, dim, context_t, true, true>;
     using source_load_t     = typename MAST::Physics::Conduction::SourceHeatLoad<fe_var_t, source_t, area_t, dim, context_t>;
-    //using flux_load_t       = typename MAST::Physics::Conduction::SurfaceFluxLoad<fe_var_t, flux_t, area_t, dim, context_t>;
     using element_vector_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using element_matrix_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     using assembled_vector_t = libMesh::NumericVector<scalar_t>;
@@ -240,31 +231,21 @@ public:
     density         (nullptr),
     k               (nullptr),
     qv              (nullptr),
-    //qn              (nullptr),
     area            (nullptr),
     _fe_data        (nullptr),
-    _fe_side_data   (nullptr),
     _fe_var         (nullptr),
-    _fe_side_var    (nullptr),
     _density_fe_var (nullptr),
     _density_field  (nullptr),
     _prop           (nullptr),
     _conduction     (nullptr),
-    _source_load    (nullptr)/*,
-    _flux_load      (nullptr)*/ {
+    _source_load    (nullptr) {
         
         _fe_data       = new typename TraitsType::fe_data_t;
         _fe_data->init(c.ex_init.q_order,
                        c.ex_init.q_type,
                        c.ex_init.fe_order,
                        c.ex_init.fe_family);
-        _fe_side_data  = new typename TraitsType::fe_side_data_t;
-        _fe_side_data->init(c.ex_init.q_order,
-                            c.ex_init.q_type,
-                            c.ex_init.fe_order,
-                            c.ex_init.fe_family);
         _fe_var        = new typename TraitsType::fe_var_t;
-        _fe_side_var   = new typename TraitsType::fe_var_t;
         
         _density_fe_var      = new typename TraitsType::density_fe_var_t;
         _density_sens_fe_var = new typename TraitsType::density_fe_var_t;
@@ -272,18 +253,13 @@ public:
         
         // associate variables with the shape functions
         _fe_var->set_fe_shape_data(_fe_data->fe_derivative());
-        _fe_side_var->set_fe_shape_data(_fe_side_data->fe_derivative());
         
         // tell the FE computations which quantities are needed for computation
         _fe_data->fe_basis().set_compute_dphi_dxi(true);
         
         _fe_data->fe_derivative().set_compute_dphi_dx(true);
         _fe_data->fe_derivative().set_compute_detJxW(true);
-        
-        _fe_side_data->fe_basis().set_compute_dphi_dxi(true);
-        _fe_side_data->fe_derivative().set_compute_normal(true);
-        _fe_side_data->fe_derivative().set_compute_detJxW(true);
-        
+                
         _fe_var->set_compute_du_dx(true);
         
         _density_fe_var->set_fe_shape_data(_fe_data->fe_derivative());
@@ -295,7 +271,6 @@ public:
         density  = new typename TraitsType::density_t;
         k        = new typename TraitsType::conductance_t;
         qv       = new typename TraitsType::source_t(1.);
-        //qn       = new typename TraitsType::flux_t(1.);
         area     = new typename TraitsType::area_t(1.0);
         _prop    = new typename TraitsType::prop_t;
         
@@ -309,39 +284,30 @@ public:
         _conduction->set_section_property(*_prop);
         _source_load  = new typename TraitsType::source_load_t;
         _source_load->set_source(*qv);
-        //_flux_load    = new typename TraitsType::flux_load_t;
-        //_flux_load->set_flux(*qn);
 
-        if (TraitsType::dim < 3) {
+        if (TraitsType::dim < 3)
             _source_load->set_section_area(*area);
-            //_flux_load->set_section_area(*area);
-        }
 
         // tell physics kernels about the FE discretization information
         _conduction->set_fe_var_data(*_fe_var);
         _source_load->set_fe_var_data(*_fe_var);
-        //_flux_load->set_fe_var_data(*_fe_side_var);
     }
     
     virtual ~ElemOps() {
         
         delete area;
         delete qv;
-        //delete qn;
         delete k;
         delete density;
 
         delete _conduction;
         delete _prop;
         delete _source_load;
-        //delete _flux_load;
 
         delete _density_field;
         delete _density_fe_var;
         
         delete _fe_var;
-        delete _fe_side_var;
-        delete _fe_side_data;
         delete _fe_data;
     }
     
@@ -363,15 +329,6 @@ public:
 
         _conduction->compute(c, res, jac);
         _source_load->compute(c, res, jac);
-        
-        /*for (uint_t s=0; s<c.elem->n_sides(); s++)
-            if (c.if_compute_flux_load_on_side(s)) {
-                
-                c.fe = &_fe_side_data->fe_derivative();
-                _fe_side_data->reinit_for_side(c, s);
-                _fe_side_var->init(c, sol_v);
-                _flux_load->compute(c, res, jac);
-            }*/
     }
     
     
@@ -420,23 +377,19 @@ public:
     typename TraitsType::density_t        *density;
     typename TraitsType::conductance_t    *k;
     typename TraitsType::source_t         *qv;
-    //typename TraitsType::flux_t           *qn;
     typename TraitsType::area_t           *area;
     
 private:
     
     // variables for quadrature and shape function
     typename TraitsType::fe_data_t         *_fe_data;
-    typename TraitsType::fe_side_data_t    *_fe_side_data;
     typename TraitsType::fe_var_t          *_fe_var;
-    typename TraitsType::fe_var_t          *_fe_side_var;
     typename TraitsType::density_fe_var_t  *_density_fe_var;
     typename TraitsType::density_fe_var_t  *_density_sens_fe_var;
     typename TraitsType::density_field_t   *_density_field;
     typename TraitsType::prop_t            *_prop;
     typename TraitsType::conduction_t      *_conduction;
     typename TraitsType::source_load_t     *_source_load;
-    //typename TraitsType::flux_load_t       *_flux_load;
 };
 
 
@@ -772,8 +725,8 @@ int main(int argc, char** argv) {
     
     if (nm == "heat_sink2d")
         run<MAST::Mesh::Generation::HeatSink2D>(init, input);
-    //if (nm == "heat_sink3d")
-    //    run<MAST::Mesh::Generation::HeatSink3D>(init, input);
+    if (nm == "heat_sink3d")
+        run<MAST::Mesh::Generation::HeatSink3D>(init, input);
     else
         std::cout << "Invalid model" << std::endl;
     
