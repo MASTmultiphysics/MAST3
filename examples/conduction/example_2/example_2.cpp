@@ -484,11 +484,11 @@ public:
                 "Incompatible design variable vector size.");
 
         libMesh::ExplicitSystem
-        &str_sys = *_c.ex_init.sys,
+        &cnd_sys = *_c.ex_init.sys,
         &rho_sys = *_c.ex_init.rho_sys;
 
         const uint_t
-        n_dofs          = str_sys.n_dofs(),
+        n_dofs          = cnd_sys.n_dofs(),
         n_rho_vals      = rho_sys.n_dofs(),
         first_local_rho = rho_sys.get_dof_map().first_dof(rho_sys.comm().rank()),
         last_local_rho  = rho_sys.get_dof_map().end_dof(rho_sys.comm().rank());
@@ -572,7 +572,7 @@ public:
 
         scalar_t
         vol        = 0.,
-        temp_sum   = _c.sys->solution->sum();
+        temp_sum   = _c.sys->solution->sum()/(1.*n_dofs);
         
         //////////////////////////////////////////////////////////////////////
         // evaluate the functions
@@ -606,7 +606,7 @@ public:
             // of unit values.
             // \f[ K^T \lambda = - \{1\} \f]
             //
-            (*res) = -1.;
+            (*res) = -1./(1.*n_dofs);
             res->close();
             
             std::unique_ptr<libMesh::NumericVector<real_t>>
