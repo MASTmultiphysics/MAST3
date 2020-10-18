@@ -93,7 +93,7 @@ flux_derivative_multiplier(const FluxFieldType    *f,
 
 
 /*!
- * This class implements the discrete evaluation of the conduction (Laplace operator) kernel defined as
+ * This class implements the discrete evaluation of the surface heat flux kernel defined as
  * \f[ - \int_{\Gamma_e} \phi q_n~d\Gamma, \f]
  * where, \f$ \phi\f$ is the variation and \f$ q_n \f$ is the boundary normal flux.
  *
