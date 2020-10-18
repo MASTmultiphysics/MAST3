@@ -88,7 +88,7 @@ flux_derivative_multiplier(const FluxFieldType    *f,
     
     Assert0(f, "Invalid pointer");
     Assert0(!s, "Pointer must be nullptr");
-    return f->derivative(c);
+    return f->derivative(c, p);
 }
 
 
