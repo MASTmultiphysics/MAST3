@@ -28,6 +28,159 @@ namespace MAST {
 namespace Physics {
 namespace Elasticity {
 
+template <typename TractionType, uint_t Dim, typename ContextType>
+inline
+typename std::enable_if<Dim == 1, void>::type
+traction_value(ContextType                    &c,
+               const TractionType             &t,
+               typename TractionType::value_t &v) {
+
+    Assert2(v.size() == Dim, v.size(), Dim, "Incorrect size");
+    
+    v(0) = t.get_scalar_for_dim(0).value(c);
+}
+
+
+template <typename TractionType, uint_t Dim, typename ContextType>
+inline
+typename std::enable_if<Dim == 2, void>::type
+traction_value(ContextType                    &c,
+               const TractionType             &t,
+               typename TractionType::value_t &v) {
+
+    Assert2(v.size() == Dim, v.size(), Dim, "Incorrect size");
+    
+    v(0) = t.get_scalar_for_dim(0).value(c);
+    v(1) = t.get_scalar_for_dim(1).value(c);
+}
+
+
+template <typename TractionType, uint_t Dim, typename ContextType>
+inline
+typename std::enable_if<Dim == 3, void>::type
+traction_value(ContextType                    &c,
+               const TractionType             &t,
+               typename TractionType::value_t &v) {
+
+    Assert2(v.size() == Dim, v.size(), Dim, "Incorrect size");
+
+    v(0) = t.get_scalar_for_dim(0).value(c);
+    v(1) = t.get_scalar_for_dim(1).value(c);
+    v(2) = t.get_scalar_for_dim(2).value(c);
+}
+
+
+template <typename TractionType,
+          uint_t Dim,
+          typename ContextType,
+          typename ScalarFieldType>
+inline
+typename std::enable_if<Dim == 1, void>::type
+traction_derivative(const ScalarFieldType          &f,
+                    ContextType                    &c,
+                    const TractionType             &t,
+                    typename TractionType::value_t &v) {
+
+    Assert2(v.size() == Dim, v.size(), Dim, "Incorrect size");
+    
+    v(0) = t.get_scalar_for_dim(0).derivative(c, f);
+}
+
+
+template <typename TractionType,
+          uint_t Dim,
+          typename ContextType,
+          typename ScalarFieldType>
+inline
+typename std::enable_if<Dim == 2, void>::type
+traction_derivative(const ScalarFieldType          &f,
+                    ContextType                    &c,
+                    const TractionType             &t,
+                    typename TractionType::value_t &v) {
+    
+    Assert2(v.size() == Dim, v.size(), Dim, "Incorrect size");
+    
+    v(0) = t.get_scalar_for_dim(0).derivative(c, f);
+    v(1) = t.get_scalar_for_dim(1).derivative(c, f);
+}
+
+
+template <typename TractionType,
+          uint_t Dim,
+          typename ContextType,
+          typename ScalarFieldType>
+inline
+typename std::enable_if<Dim == 3, void>::type
+traction_derivative(const ScalarFieldType          &f,
+                    ContextType                    &c,
+                    const TractionType             &t,
+                    typename TractionType::value_t &v) {
+
+    Assert2(v.size() == Dim, v.size(), Dim, "Incorrect size");
+
+    v(0) = t.get_scalar_for_dim(0).derivative(c, f);
+    v(1) = t.get_scalar_for_dim(1).derivative(c, f);
+    v(2) = t.get_scalar_for_dim(2).derivative(c, f);
+}
+
+
+/*!
+ * This class defines a data structure that can be used to define a parameterized surface traction vector, where
+ * each component of the \p Dim dimensional vector is scalar of type \p TractionScalarType, which is
+ * typically a \p ScalarConstant. An opject of this type can be used as the \p TractionFieldType
+ * template parameter for the \p SurfaceTractionLoad class. 
+ */
+template <typename TractionScalarType, uint_t Dim, typename ContextType>
+class Traction {
+
+public:
+    
+    using scalar_t   = typename TractionScalarType::scalar_t;
+    using value_t    = Eigen::Matrix<scalar_t, Dim, 1>;
+    using traction_t = Traction<TractionScalarType, Dim, ContextType>;
+    
+    Traction(const TractionScalarType *t0,
+             const TractionScalarType *t1 = nullptr,
+             const TractionScalarType *t2 = nullptr):
+    _t  ({t0, t1, t2}) {
+        
+        Assert1(Dim>1 || t1 == nullptr,
+                Dim, "t1 should be nullptr for 1D traction");
+        Assert1(Dim>2 || t2 == nullptr,
+                Dim, "t2 should be nullptr for 2D traction");
+    }
+    
+    inline const TractionScalarType& get_scalar_for_dim(uint_t i) const {
+        
+        Assert2(i < Dim, i, Dim, "Invalid dimension index");
+        return *_t[i];
+    }
+    
+    
+    inline void value(ContextType& c, value_t& v) const {
+
+        Assert2(v.size() == Dim, v.size(), Dim, "Incorrect size");
+        
+        traction_value<traction_t, Dim, ContextType>(c, *this, v);
+    }
+    
+    template <typename ScalarFieldType>
+    inline void
+    derivative(const ScalarFieldType& f, ContextType& c, value_t& v) const {
+        
+        Assert2(v.size() == Dim, v.size(), Dim, "Incorrect size");
+        
+        traction_derivative<traction_t, Dim, ContextType, ScalarFieldType>
+        (f, c, *this, v);
+    }
+
+    
+protected:
+    
+    std::vector<const TractionScalarType*> _t;
+};
+
+
 /*!
  * This class implements the discrete evaluation of the surface traction kernel defined as
  * \f[ - \int_{\Gamma_e}  a \phi t \cdot \hat{n} ~d\Gamma, \f]
