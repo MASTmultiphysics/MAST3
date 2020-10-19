@@ -97,7 +97,7 @@ struct HeatSink3D {
                            const real_t length,
                            const real_t height,
                            const real_t width,
-                           const real_t dirichletlength_fraction,
+                           const real_t dirichlet_length_fraction,
                            const libMesh::ElemType type) {
         
         Assert0(type == libMesh::HEX8 || type == libMesh::HEX27,
@@ -214,10 +214,10 @@ struct HeatSink3D {
                                 boundary_info.add_side(elem, 2, 2);
                             
                             if ((j == 0) &&
-                                (i <= .5*(1.+dirichletlength_fraction) * nx) &&
-                                (i >= .5*(1.-dirichletlength_fraction) * nx) &&
-                                (k <= .5*(1.+dirichletlength_fraction) * nz) &&
-                                (k >= .5*(1.-dirichletlength_fraction) * nz))
+                                (i <= .5*(1.+dirichlet_length_fraction) * nx) &&
+                                (i >= .5*(1.-dirichlet_length_fraction) * nx) &&
+                                (k <= .5*(1.+dirichlet_length_fraction) * nz) &&
+                                (k >= .5*(1.-dirichlet_length_fraction) * nz))
                                 boundary_info.add_side(elem, 1, 6);
                         }
                 break;
@@ -283,10 +283,10 @@ struct HeatSink3D {
                                 boundary_info.add_side(elem, 2, 2);
 
                             if ((j == 0) &&
-                                (i <= .5*(1.+dirichletlength_fraction) * 2*nx) &&
-                                (i >= .5*(1.-dirichletlength_fraction) * 2*nx) &&
-                                (k <= .5*(1.+dirichletlength_fraction) * 2*nz) &&
-                                (k >= .5*(1.-dirichletlength_fraction) * 2*nz))
+                                (i <= .5*(1.+dirichlet_length_fraction) * 2*nx) &&
+                                (i >= .5*(1.-dirichlet_length_fraction) * 2*nx) &&
+                                (k <= .5*(1.+dirichlet_length_fraction) * 2*nz) &&
+                                (k >= .5*(1.-dirichlet_length_fraction) * 2*nz))
                                 boundary_info.add_side(elem, 1, 6);
                         }
                 break;
@@ -328,8 +328,8 @@ struct HeatSink3D {
         length  = c.input("length", "length of domain along x-axis", 1.),
         height  = c.input("height", "length of domain along y-axis", 1.),
         width   = c.input("width",  "length of domain along z-axis", 1.),
-        dirichletlength_fraction = c.input
-        ("dirichletlength_fraction",
+        dirichlet_length_fraction = c.input
+        ("dirichlet_length_fraction",
          "length fraction of the truss boundary where dirichlet condition is applied",
          0.1);
         
@@ -362,7 +362,7 @@ struct HeatSink3D {
                    length,
                    height,
                    width,
-                   dirichletlength_fraction,
+                   dirichlet_length_fraction,
                    e_type);
         
         // we now uniformly refine this mesh

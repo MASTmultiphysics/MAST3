@@ -120,7 +120,7 @@ struct Truss2D {
                            const uint_t ny,
                            const real_t length,
                            const real_t height,
-                           const real_t dirichletlength_fraction,
+                           const real_t dirichlet_length_fraction,
                            const libMesh::ElemType type) {
         
         Assert0(type == libMesh::QUAD4 || type == libMesh::QUAD9,
@@ -221,10 +221,10 @@ struct Truss2D {
                     if (i == (nx-1))
                         boundary_info.add_side(elem, 1, 1);
                     
-                    if (j == 0 && i <= dirichletlength_fraction * nx)
+                    if (j == 0 && i <= dirichlet_length_fraction * nx)
                         boundary_info.add_side(elem, 0, 6);
 
-                    if (j == 0 && i >= (1.-dirichletlength_fraction)* nx)
+                    if (j == 0 && i >= (1.-dirichlet_length_fraction)* nx)
                         boundary_info.add_side(elem, 0, 7);
 
                     if (j == 0 && i == 0)
@@ -266,10 +266,10 @@ struct Truss2D {
                         if (i == 2*(nx-1))
                             boundary_info.add_side(elem, 1, 1);
                         
-                        if (j == 0 && i <= dirichletlength_fraction * 2*nx)
+                        if (j == 0 && i <= dirichlet_length_fraction * 2*nx)
                             boundary_info.add_side(elem, 0, 6);
 
-                        if (j == 0 && i >= (1.-dirichletlength_fraction)* 2*nx)
+                        if (j == 0 && i >= (1.-dirichlet_length_fraction)* 2*nx)
                             boundary_info.add_side(elem, 0, 7);
 
                         if (j == 0 && i == 0)
@@ -309,8 +309,8 @@ struct Truss2D {
         real_t
         length  = c.input("length", "length of domain along x-axis", 0.24),
         height  = c.input("height", "length of domain along y-axis", 0.04),
-        dirichletlength_fraction = c.input
-        ("truss_dirichletlength_fraction",
+        dirichlet_length_fraction = c.input
+        ("dirichlet_length_fraction",
          "length fraction of the truss boundary where dirichlet condition is applied",
          0.02);
 
@@ -338,7 +338,7 @@ struct Truss2D {
                    nx_divs, ny_divs,
                    length,
                    height,
-                   dirichletlength_fraction,
+                   dirichlet_length_fraction,
                    e_type);
     }
     

@@ -125,7 +125,7 @@ struct Truss3D {
                            const real_t length,
                            const real_t height,
                            const real_t width,
-                           const real_t dirichletlength_fraction,
+                           const real_t dirichlet_length_fraction,
                            const libMesh::ElemType type) {
         
         Assert0(type == libMesh::HEX8 || type == libMesh::HEX27,
@@ -241,10 +241,10 @@ struct Truss3D {
                             if (i == (nx-1))
                                 boundary_info.add_side(elem, 2, 2);
                             
-                            if (j == 0 && i <= dirichletlength_fraction * nx)
+                            if (j == 0 && i <= dirichlet_length_fraction * nx)
                                 boundary_info.add_side(elem, 1, 6);
 
-                            if (j == 0 && i >= (1.-dirichletlength_fraction)* nx)
+                            if (j == 0 && i >= (1.-dirichlet_length_fraction)* nx)
                                 boundary_info.add_side(elem, 1, 7);
 
                             if (j == 0 && i == 0 && k == 0)
@@ -312,10 +312,10 @@ struct Truss3D {
                             if (i == 2*(nx-1))
                                 boundary_info.add_side(elem, 2, 2);
 
-                            if (j == 0 && i <= dirichletlength_fraction * 2*nx)
+                            if (j == 0 && i <= dirichlet_length_fraction * 2*nx)
                                 boundary_info.add_side(elem, 1, 6);
 
-                            if (j == 0 && i >= (1.-dirichletlength_fraction)* 2*nx)
+                            if (j == 0 && i >= (1.-dirichlet_length_fraction)* 2*nx)
                                 boundary_info.add_side(elem, 1, 7);
 
                             if (j == 0 && i == 0 && k == 0)
@@ -361,10 +361,10 @@ struct Truss3D {
         length  = c.input("length", "length of domain along x-axis", 0.24),
         height  = c.input("height", "length of domain along y-axis", 0.04),
         width   = c.input("width",  "length of domain along z-axis", 0.08),
-        dirichletlength_fraction = c.input
-        ("truss_dirichletlength_fraction",
+        dirichlet_length_fraction = c.input
+        ("dirichlet_length_fraction",
          "length fraction of the truss boundary where dirichlet condition is applied",
-         0.05);
+         0.02);
         
         uint_t
         nx_divs = c.input("nx_divs", "number of elements along x-axis", 30),
@@ -395,7 +395,7 @@ struct Truss3D {
                    length,
                    height,
                    width,
-                   dirichletlength_fraction,
+                   dirichlet_length_fraction,
                    e_type);
         
         // we now uniformly refine this mesh
@@ -413,9 +413,7 @@ struct Truss3D {
     init_analysis_dirichlet_conditions(Context& c) {
         
         c.sys->get_dof_map().add_dirichlet_boundary
-        (libMesh::DirichletBoundary({6, 7}, {1}, libMesh::ZeroFunction<real_t>()));
-        c.sys->get_dof_map().add_dirichlet_boundary
-        (libMesh::DirichletBoundary({8}, {0, 2}, libMesh::ZeroFunction<real_t>()));
+        (libMesh::DirichletBoundary({6, 7}, {0, 1, 2}, libMesh::ZeroFunction<real_t>()));
     }
     
     
