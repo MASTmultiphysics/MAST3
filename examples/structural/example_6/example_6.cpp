@@ -44,6 +44,7 @@
 // topology optimization benchmark cases
 #include <mast/mesh/generation/truss2d.hpp>
 #include <mast/mesh/generation/truss3d.hpp>
+#include <mast/mesh/generation/inplane2d.hpp>
 #include <mast/mesh/generation/bracket2d.hpp>
 #include <mast/mesh/generation/bracket3d.hpp>
 
@@ -756,16 +757,20 @@ int main(int argc, char** argv) {
     MAST::Utility::GetPotWrapper input(argc, argv);
 
     std::string
-    nm = input("model", "model to run for topology optimization: bracket2d/bracket3d/truss2d/truss3d", "bracket2d");
+    nm = input("model",
+               "model to run for topology optimization: bracket2d/bracket3d/truss2d/truss3d/inplane2d",
+               "bracket2d");
     
     if (nm == "bracket2d")
         run<MAST::Mesh::Generation::Bracket2D>(init, input);
-    if (nm == "bracket3d")
+    else if (nm == "bracket3d")
         run<MAST::Mesh::Generation::Bracket3D>(init, input);
-    if (nm == "truss2d")
+    else if (nm == "truss2d")
         run<MAST::Mesh::Generation::Truss2D>(init, input);
-    if (nm == "truss3d")
+    else if (nm == "truss3d")
         run<MAST::Mesh::Generation::Truss3D>(init, input);
+    else if (nm == "inplane2d")
+        run<MAST::Mesh::Generation::Inplane2D>(init, input);
     else
         std::cout << "Invalid model" << std::endl;
     
