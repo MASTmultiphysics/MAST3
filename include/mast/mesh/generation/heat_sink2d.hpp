@@ -92,7 +92,7 @@ struct HeatSink2D {
                            const uint_t ny,
                            const real_t length,
                            const real_t height,
-                           const real_t dirichletlength_fraction,
+                           const real_t dirichlet_length_fraction,
                            const libMesh::ElemType type) {
         
         Assert0(type == libMesh::QUAD4 || type == libMesh::QUAD9,
@@ -194,8 +194,8 @@ struct HeatSink2D {
                         boundary_info.add_side(elem, 1, 1);
                     
                     if ((j == 0) &&
-                        (i <= .5*(1.+dirichletlength_fraction) * nx) &&
-                        (i >= .5*(1.-dirichletlength_fraction) * nx))
+                        (i <= .5*(1.+dirichlet_length_fraction) * nx) &&
+                        (i >= .5*(1.-dirichlet_length_fraction) * nx))
                         boundary_info.add_side(elem, 0, 6);
                     }
                 break;
@@ -235,8 +235,8 @@ struct HeatSink2D {
                             boundary_info.add_side(elem, 1, 1);
                         
                         if ((j == 0) &&
-                            (i <= .5*(1.+dirichletlength_fraction) * 2*nx) &&
-                            (i >= .5*(1.-dirichletlength_fraction) * 2*nx))
+                            (i <= .5*(1.+dirichlet_length_fraction) * 2*nx) &&
+                            (i >= .5*(1.-dirichlet_length_fraction) * 2*nx))
                             boundary_info.add_side(elem, 0, 6);
                     }
                 break;
@@ -272,8 +272,8 @@ struct HeatSink2D {
         real_t
         length  = c.input("length", "length of domain along x-axis", 1.),
         height  = c.input("height", "length of domain along y-axis", 1.),
-        dirichletlength_fraction = c.input
-        ("dirichletlength_fraction",
+        dirichlet_length_fraction = c.input
+        ("dirichlet_length_fraction",
          "length fraction of the boundary where dirichlet condition is applied",
          0.1);
 
@@ -301,7 +301,7 @@ struct HeatSink2D {
                    nx_divs, ny_divs,
                    length,
                    height,
-                   dirichletlength_fraction,
+                   dirichlet_length_fraction,
                    e_type);
     }
     
