@@ -312,7 +312,7 @@ struct Truss2D {
         dirichletlength_fraction = c.input
         ("truss_dirichletlength_fraction",
          "length fraction of the truss boundary where dirichlet condition is applied",
-         0.05);
+         0.02);
 
         uint_t
         nx_divs = c.input("nx_divs", "number of elements along x-axis", 30),
@@ -349,9 +349,7 @@ struct Truss2D {
     init_analysis_dirichlet_conditions(Context& c) {
         
         c.sys->get_dof_map().add_dirichlet_boundary
-        (libMesh::DirichletBoundary({6, 7}, {1}, libMesh::ZeroFunction<real_t>()));
-        c.sys->get_dof_map().add_dirichlet_boundary
-        (libMesh::DirichletBoundary({8}, {0}, libMesh::ZeroFunction<real_t>()));
+        (libMesh::DirichletBoundary({6, 7}, {0, 1}, libMesh::ZeroFunction<real_t>()));
     }
     
     
