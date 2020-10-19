@@ -8,6 +8,7 @@ target_sources(mast_catch_tests
                ${CMAKE_CURRENT_LIST_DIR}/plate_bending_section_property_complex_step_sensitivity.cpp
                ${CMAKE_CURRENT_LIST_DIR}/pressure_load.cpp
                ${CMAKE_CURRENT_LIST_DIR}/stress_evaluation.cpp
+               ${CMAKE_CURRENT_LIST_DIR}/traction_load.cpp
                ${CMAKE_CURRENT_LIST_DIR}/von_mises_stress_complex_step_sensitivity.cpp)
 
 #Linear elasticity kernel
@@ -44,6 +45,14 @@ set_tests_properties(FlatShellFaceLinearPressureLoad
         PROPERTIES
         LABELS "SEQ"
         FIXTURES_SETUP     FlatShellFaceLinearPressureLoad)
+
+#Linear traction load kernel
+add_test(NAME LinearTractionLoad
+         COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "linear_traction_load")
+set_tests_properties(LinearTractionLoad
+                     PROPERTIES
+                     LABELS "SEQ"
+                     FIXTURES_SETUP     LinearTractionLoad)
 
 
 #Isotropic linear material
