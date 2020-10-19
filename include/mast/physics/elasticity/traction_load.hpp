@@ -153,7 +153,7 @@ public:
             _traction->value(c, trac);
             _traction->derivative(f, c, dtrac);
             
-            dtrac *= _traction->value(c);
+            dtrac *= _section->value(c);
             trac  *= _section->derivative(c, f);
             trac += dtrac;
             
