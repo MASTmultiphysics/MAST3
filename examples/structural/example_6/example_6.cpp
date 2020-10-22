@@ -28,6 +28,7 @@
 #include <mast/physics/elasticity/isotropic_stiffness.hpp>
 #include <mast/physics/elasticity/linear_strain_energy.hpp>
 #include <mast/physics/elasticity/pressure_load.hpp>
+#include <mast/physics/elasticity/linear_thermoelastic_load.hpp>
 #include <mast/physics/elasticity/libmesh/mat_null_space.hpp>
 #include <mast/optimization/topology/simp/penalized_density.hpp>
 #include <mast/optimization/topology/simp/penalized_scalar.hpp>
@@ -217,11 +218,14 @@ struct Traits {
     using density_t         = typename MAST::Optimization::Topology::SIMP::PenalizedDensity<SolScalarType, density_field_t>;
     using modulus_t         = typename MAST::Optimization::Topology::SIMP::PenalizedScalar<SolScalarType, density_t>;
     using nu_t              = typename MAST::Base::ScalarConstant<SolScalarType>;
+    using alpha_t           = typename MAST::Base::ScalarConstant<SolScalarType>;
     using press_t           = typename ModelType::template pressure_t<scalar_t>;
+    using temp_t            = typename MAST::Optimization::Topology::SIMP::PenalizedScalar<SolScalarType, density_t>;
     using area_t            = typename MAST::Base::ScalarConstant<SolScalarType>;
     using prop_t            = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<SolScalarType, dim, modulus_t, nu_t, context_t>;
     using energy_t          = typename MAST::Physics::Elasticity::LinearContinuum::StrainEnergy<fe_var_t, prop_t, dim, context_t>;
     using press_load_t      = typename MAST::Physics::Elasticity::SurfacePressureLoad<fe_var_t, press_t, area_t, dim, context_t>;
+    using temp_load_t       = typename MAST::Physics::Elasticity::LinearContinuum::ThermoelasticLoad<fe_var_t, temp_t, alpha_t, prop_t, dim, context_t>;
     using element_vector_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using element_matrix_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     using assembled_vector_t = libMesh::NumericVector<scalar_t>;
@@ -243,7 +247,9 @@ public:
     ElemOps(context_t  &c):
     density         (nullptr),
     E               (nullptr),
+    dt              (nullptr),
     nu              (nullptr),
+    alpha           (nullptr),
     press           (nullptr),
     area            (nullptr),
     _fe_data        (nullptr),
@@ -254,6 +260,7 @@ public:
     _density_field  (nullptr),
     _prop           (nullptr),
     _energy         (nullptr),
+    _temp_load      (nullptr),
     _p_load         (nullptr) {
         
         _fe_data       = new typename TraitsType::fe_data_t;
@@ -297,7 +304,9 @@ public:
         // variables for physics
         density  = new typename TraitsType::density_t;
         E        = new typename TraitsType::modulus_t;
+        dt       = new typename TraitsType::temp_t;
         nu       = new typename TraitsType::nu_t(0.33);
+        alpha    = new typename TraitsType::alpha_t(2.e-5);
         press    = c.ex_init.model->template build_pressure_load<scalar_t, typename TraitsType::ex_init_t>(c.ex_init).release();
         area     = new typename TraitsType::area_t(1.0);
         _prop    = new typename TraitsType::prop_t;
@@ -306,17 +315,24 @@ public:
         density->set_density_field(*_density_field);
         E->set_density(*density);
         E->set_scalar(72.e9, 72.e2);
-        
+        dt->set_density(*density);
+        dt->set_scalar(100., 0.);
+
         _prop->set_modulus_and_nu(*E, *nu);
         _energy   = new typename TraitsType::energy_t;
         _energy->set_section_property(*_prop);
         _p_load   = new typename TraitsType::press_load_t;
         _p_load->set_section_area(*area);
-        _p_load->set_pressure(*press);
+        _p_load->set_pressure(*press); 
+        _temp_load = new typename TraitsType::temp_load_t;
+        _temp_load->set_section_property(*_prop);
+        _temp_load->set_coeff_thermal_expansion(*alpha);
+        _temp_load->set_temperature(*dt);
         
         // tell physics kernels about the FE discretization information
         _energy->set_fe_var_data(*_fe_var);
         _p_load->set_fe_var_data(*_fe_side_var);
+        _temp_load->set_fe_var_data(*_fe_var);
     }
     
     virtual ~ElemOps() {
@@ -324,12 +340,15 @@ public:
         delete area;
         delete press;
         delete nu;
+        delete alpha;
         delete E;
+        delete dt;
         delete density;
 
         delete _energy;
         delete _prop;
         delete _p_load;
+        delete _temp_load;
 
         delete _density_field;
         delete _density_fe_var;
@@ -357,6 +376,7 @@ public:
         _density_fe_var->init(c, density_v);
 
         _energy->compute(c, res, jac);
+        _temp_load->compute(c, res, jac);
         
         for (uint_t s=0; s<c.elem->n_sides(); s++)
             if (c.if_compute_pressure_load_on_side(s)) {
@@ -389,6 +409,7 @@ public:
         _density_sens_fe_var->init(c, density_sens);
 
         _energy->derivative(c, f, res, jac);
+        _temp_load->derivative(c, f, res, jac);
     }
 
     
@@ -404,16 +425,30 @@ public:
                const Accessor2Type               &density_v,
                const Accessor3Type               &density_sens) {
 
-        // nothing to be done here since external work done due to pressure
-        // is independent of topology parameter
-        return 0.;
+        // pressure load is independent of design parameters but thermoelastic load
+        // depends on it. So, we compute the partial derivative of compliance contribution
+        // from that term
+        c.fe = &_fe_data->fe_derivative();
+        _fe_data->reinit(c);
+        _fe_var->init(c, sol_v);
+        _density_fe_var->init(c, density_v);
+        _density_sens_fe_var->init(c, density_sens);
+
+        typename TraitsType::element_vector_t
+        res = TraitsType::element_vector_t::Zero(_temp_load->n_dofs());
+        
+        _temp_load->derivative(c, f, res);
+        
+        return -sol_v.dot(res);
     }
 
     
     // parameters
     typename TraitsType::density_t    *density;
     typename TraitsType::modulus_t    *E;
+    typename TraitsType::temp_t       *dt;
     typename TraitsType::nu_t         *nu;
+    typename TraitsType::alpha_t      *alpha;
     typename TraitsType::press_t      *press;
     typename TraitsType::area_t       *area;
     
@@ -429,6 +464,7 @@ private:
     typename TraitsType::density_field_t   *_density_field;
     typename TraitsType::prop_t            *_prop;
     typename TraitsType::energy_t          *_energy;
+    typename TraitsType::temp_load_t       *_temp_load;
     typename TraitsType::press_load_t      *_p_load;
 };
 
@@ -591,12 +627,6 @@ public:
         // We multiply with -1 before solving for \f$ x \f$.
         res->scale(-1);
         // This solves for \f$ x\f$ from the system of equations \f$ K x = f \f$.
-        libMesh::SparseMatrix<real_t>
-        *pc  = _c.sys->request_matrix("Preconditioner");
-
-        std::pair<unsigned int, real_t>
-        solver_params = _c.sys->get_linear_solve_parameters();
-
         Mat
         m   = dynamic_cast<libMesh::PetscMatrix<real_t>*>(_c.sys->matrix)->mat();
         Vec
