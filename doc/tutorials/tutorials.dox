@@ -23,5 +23,6 @@
 
 \subpage TutorialsHeatTransfer
   - \ref conduction_example_1
+  - \ref conduction_example_2
 
 */

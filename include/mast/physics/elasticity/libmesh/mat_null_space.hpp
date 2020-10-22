@@ -253,10 +253,10 @@ private:
     MatNullSpace        _mns;
 
 };
-}  // namespace MAST
-}  // namespace Physics
-}  // namespace Elasticity
 }  // namespace libMeshWrapper
+}  // namespace Elasticity
+}  // namespace Physics
+}  // namespace MAST
 
 
 #endif // __mast_libmesh_wrapper_elasticity_null_space_h__

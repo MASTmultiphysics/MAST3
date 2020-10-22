@@ -22,14 +22,12 @@
 #include <mast/base/scalar_constant.hpp>
 #include <mast/fe/eval/fe_basis_derivatives.hpp>
 #include <mast/fe/libmesh/fe_data.hpp>
-#include <mast/fe/libmesh/fe_side_data.hpp>
 #include <mast/fe/fe_var_data.hpp>
 #include <mast/fe/scalar_field_wrapper.hpp>
-#include <mast/physics/elasticity/isotropic_stiffness.hpp>
-#include <mast/physics/elasticity/linear_strain_energy.hpp>
-#include <mast/physics/elasticity/pressure_load.hpp>
-#include <mast/physics/elasticity/linear_thermoelastic_load.hpp>
-#include <mast/physics/elasticity/libmesh/mat_null_space.hpp>
+#include <mast/physics/conduction/material_conductance.hpp>
+#include <mast/physics/conduction/linear_conduction_kernel.hpp>
+#include <mast/physics/conduction/source_kernel.hpp>
+#include <mast/physics/conduction/libmesh/mat_null_space.hpp>
 #include <mast/optimization/topology/simp/penalized_density.hpp>
 #include <mast/optimization/topology/simp/penalized_scalar.hpp>
 #include <mast/optimization/topology/simp/libmesh/residual_and_jacobian.hpp>
@@ -43,11 +41,8 @@
 #include <mast/solvers/petsc/linear_solver.hpp>
 
 // topology optimization benchmark cases
-#include <mast/mesh/generation/truss2d.hpp>
-#include <mast/mesh/generation/truss3d.hpp>
-#include <mast/mesh/generation/inplane2d.hpp>
-#include <mast/mesh/generation/bracket2d.hpp>
-#include <mast/mesh/generation/bracket3d.hpp>
+#include <mast/mesh/generation/heat_sink2d.hpp>
+#include <mast/mesh/generation/heat_sink3d.hpp>
 
 // libMesh includes
 #include <libmesh/distributed_mesh.h>
@@ -59,13 +54,13 @@
 #include <libmesh/petsc_matrix.h>
 
 
-// BEGIN_TRANSLATE SIMP Minimum Compliance Topology Optimization with MPI based solvers
+// BEGIN_TRANSLATE SIMP Heat Sink Topology Optimization with MPI based solvers
 
 
 namespace MAST {
 namespace Examples {
-namespace Structural {
-namespace Example6 {
+namespace Conduction {
+namespace Example2 {
 
 template <typename ModelType>
 class InitExample {
@@ -83,19 +78,15 @@ public:
     fe_family (libMesh::LAGRANGE),
     mesh      (new libMesh::DistributedMesh(comm)),
     eq_sys    (new libMesh::EquationSystems(*mesh)),
-    sys       (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("structural")),
+    sys       (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("conduction")),
     rho_sys   (&eq_sys->add_system<libMesh::ExplicitSystem>("density")),
     filter    (nullptr),
-    p_side_id (-1),
     penalty   (0.) {
         
         model->init_analysis_mesh(*this, *mesh);
 
         // displacement variables for elasticity solution
-        sys->add_variable("u_x", libMesh::FEType(fe_order, fe_family));
-        sys->add_variable("u_y", libMesh::FEType(fe_order, fe_family));
-        if (ModelType::dim == 3)
-            sys->add_variable("u_z", libMesh::FEType(fe_order, fe_family));
+        sys->add_variable("T", libMesh::FEType(fe_order, fe_family));
         
         // density field
         rho_sys->add_variable("rho", libMesh::FEType(fe_order, fe_family));
@@ -114,7 +105,7 @@ public:
         eq_sys->reinit();
 
         // create and attach the null space to the matrix
-        MAST::Physics::Elasticity::libMeshWrapper::NullSpace
+        MAST::Physics::Conduction::libMeshWrapper::NullSpace
         null_sp(*sys, ModelType::dim);
         
         Mat m = dynamic_cast<libMesh::PetscMatrix<real_t>*>(sys->matrix)->mat();
@@ -144,7 +135,6 @@ public:
     libMesh::NonlinearImplicitSystem            *sys;
     libMesh::ExplicitSystem                     *rho_sys;
     MAST::Mesh::libMeshWrapper::GeometricFilter *filter;
-    uint_t                                       p_side_id;
     real_t                                       penalty;
 };
 
@@ -180,8 +170,6 @@ public:
     inline bool elem_is_hex() const  {return (elem->type() == libMesh::HEX8 ||
                                               elem->type() == libMesh::HEX20 ||
                                               elem->type() == libMesh::HEX27);}
-    inline bool if_compute_pressure_load_on_side(const uint_t s)
-    { return ex_init.mesh->boundary_info->has_boundary_id(elem, s, ex_init.p_side_id);}
     
     
     InitExample<model_t>                &ex_init;
@@ -203,7 +191,7 @@ typename ModelType>
 struct Traits {
     
     static const uint_t dim = ModelType::dim;
-    using traits_t          = MAST::Examples::Structural::Example6::Traits<BasisScalarType, NodalScalarType, SolScalarType, ModelType>;
+    using traits_t          = MAST::Examples::Conduction::Example2::Traits<BasisScalarType, NodalScalarType, SolScalarType, ModelType>;
     using model_t           = ModelType;
     using context_t         = Context<traits_t>;
     using ex_init_t         = InitExample<model_t>;
@@ -211,21 +199,16 @@ struct Traits {
     using fe_basis_t        = typename MAST::FEBasis::libMeshWrapper::FEBasis<BasisScalarType, dim>;
     using fe_shape_t        = typename MAST::FEBasis::Evaluation::FEShapeDerivative<BasisScalarType, NodalScalarType, dim, dim, fe_basis_t>;
     using fe_data_t         = typename MAST::FEBasis::libMeshWrapper::FEData<dim, fe_basis_t, fe_shape_t>;
-    using fe_side_data_t    = typename MAST::FEBasis::libMeshWrapper::FESideData<dim, fe_basis_t, fe_shape_t>;
-    using fe_var_t          = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, dim, dim, context_t, fe_shape_t>;
+    using fe_var_t          = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, 1, dim, context_t, fe_shape_t>;
     using density_fe_var_t  = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, 1, dim, context_t, fe_shape_t>;
     using density_field_t   = typename MAST::FEBasis::ScalarFieldWrapper<scalar_t, density_fe_var_t>;
     using density_t         = typename MAST::Optimization::Topology::SIMP::PenalizedDensity<SolScalarType, density_field_t>;
-    using modulus_t         = typename MAST::Optimization::Topology::SIMP::PenalizedScalar<SolScalarType, density_t>;
-    using nu_t              = typename MAST::Base::ScalarConstant<SolScalarType>;
-    using alpha_t           = typename MAST::Base::ScalarConstant<SolScalarType>;
-    using press_t           = typename ModelType::template pressure_t<scalar_t>;
-    using temp_t            = typename MAST::Optimization::Topology::SIMP::PenalizedScalar<SolScalarType, density_t>;
+    using conductance_t     = typename MAST::Optimization::Topology::SIMP::PenalizedScalar<SolScalarType, density_t>;
+    using source_t          = typename MAST::Base::ScalarConstant<SolScalarType>;
     using area_t            = typename MAST::Base::ScalarConstant<SolScalarType>;
-    using prop_t            = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<SolScalarType, dim, modulus_t, nu_t, context_t>;
-    using energy_t          = typename MAST::Physics::Elasticity::LinearContinuum::StrainEnergy<fe_var_t, prop_t, dim, context_t>;
-    using press_load_t      = typename MAST::Physics::Elasticity::SurfacePressureLoad<fe_var_t, press_t, area_t, dim, context_t>;
-    using temp_load_t       = typename MAST::Physics::Elasticity::LinearContinuum::ThermoelasticLoad<fe_var_t, temp_t, alpha_t, prop_t, dim, context_t>;
+    using prop_t            = typename MAST::Physics::Conduction::IsotropicMaterialConductance<SolScalarType, conductance_t, context_t>;
+    using conduction_t      = typename MAST::Physics::Conduction::ConductionKernel<fe_var_t, prop_t, dim, context_t, true, true>;
+    using source_load_t     = typename MAST::Physics::Conduction::SourceHeatLoad<fe_var_t, source_t, area_t, dim, context_t>;
     using element_vector_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using element_matrix_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     using assembled_vector_t = libMesh::NumericVector<scalar_t>;
@@ -246,35 +229,23 @@ public:
     
     ElemOps(context_t  &c):
     density         (nullptr),
-    E               (nullptr),
-    dt              (nullptr),
-    nu              (nullptr),
-    alpha           (nullptr),
-    press           (nullptr),
+    k               (nullptr),
+    qv              (nullptr),
     area            (nullptr),
     _fe_data        (nullptr),
-    _fe_side_data   (nullptr),
     _fe_var         (nullptr),
-    _fe_side_var    (nullptr),
     _density_fe_var (nullptr),
     _density_field  (nullptr),
     _prop           (nullptr),
-    _energy         (nullptr),
-    _temp_load      (nullptr),
-    _p_load         (nullptr) {
+    _conduction     (nullptr),
+    _source_load    (nullptr) {
         
         _fe_data       = new typename TraitsType::fe_data_t;
         _fe_data->init(c.ex_init.q_order,
                        c.ex_init.q_type,
                        c.ex_init.fe_order,
                        c.ex_init.fe_family);
-        _fe_side_data  = new typename TraitsType::fe_side_data_t;
-        _fe_side_data->init(c.ex_init.q_order,
-                            c.ex_init.q_type,
-                            c.ex_init.fe_order,
-                            c.ex_init.fe_family);
         _fe_var        = new typename TraitsType::fe_var_t;
-        _fe_side_var   = new typename TraitsType::fe_var_t;
         
         _density_fe_var      = new typename TraitsType::density_fe_var_t;
         _density_sens_fe_var = new typename TraitsType::density_fe_var_t;
@@ -282,18 +253,13 @@ public:
         
         // associate variables with the shape functions
         _fe_var->set_fe_shape_data(_fe_data->fe_derivative());
-        _fe_side_var->set_fe_shape_data(_fe_side_data->fe_derivative());
         
         // tell the FE computations which quantities are needed for computation
         _fe_data->fe_basis().set_compute_dphi_dxi(true);
         
         _fe_data->fe_derivative().set_compute_dphi_dx(true);
         _fe_data->fe_derivative().set_compute_detJxW(true);
-        
-        _fe_side_data->fe_basis().set_compute_dphi_dxi(true);
-        _fe_side_data->fe_derivative().set_compute_normal(true);
-        _fe_side_data->fe_derivative().set_compute_detJxW(true);
-        
+                
         _fe_var->set_compute_du_dx(true);
         
         _density_fe_var->set_fe_shape_data(_fe_data->fe_derivative());
@@ -303,59 +269,45 @@ public:
 
         // variables for physics
         density  = new typename TraitsType::density_t;
-        E        = new typename TraitsType::modulus_t;
-        dt       = new typename TraitsType::temp_t;
-        nu       = new typename TraitsType::nu_t(0.33);
-        alpha    = new typename TraitsType::alpha_t(2.e-5);
-        press    = c.ex_init.model->template build_pressure_load<scalar_t, typename TraitsType::ex_init_t>(c.ex_init).release();
+        k        = new typename TraitsType::conductance_t;
+        qv       = new typename TraitsType::source_t(1.);
         area     = new typename TraitsType::area_t(1.0);
         _prop    = new typename TraitsType::prop_t;
         
         density->set_penalty(c.ex_init.penalty);
         density->set_density_field(*_density_field);
-        E->set_density(*density);
-        E->set_scalar(72.e9, 72.e2);
-        dt->set_density(*density);
-        dt->set_scalar(100., 0.);
-
-        _prop->set_modulus_and_nu(*E, *nu);
-        _energy   = new typename TraitsType::energy_t;
-        _energy->set_section_property(*_prop);
-        _p_load   = new typename TraitsType::press_load_t;
-        _p_load->set_section_area(*area);
-        _p_load->set_pressure(*press); 
-        _temp_load = new typename TraitsType::temp_load_t;
-        _temp_load->set_section_property(*_prop);
-        _temp_load->set_coeff_thermal_expansion(*alpha);
-        _temp_load->set_temperature(*dt);
+        k->set_density(*density);
+        k->set_scalar(1.0, 1.e-3);
         
+        _prop->set_conductance(*k);
+        _conduction   = new typename TraitsType::conduction_t;
+        _conduction->set_section_property(*_prop);
+        _source_load  = new typename TraitsType::source_load_t;
+        _source_load->set_source(*qv);
+
+        if (TraitsType::dim < 3)
+            _source_load->set_section_area(*area);
+
         // tell physics kernels about the FE discretization information
-        _energy->set_fe_var_data(*_fe_var);
-        _p_load->set_fe_var_data(*_fe_side_var);
-        _temp_load->set_fe_var_data(*_fe_var);
+        _conduction->set_fe_var_data(*_fe_var);
+        _source_load->set_fe_var_data(*_fe_var);
     }
     
     virtual ~ElemOps() {
         
         delete area;
-        delete press;
-        delete nu;
-        delete alpha;
-        delete E;
-        delete dt;
+        delete qv;
+        delete k;
         delete density;
 
-        delete _energy;
+        delete _conduction;
         delete _prop;
-        delete _p_load;
-        delete _temp_load;
+        delete _source_load;
 
         delete _density_field;
         delete _density_fe_var;
         
         delete _fe_var;
-        delete _fe_side_var;
-        delete _fe_side_data;
         delete _fe_data;
     }
     
@@ -375,17 +327,8 @@ public:
         _fe_var->init(c, sol_v);
         _density_fe_var->init(c, density_v);
 
-        _energy->compute(c, res, jac);
-        _temp_load->compute(c, res, jac);
-        
-        for (uint_t s=0; s<c.elem->n_sides(); s++)
-            if (c.if_compute_pressure_load_on_side(s)) {
-                
-                c.fe = &_fe_side_data->fe_derivative();
-                _fe_side_data->reinit_for_side(c, s);
-                _fe_side_var->init(c, sol_v);
-                _p_load->compute(c, res, jac);
-            }
+        _conduction->compute(c, res, jac);
+        _source_load->compute(c, res, jac);
     }
     
     
@@ -408,8 +351,7 @@ public:
         _density_fe_var->init(c, density_v);
         _density_sens_fe_var->init(c, density_sens);
 
-        _energy->derivative(c, f, res, jac);
-        _temp_load->derivative(c, f, res, jac);
+        _conduction->derivative(c, f, res, jac);
     }
 
     
@@ -425,47 +367,29 @@ public:
                const Accessor2Type               &density_v,
                const Accessor3Type               &density_sens) {
 
-        // pressure load is independent of design parameters but thermoelastic load
-        // depends on it. So, we compute the partial derivative of compliance contribution
-        // from that term
-        c.fe = &_fe_data->fe_derivative();
-        _fe_data->reinit(c);
-        _fe_var->init(c, sol_v);
-        _density_fe_var->init(c, density_v);
-        _density_sens_fe_var->init(c, density_sens);
-
-        typename TraitsType::element_vector_t
-        res = TraitsType::element_vector_t::Zero(_temp_load->n_dofs());
-        
-        _temp_load->derivative(c, f, res);
-        
-        return -sol_v.dot(res);
+        // nothing to be done here since external work done due to pressure
+        // is independent of topology parameter
+        return 0.;
     }
 
     
     // parameters
-    typename TraitsType::density_t    *density;
-    typename TraitsType::modulus_t    *E;
-    typename TraitsType::temp_t       *dt;
-    typename TraitsType::nu_t         *nu;
-    typename TraitsType::alpha_t      *alpha;
-    typename TraitsType::press_t      *press;
-    typename TraitsType::area_t       *area;
+    typename TraitsType::density_t        *density;
+    typename TraitsType::conductance_t    *k;
+    typename TraitsType::source_t         *qv;
+    typename TraitsType::area_t           *area;
     
 private:
     
     // variables for quadrature and shape function
     typename TraitsType::fe_data_t         *_fe_data;
-    typename TraitsType::fe_side_data_t    *_fe_side_data;
     typename TraitsType::fe_var_t          *_fe_var;
-    typename TraitsType::fe_var_t          *_fe_side_var;
     typename TraitsType::density_fe_var_t  *_density_fe_var;
     typename TraitsType::density_fe_var_t  *_density_sens_fe_var;
     typename TraitsType::density_field_t   *_density_field;
     typename TraitsType::prop_t            *_prop;
-    typename TraitsType::energy_t          *_energy;
-    typename TraitsType::temp_load_t       *_temp_load;
-    typename TraitsType::press_load_t      *_p_load;
+    typename TraitsType::conduction_t      *_conduction;
+    typename TraitsType::source_load_t     *_source_load;
 };
 
 
@@ -485,7 +409,7 @@ public:
     _dvs          (new MAST::Optimization::DesignParameterVector<scalar_t>(c.rho_sys->comm())),
     _volume       (_c.ex_init.model->reference_volume(_c.ex_init)),
     _vf           (_c.ex_init.input("volume_fraction",
-                                    "upper limit for the volume fraction", 0.2)) {
+                                    "upper limit for the volume fraction", 0.3)) {
         
         // initialize the design variable vector
         _c.ex_init.model->init_simp_dvs(_c.ex_init, *_dvs);
@@ -560,11 +484,11 @@ public:
                 "Incompatible design variable vector size.");
 
         libMesh::ExplicitSystem
-        &str_sys = *_c.ex_init.sys,
+        &cnd_sys = *_c.ex_init.sys,
         &rho_sys = *_c.ex_init.rho_sys;
 
         const uint_t
-        n_dofs          = str_sys.n_dofs(),
+        n_dofs          = cnd_sys.n_dofs(),
         n_rho_vals      = rho_sys.n_dofs(),
         first_local_rho = rho_sys.get_dof_map().first_dof(rho_sys.comm().rank()),
         last_local_rho  = rho_sys.get_dof_map().end_dof(rho_sys.comm().rank());
@@ -646,10 +570,9 @@ public:
 
         _c.sys->update();
 
-        // compliance is defined using the external work done \f$ c = x^T f \f$
         scalar_t
-        vol    = 0.,
-        comp   = _c.sys->solution->dot(*res);
+        vol        = 0.,
+        temp_sum   = _c.sys->solution->sum()/(1.*n_dofs);
         
         //////////////////////////////////////////////////////////////////////
         // evaluate the functions
@@ -663,11 +586,9 @@ public:
         std::cout << "volume: " << vol << std::endl;
         
         // evaluate the output based on specified problem type
-        //nonlinear_assembly.calculate_output(*_sys->current_local_solution, false, compliance);
-        //comp      = compliance.output_total();
-        obj       = comp;
+        obj       = temp_sum;
         fvals[0]  = vol/_volume - _vf; // vol/vol0 - a <=
-        std::cout << "compliance: " << comp << std::endl;
+        std::cout << "Sum_i Temperature: " << temp_sum << std::endl;
         
 
         //////////////////////////////////////////////////////////////////////
@@ -677,31 +598,39 @@ public:
             
             MAST::Optimization::Topology::SIMP::libMeshWrapper::AssembleOutputSensitivity
             <scalar_t, ElemOps<TraitsType>, ElemOps<TraitsType>>
-            compliance_sens;
+            temp_sum_sens;
             
-            compliance_sens.set_elem_ops(_e_ops, _e_ops);
+            temp_sum_sens.set_elem_ops(_e_ops, _e_ops);
 
-            // the adjoint solution for compliance is the negative of displacement. We copy the
-            // negative of solution in vector \p res.
-            res.reset(_c.sys->current_local_solution->clone().release());
-            res->scale(-1.);
+            // the adjoint solution for sum of temperature is obtained using a RHS vector
+            // of unit values scaled by the number of degrees-of-freedom, \f$ N \f$.
+            // \f[ K^T \lambda = - \{1\}/N \f]
+            //
+            (*res) = -1./(1.*n_dofs);
             
-            // This solves for the sensitivity of compliance, \f$ c=x^T f \f$, with respect to
-            // a parameter \f$ \alpha \f$.
-            // \f{eqnarray*}{ \frac{dc}{d\alpha}
-            //    & = & \frac{\partial c}{\partial \alpha} + \frac{\partial c}{\partial x}
-            //     \frac{dx}{d\alpha} \\
-            //    & = & \frac{\partial c}{\partial \alpha} +
-            //     \lambda^T \frac{\partial R(x)}{\partial \alpha}
+            std::unique_ptr<libMesh::NumericVector<real_t>>
+            adj(_c.sys->solution->zero_clone().release()),
+            adj_localized(_c.sys->current_local_solution->zero_clone().release());
+            Vec
+            adj_v = dynamic_cast<libMesh::PetscVector<real_t>*>(adj.get())->vec();
+            b     = dynamic_cast<libMesh::PetscVector<real_t>*>(res.get())->vec();
+            linear_solver.solve(adj_v, b);
+            adj->localize(*adj_localized, _c.sys->get_dof_map().get_send_list());
+            
+            // This solves for the sensitivity of sum of temperature,
+            // \f$ T_s=\sum_{i=1}^N T_i \f$, with respect to a parameter \f$ \alpha \f$.
+            // \f{eqnarray*}{ \frac{dT_s)}{d\alpha}
+            //    & = & \frac{\partial T_s}{\partial \alpha} + \frac{\partial T_s}{\partial T}
+            //     \frac{dT}{d\alpha} \\
+            //    & = & 0 + \lambda^T \frac{\partial R(x)}{\partial \alpha}
             // \f}
-            // Note that the adjoint solution for compliance is \f$ \lambda = -x \f$.
-            compliance_sens.assemble(_c,
-                                     *_c.sys->current_local_solution,      // solution
-                                     *_c.rho_sys->current_local_solution,  // filtered density
-                                     *res,                                 // adjoint solution
-                                     *_c.ex_init.filter,                   // geometric filter
-                                     *_dvs,
-                                     obj_grad);
+            temp_sum_sens.assemble(_c,
+                                   *_c.sys->current_local_solution,      // solution
+                                   *_c.rho_sys->current_local_solution,  // filtered density
+                                   *adj_localized,                       // adjoint solution
+                                   *_c.ex_init.filter,                   // geometric filter
+                                   *_dvs,
+                                   obj_grad);
         }
         
         
@@ -757,8 +686,8 @@ private:
     real_t                                               _vf;
     std::ofstream                                        _history;
 };
-} // namespace Example6
-} // namespace Structural
+} // namespace Example2
+} // namespace Conduction
 } // namespace Examples
 } // namespace MAST
 
@@ -767,9 +696,9 @@ private:
 template <typename ModelType>
 void run(libMesh::LibMeshInit& init, MAST::Utility::GetPotWrapper& input) {
     
-    using traits_t    = MAST::Examples::Structural::Example6::Traits<real_t, real_t, real_t, ModelType>;
-    using elem_ops_t  = MAST::Examples::Structural::Example6::ElemOps<traits_t>;
-    using func_eval_t = MAST::Examples::Structural::Example6::FunctionEvaluation<traits_t>;
+    using traits_t    = MAST::Examples::Conduction::Example2::Traits<real_t, real_t, real_t, ModelType>;
+    using elem_ops_t  = MAST::Examples::Conduction::Example2::ElemOps<traits_t>;
+    using func_eval_t = MAST::Examples::Conduction::Example2::FunctionEvaluation<traits_t>;
 
     typename traits_t::ex_init_t ex_init(init.comm(), input);
 
@@ -793,20 +722,12 @@ int main(int argc, char** argv) {
     MAST::Utility::GetPotWrapper input(argc, argv);
 
     std::string
-    nm = input("model",
-               "model to run for topology optimization: bracket2d/bracket3d/truss2d/truss3d/inplane2d",
-               "bracket2d");
+    nm = input("model", "model to run for topology optimization: heat_sink2d/heat_sink3d", "heat_sink2d");
     
-    if (nm == "bracket2d")
-        run<MAST::Mesh::Generation::Bracket2D>(init, input);
-    else if (nm == "bracket3d")
-        run<MAST::Mesh::Generation::Bracket3D>(init, input);
-    else if (nm == "truss2d")
-        run<MAST::Mesh::Generation::Truss2D>(init, input);
-    else if (nm == "truss3d")
-        run<MAST::Mesh::Generation::Truss3D>(init, input);
-    else if (nm == "inplane2d")
-        run<MAST::Mesh::Generation::Inplane2D>(init, input);
+    if (nm == "heat_sink2d")
+        run<MAST::Mesh::Generation::HeatSink2D>(init, input);
+    if (nm == "heat_sink3d")
+        run<MAST::Mesh::Generation::HeatSink3D>(init, input);
     else
         std::cout << "Invalid model" << std::endl;
     

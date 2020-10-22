@@ -391,12 +391,16 @@ private:
     private:
         // Constant reference to the Mesh we are adapting for use in Nanoflann
         const libMesh::MeshBase & _mesh;
-        
+        uint_t                      _n_local_nodes;
+        uint_t                      _n_nodes;
+
     public:
         NanoflannMeshAdaptor (const libMesh::MeshBase & mesh) :
-        _mesh(mesh) {
+        _mesh           (mesh),
+        _n_local_nodes  (mesh.n_local_nodes()),
+        _n_nodes        (mesh.n_nodes()) {
             
-            nodes.reserve(mesh.n_local_nodes());
+            nodes.reserve(_n_local_nodes);
             
             libMesh::MeshBase::const_node_iterator
             it   = mesh.local_nodes_begin(),
@@ -418,7 +422,7 @@ private:
          * Must return the number of data points
          */
         inline size_t
-        kdtree_get_point_count() const { return _mesh.n_local_nodes(); }
+        kdtree_get_point_count() const { return _n_local_nodes; }
         
         /**
          * Returns the distance between the vector "p1[0:size-1]"
@@ -454,10 +458,10 @@ private:
         {
             Assert2(dim < (int) Dim, dim, (int) Dim,
                     "Incompatible dimension");
-            Assert2(idx < _mesh.n_local_nodes(), idx, _mesh.n_nodes(),
+            Assert2(idx < _n_local_nodes, idx, _n_nodes,
                     "Invalid node index");
             Assert1(dim < 3, dim, "Invalid dimension");
-            
+
             return (*nodes[idx])(dim);
         }
         

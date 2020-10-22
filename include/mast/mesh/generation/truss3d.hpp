@@ -17,8 +17,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef __mast_mesh_generation_bracket_3d_h__
-#define __mast_mesh_generation_bracket_3d_h__
+#ifndef __mast_mesh_generation_truss_3d_h__
+#define __mast_mesh_generation_truss_3d_h__
 
 // MAST includes
 #include <mast/base/mast_data_types.h>
@@ -46,7 +46,7 @@ namespace Mesh {
 namespace Generation {
 
 
-struct Bracket3D {
+struct Truss3D {
     
     template <typename ScalarType>
     class Pressure {
@@ -60,7 +60,7 @@ struct Bracket3D {
         
         template <typename ContextType>
         inline ScalarType value(ContextType& c) const {
-            ScalarType v=(c.qp_location(0)>=_l1*(1.-_frac))?_p:0.;
+            ScalarType v=(fabs(c.qp_location(0)-_l1*0.5) <= 0.5*_frac*_l1)?_p:0.;
             return v;
         }
         
@@ -76,16 +76,16 @@ struct Bracket3D {
     
     static const uint_t dim = 3;
     template <typename ScalarType>
-    using pressure_t        =  MAST::Mesh::Generation::Bracket3D::Pressure<ScalarType>;
+    using pressure_t        =  MAST::Mesh::Generation::Truss3D::Pressure<ScalarType>;
     
     template <typename Context>
     inline real_t
     reference_volume(Context& c) {
         
         real_t
-        length  = c.input("length", "length of domain along x-axis", 0.3),
-        height  = c.input("height", "length of domain along y-axis", 0.3),
-        width   = c.input("width",  "length of domain along z-axis", 0.1);
+        length  = c.input("length", "length of domain along x-axis", 0.24),
+        height  = c.input("height", "length of domain along y-axis", 0.04),
+        width   = c.input("width",  "length of domain along z-axis", 0.08);
         
         return length * height * width;
     }
@@ -125,6 +125,7 @@ struct Bracket3D {
                            const real_t length,
                            const real_t height,
                            const real_t width,
+                           const real_t dirichlet_length_fraction,
                            const libMesh::ElemType type) {
         
         Assert0(type == libMesh::HEX8 || type == libMesh::HEX27,
@@ -164,13 +165,11 @@ struct Bracket3D {
                 for (uint_t k=0; k<=nz; k++)
                     for (uint_t j=0; j<=ny; j++)
                         for (uint_t i=0; i<=nx; i++) {
-                            if ( i<=nx/10*4 || j>=ny/10*6) {
-                                nodes[node_id] =
-                                mesh.add_point(libMesh::Point(static_cast<real_t>(i)/static_cast<real_t>(nx)*length,
-                                                              static_cast<real_t>(j)/static_cast<real_t>(ny)*height,
-                                                              static_cast<real_t>(k)/static_cast<real_t>(nz)*width),
-                                               n++);
-                            }
+                            nodes[node_id] =
+                            mesh.add_point(libMesh::Point(static_cast<real_t>(i)/static_cast<real_t>(nx)*length,
+                                                          static_cast<real_t>(j)/static_cast<real_t>(ny)*height,
+                                                          static_cast<real_t>(k)/static_cast<real_t>(nz)*width),
+                                           n++);
                             node_id++;
                         }
                 
@@ -183,13 +182,11 @@ struct Bracket3D {
                 for (uint_t k=0; k<=(2*nz); k++)
                     for (uint_t j=0; j<=(2*ny); j++)
                         for (uint_t i=0; i<=(2*nx); i++) {
-                            if ( i<=2*nx/10*4 || j>=2*ny/10*6) {
-                                nodes[node_id] =
-                                mesh.add_point(libMesh::Point(static_cast<real_t>(i)/static_cast<real_t>(2*nx)*length,
-                                                              static_cast<real_t>(j)/static_cast<real_t>(2*ny)*height,
-                                                              static_cast<real_t>(k)/static_cast<real_t>(2*nz)*width),
-                                               n++);
-                            }
+                            nodes[node_id] =
+                            mesh.add_point(libMesh::Point(static_cast<real_t>(i)/static_cast<real_t>(2*nx)*length,
+                                                          static_cast<real_t>(j)/static_cast<real_t>(2*ny)*height,
+                                                          static_cast<real_t>(k)/static_cast<real_t>(2*nz)*width),
+                                           n++);
                             node_id++;
                         }
                 
@@ -211,46 +208,47 @@ struct Bracket3D {
                 for (uint_t k=0; k<nz; k++)
                     for (uint_t j=0; j<ny; j++)
                         for (uint_t i=0; i<nx; i++) {
-                            if (i < nx*4/10 || j>=ny*6/10) {
-                                
-                                libMesh::Elem
-                                *elem = libMesh::Elem::build(libMesh::HEX8).release();
-                                elem->set_id(elem_id++);
-                                mesh.add_elem(elem);
-                                
-                                elem->set_node(0) = nodes[idx(type,nx,ny,i,j,k)      ];
-                                elem->set_node(1) = nodes[idx(type,nx,ny,i+1,j,k)    ];
-                                elem->set_node(2) = nodes[idx(type,nx,ny,i+1,j+1,k)  ];
-                                elem->set_node(3) = nodes[idx(type,nx,ny,i,j+1,k)    ];
-                                elem->set_node(4) = nodes[idx(type,nx,ny,i,j,k+1)    ];
-                                elem->set_node(5) = nodes[idx(type,nx,ny,i+1,j,k+1)  ];
-                                elem->set_node(6) = nodes[idx(type,nx,ny,i+1,j+1,k+1)];
-                                elem->set_node(7) = nodes[idx(type,nx,ny,i,j+1,k+1)  ];
-                                
-                                if (k == 0)
-                                    boundary_info.add_side(elem, 0, 0);
-                                
-                                if (k == (nz-1))
-                                    boundary_info.add_side(elem, 5, 5);
-                                
-                                if (j == 0)
-                                    boundary_info.add_side(elem, 1, 1);
-                                
-                                if (j == (ny-1))
-                                    boundary_info.add_side(elem, 3, 3);
-                                
-                                if (i == 0)
-                                    boundary_info.add_side(elem, 4, 4);
-                                
-                                if (i == (nx-1))
-                                    boundary_info.add_side(elem, 2, 2);
-                                
-                                if (i==nx*3/10 && j<ny*6/10)
-                                    boundary_info.add_side(elem, 2, 6);
-                                
-                                if (j==ny*6/10 && i>nx*3/10)
-                                    boundary_info.add_side(elem, 1, 7);
-                            }
+                            
+                            libMesh::Elem
+                            *elem = libMesh::Elem::build(libMesh::HEX8).release();
+                            elem->set_id(elem_id++);
+                            mesh.add_elem(elem);
+                            
+                            elem->set_node(0) = nodes[idx(type,nx,ny,i,j,k)      ];
+                            elem->set_node(1) = nodes[idx(type,nx,ny,i+1,j,k)    ];
+                            elem->set_node(2) = nodes[idx(type,nx,ny,i+1,j+1,k)  ];
+                            elem->set_node(3) = nodes[idx(type,nx,ny,i,j+1,k)    ];
+                            elem->set_node(4) = nodes[idx(type,nx,ny,i,j,k+1)    ];
+                            elem->set_node(5) = nodes[idx(type,nx,ny,i+1,j,k+1)  ];
+                            elem->set_node(6) = nodes[idx(type,nx,ny,i+1,j+1,k+1)];
+                            elem->set_node(7) = nodes[idx(type,nx,ny,i,j+1,k+1)  ];
+                            
+                            if (k == 0)
+                                boundary_info.add_side(elem, 0, 0);
+                            
+                            if (k == (nz-1))
+                                boundary_info.add_side(elem, 5, 5);
+                            
+                            if (j == 0)
+                                boundary_info.add_side(elem, 1, 1);
+                            
+                            if (j == (ny-1))
+                                boundary_info.add_side(elem, 3, 3);
+                            
+                            if (i == 0)
+                                boundary_info.add_side(elem, 4, 4);
+                            
+                            if (i == (nx-1))
+                                boundary_info.add_side(elem, 2, 2);
+                            
+                            if (j == 0 && i <= dirichlet_length_fraction * nx)
+                                boundary_info.add_side(elem, 1, 6);
+
+                            if (j == 0 && i >= (1.-dirichlet_length_fraction)* nx)
+                                boundary_info.add_side(elem, 1, 7);
+
+                            if (j == 0 && i == 0 && k == 0)
+                                boundary_info.add_side(elem, 1, 8);
                         }
                 break;
             }
@@ -314,11 +312,14 @@ struct Bracket3D {
                             if (i == 2*(nx-1))
                                 boundary_info.add_side(elem, 2, 2);
 
-                            if (i==nx*4/10)
-                                boundary_info.add_side(elem, 2, 6);
-                            
-                            if (j==ny*6/10)
+                            if (j == 0 && i <= dirichlet_length_fraction * 2*nx)
+                                boundary_info.add_side(elem, 1, 6);
+
+                            if (j == 0 && i >= (1.-dirichlet_length_fraction)* 2*nx)
                                 boundary_info.add_side(elem, 1, 7);
+
+                            if (j == 0 && i == 0 && k == 0)
+                                boundary_info.add_side(elem, 1, 8);
                         }
                 break;
             }
@@ -334,8 +335,8 @@ struct Bracket3D {
         boundary_info.sideset_name(3) = "top";
         boundary_info.sideset_name(4) = "left";
         boundary_info.sideset_name(5) = "front";
-        boundary_info.sideset_name(6) = "facing_right";
-        boundary_info.sideset_name(7) = "facing_down";
+        boundary_info.sideset_name(6) = "left_dirichlet";
+        boundary_info.sideset_name(7) = "right_dirichlet";
 
         // Add nodeset names to boundary info
         boundary_info.nodeset_name(0) = "back";
@@ -357,18 +358,19 @@ struct Bracket3D {
                        libMesh::UnstructuredMesh& mesh) {
         
         real_t
-        length  = c.input("length", "length of domain along x-axis", 0.3),
-        height  = c.input("height", "length of domain along y-axis", 0.3),
-        width   = c.input("width",  "length of domain along z-axis", 0.1);
+        length  = c.input("length", "length of domain along x-axis", 0.24),
+        height  = c.input("height", "length of domain along y-axis", 0.04),
+        width   = c.input("width",  "length of domain along z-axis", 0.08),
+        dirichlet_length_fraction = c.input
+        ("dirichlet_length_fraction",
+         "length fraction of the truss boundary where dirichlet condition is applied",
+         0.02);
         
         uint_t
-        nx_divs = c.input("nx_divs", "number of elements along x-axis", 10),
-        ny_divs = c.input("ny_divs", "number of elements along y-axis", 10),
-        nz_divs = c.input("nz_divs", "number of elements along z-axis", 4),
+        nx_divs = c.input("nx_divs", "number of elements along x-axis", 30),
+        ny_divs = c.input("ny_divs", "number of elements along y-axis",  5),
+        nz_divs = c.input("nz_divs", "number of elements along z-axis", 10),
         n_refine= c.input("n_uniform_refinement", "number of times the mesh is uniformly refined", 0);
-        
-        if (nx_divs%10 != 0 || ny_divs%10 != 0)
-            Error(false, "number of divisions in x and y must be multiples of 10");
         
         std::string
         t = c.input("elem_type", "type of geometric element in the mesh", "hex8");
@@ -393,6 +395,7 @@ struct Bracket3D {
                    length,
                    height,
                    width,
+                   dirichlet_length_fraction,
                    e_type);
         
         // we now uniformly refine this mesh
@@ -410,7 +413,7 @@ struct Bracket3D {
     init_analysis_dirichlet_conditions(Context& c) {
         
         c.sys->get_dof_map().add_dirichlet_boundary
-        (libMesh::DirichletBoundary({1}, {0, 1, 2}, libMesh::ZeroFunction<real_t>()));
+        (libMesh::DirichletBoundary({6, 7}, {0, 1, 2}, libMesh::ZeroFunction<real_t>()));
     }
     
     
@@ -420,10 +423,10 @@ struct Bracket3D {
     build_pressure_load(InitType& c) {
         
         real_t
-        length      = c.input("length", "length of domain along x-axis", 0.3),
-        frac        = c.input("loadlength_fraction", "fraction of boundary length on which pressure will act", 0.125),
-        p_val       = c.input("pressure", "pressure on side of domain",   5.e7);
-        c.p_side_id = 7;
+        length      = c.input("length", "length of domain along x-axis", 0.24),
+        frac        = c.input("loadlength_fraction", "fraction of boundary length on which pressure will act", 0.2),
+        p_val       = c.input("pressure", "pressure on side of domain",   2.e4);
+        c.p_side_id = 3;
         
         std::unique_ptr<pressure_t<ScalarType>>
         press(new pressure_t<ScalarType>(p_val, length, frac));
@@ -448,15 +451,10 @@ struct Bracket3D {
         
         real_t
         tol           = 1.e-12,
-        l_frac        = 0.4,
-        h_frac        = 0.4,
-        length        = c.input("length", "length of domain along x-axis", 0.3),
-        height        = c.input("height", "length of domain along y-axis", 0.3),
-        x_lim         = length * l_frac,
-        y_lim         = height * (1.-h_frac),
-        frac          = c.input("loadlength_fraction", "fraction of boundary length on which pressure will act", 0.125),
-        filter_radius = c.input("filter_radius", "radius of geometric filter for level set field", 0.015),
-        rho_min       = c.input("rho_min", "lower limit on density variable", 0.),
+        length        = c.input("length", "length of domain along x-axis", 0.24),
+        height        = c.input("height", "length of domain along y-axis", 0.04),
+        frac          = c.input("loadlength_fraction", "fraction of boundary length on which pressure will act", 0.2),
+        filter_radius = c.input("filter_radius", "radius of geometric filter for level set field", 0.008),
         vf            = c.input("volume_fraction", "upper limit for the volume fraction", 0.2);
         
         uint_t
@@ -493,7 +491,7 @@ struct Bracket3D {
                 
                 dof_id = n.dof_number(sys_num, 0, 0);
                 
-                if ((n(1)-filter_radius) <= y_lim &&
+                /*if ((n(1)-filter_radius) <= y_lim &&
                     (n(0)+filter_radius) >= length*(1.-frac)) {
                     
                     //
@@ -503,7 +501,7 @@ struct Bracket3D {
                         dof_id <  end_dof)
                         c.rho_sys->solution->set(dof_id, 1.e0);
                 }
-                else {
+                else*/ {
                     
                     MAST::Optimization::DesignParameter<ScalarType>
                     *dv = new MAST::Optimization::DesignParameter<ScalarType>(vf);
@@ -528,4 +526,4 @@ struct Bracket3D {
 }  // namespace MAST
 
 
-#endif // __mast_mesh_generation_bracket_3d_h__
+#endif // __mast_mesh_generation_truss_3d_h__
