@@ -55,8 +55,12 @@
 // Eigen includes
 #include <Eigen/SparseLU>
 
-// BEGIN_TRANSLATE SIMP Minimum Compliance Topology Optimization
+// BEGIN_TRANSLATE SIMP Minimum Compliance Topology Optimization: Complex-Step Sensitivity
 
+// This example demonstrates the implementation of SIMP-based minimum compliance
+// topology optimization and use of complex-step sensitivity analysis to verify the
+// sensitivity information. The example does not show optimization, which is covered
+// in the next example Example6. 
 
 namespace MAST {
 namespace Examples {
@@ -494,8 +498,6 @@ public:
                           std::vector<bool>           &eval_grads,
                           std::vector<scalar_t>       &grads) {
 
-        std::cout << "New Evaluation" << std::endl;
-        
         Assert2(x.size() == _dvs->size(),
                 x.size(), _dvs->size(),
                 "Incompatible design variable vector size.");
@@ -546,8 +548,6 @@ public:
         // subproblem solution                                                *
         //*********************************************************************
         
-        std::cout << "Static Solve" << std::endl;
-        
         MAST::Optimization::Topology::SIMP::libMeshWrapper::ResidualAndJacobian<scalar_t, ElemOps<TraitsType>>
         assembly;
         
@@ -581,8 +581,14 @@ public:
         // compliance is defined using the external work done \f$ c = x^T f \f$
         scalar_t
         vol    = 0.,
-        comp   = sol.dot(res);
-
+        comp   = 0.;
+        
+        // NOTE: we are using a for-loop to compute the compliance, as opposed to
+        // calling sol.dot(res) since Eigen uses the conjugate of the vector
+        // for complex valued vectors.
+        for (uint_t i=0; i<sol.size(); i++)
+            comp += sol(i) * res(i);
+        
         //////////////////////////////////////////////////////////////////////
         // evaluate the functions
         //////////////////////////////////////////////////////////////////////
@@ -592,12 +598,10 @@ public:
         volume;
         
         vol = volume.compute(_c, rho_filtered);
-        std::cout << "volume: " << vol << std::endl;
         
         // evaluate the output based on specified problem type
         obj       = comp;
-        fvals[0]  = vol/_volume - _vf; // vol/vol0 - a <=
-        std::cout << "compliance: " << comp << std::endl;
+        fvals[0]  = vol/_volume - _vf; // vol/vol0 - a <= 0
         
 
         //////////////////////////////////////////////////////////////////////
@@ -693,7 +697,7 @@ int main(int argc, char** argv) {
     elem_ops_t           e_ops(c);
     func_eval_t          f_eval(e_ops, c);
     
-    /*using traits_complex_t   = MAST::Examples::Structural::Example5::Traits<real_t, real_t, complex_t, model_t>;
+    using traits_complex_t   = MAST::Examples::Structural::Example5::Traits<real_t, real_t, complex_t, model_t>;
     using elem_ops_complex_t = MAST::Examples::Structural::Example5::ElemOps<traits_complex_t>;
     using func_eval_complex_t= MAST::Examples::Structural::Example5::FunctionEvaluation<traits_complex_t>;
 
@@ -732,8 +736,21 @@ int main(int argc, char** argv) {
     b_vec[0] = false;
     f_eval_c.init_dvar(dvs_c, xlow_c, xup_c);
     
-    std::cout << "obj: " << obj << std::endl;
-    
+
+    std::cout
+    << std::setw(5)  << "DV"
+    << std::setw(60) << "------------  Compliance Sensitivity ----------------------"
+    << std::setw(60) << "------------  Volume Sensitivity ----------------------"
+    << std::endl
+    << std::setw(5)  << ""
+    << std::setw(20) << "Analytical"
+    << std::setw(20) << "Complex-Step"
+    << std::setw(20) << "Difference"
+    << std::setw(20) << "Analytical"
+    << std::setw(20) << "Complex-Step"
+    << std::setw(20) << "Difference"
+    << std::endl;
+
     for (uint_t i=0; i<f_eval.n_vars(); i++) {
         
         dvs_c[i] += complex_t(0., ComplexStepDelta);
@@ -743,25 +760,15 @@ int main(int argc, char** argv) {
         g_cs[i] = g_c[0].imag()/ComplexStepDelta;
         
         std::cout
-        << std::setw(5) << i
+        << std::setw(5)  << i
         << std::setw(20) << o_sens[i]
         << std::setw(20) << o_cs[i]
         << std::setw(20) << std::fabs(o_sens[i]-o_cs[i])
         << std::setw(20) << g_sens[i]
         << std::setw(20) << g_cs[i]
         << std::setw(20) << std::fabs(g_sens[i]-g_cs[i]) << std::endl;
-    }*/
+    }
 
-    
-    // create an optimizer, attach the function evaluation
-    MAST::Optimization::Solvers::GCMMAInterface<func_eval_t> optimizer(init.comm());
-    optimizer.max_inner_iters = 6;
-    optimizer.constr_penalty  = 1.e5;
-    optimizer.set_function_evaluation(f_eval);
-    
-    // optimize
-    optimizer.optimize();
-    
     
     // END_TRANSLATE
     return 0;

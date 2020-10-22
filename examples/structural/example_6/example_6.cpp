@@ -627,12 +627,6 @@ public:
         // We multiply with -1 before solving for \f$ x \f$.
         res->scale(-1);
         // This solves for \f$ x\f$ from the system of equations \f$ K x = f \f$.
-        libMesh::SparseMatrix<real_t>
-        *pc  = _c.sys->request_matrix("Preconditioner");
-
-        std::pair<unsigned int, real_t>
-        solver_params = _c.sys->get_linear_solve_parameters();
-
         Mat
         m   = dynamic_cast<libMesh::PetscMatrix<real_t>*>(_c.sys->matrix)->mat();
         Vec
