@@ -30,6 +30,7 @@
 #include <mast/physics/elasticity/linear_strain_energy.hpp>
 #include <mast/physics/elasticity/pressure_load.hpp>
 #include <mast/optimization/topology/simp/penalized_density.hpp>
+#include <mast/optimization/topology/simp/heaviside_filter.hpp>
 #include <mast/optimization/topology/simp/penalized_scalar.hpp>
 #include <mast/optimization/topology/simp/libmesh/residual_and_jacobian.hpp>
 #include <mast/optimization/topology/simp/libmesh/assemble_output_sensitivity.hpp>
@@ -202,7 +203,8 @@ struct Traits {
     using fe_var_t          = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, dim, dim, context_t, fe_shape_t>;
     using density_fe_var_t  = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, 1, dim, context_t, fe_shape_t>;
     using density_field_t   = typename MAST::FEBasis::ScalarFieldWrapper<scalar_t, density_fe_var_t>;
-    using density_t         = typename MAST::Optimization::Topology::SIMP::PenalizedDensity<SolScalarType, density_field_t>;
+    using heaviside_t       = typename MAST::Optimization::Topology::SIMP::HeavisideFilter<SolScalarType, density_field_t>;
+    using density_t         = typename MAST::Optimization::Topology::SIMP::PenalizedDensity<SolScalarType, heaviside_t>;
     using modulus_t         = typename MAST::Optimization::Topology::SIMP::PenalizedScalar<SolScalarType, density_t>;
     using nu_t              = typename MAST::Base::ScalarConstant<SolScalarType>;
     using press_t           = typename ModelType::template pressure_t<scalar_t>;
@@ -283,15 +285,18 @@ public:
         _density_field->set_derivative_fe_object_and_component(*_density_sens_fe_var, 0);
 
         // variables for physics
-        density  = new typename TraitsType::density_t;
-        E        = new typename TraitsType::modulus_t;
-        nu       = new typename TraitsType::nu_t(0.33);
-        press    = c.ex_init.model->template build_pressure_load<scalar_t, typename TraitsType::ex_init_t>(c.ex_init).release();
-        area     = new typename TraitsType::area_t(1.0);
-        _prop    = new typename TraitsType::prop_t;
+        heaviside = new typename TraitsType::heaviside_t;
+        density   = new typename TraitsType::density_t;
+        E         = new typename TraitsType::modulus_t;
+        nu        = new typename TraitsType::nu_t(0.33);
+        press     = c.ex_init.model->template build_pressure_load<scalar_t, typename TraitsType::ex_init_t>(c.ex_init).release();
+        area      = new typename TraitsType::area_t(1.0);
+        _prop     = new typename TraitsType::prop_t;
         
+        heaviside->set_parameters(10., 0.1);
+        heaviside->set_field(*_density_field);
         density->set_penalty(c.ex_init.penalty);
-        density->set_density_field(*_density_field);
+        density->set_density_field(*heaviside);
         E->set_density(*density);
         E->set_scalar(72.e9, 72.e2);
         
@@ -314,6 +319,7 @@ public:
         delete nu;
         delete E;
         delete density;
+        delete heaviside;
 
         delete _energy;
         delete _prop;
@@ -399,6 +405,7 @@ public:
 
     
     // parameters
+    typename TraitsType::heaviside_t  *heaviside;
     typename TraitsType::density_t    *density;
     typename TraitsType::modulus_t    *E;
     typename TraitsType::nu_t         *nu;
