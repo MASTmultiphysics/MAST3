@@ -231,6 +231,7 @@ public:
     using matrix_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     
     ElemOps(context_t  &c):
+    heaviside       (nullptr),
     density         (nullptr),
     E               (nullptr),
     nu              (nullptr),

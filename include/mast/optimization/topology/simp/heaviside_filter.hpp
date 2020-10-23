@@ -31,7 +31,7 @@ namespace SIMP {
 
 /*!
  * This class implements the Heaviside filter defined as
- * \f[ \tilde{v) =  \frac{\tanh(\beta \eta) + \tanh(\beta(\v-\eta)) }{\tanh (\beta \eta) + \tanh (\beta(1-\eta)) } \f]
+ * \f[ \tilde{v) =  \frac{\tanh(\beta \eta) + \tanh(\beta(v-\eta)) }{\tanh (\beta \eta) + \tanh (\beta(1-\eta)) } \f]
  */
 template <typename ScalarType, typename FieldType>
 class HeavisideFilter {
