@@ -54,6 +54,19 @@ public:
         _eta  = eta;
     }
     
+    /*!
+     * a function to compute the filtered value for given scalar \p s
+     */
+    inline ScalarType filter(ScalarType s) {
+        
+        return ((tanh(_beta*_eta)+tanh(_beta*(s-_eta))) /
+                (tanh(_beta*_eta)+tanh(_beta*(1.-_eta))));
+    }
+
+    /*!
+     * @returns filtered value of field value.
+     * \param c is a context object that is passed to the field object
+     */
     template <typename ContextType>
     inline ScalarType value(const ContextType& c) const {
         
@@ -63,6 +76,9 @@ public:
                 (tanh(_beta*_eta)+tanh(_beta*(1.-_eta))));
     }
 
+    /*!
+     * @returns filtered value of field value
+     */
     template <typename ContextType, typename ScalarFieldType>
     inline ScalarType derivative(const ContextType&     c,
                                  const ScalarFieldType& f) const {
