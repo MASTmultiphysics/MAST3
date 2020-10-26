@@ -122,6 +122,24 @@ public:
     }
     
     
+    /*!
+     * initializes the design variable vector from the function object.
+     */
+    inline void init() {
+        
+        Assert0(_feval, "Function evaluation object not set");
+        int
+        N                  = _feval->n_vars(),
+        _total_iter = 0;
+        
+        _XVAL.resize(N, 0.);
+        _XMIN.resize(N, 0.);
+        _XMAX.resize(N, 0.);
+        
+        _feval->init_dvar(_XVAL, _XMIN, _XMAX);
+    }
+    
+    
     inline void optimize() {
         
 #if MAST_ENABLE_GCMMA == 1
@@ -133,9 +151,12 @@ public:
         M                  = _feval->n_eq() + _feval->n_ineq();
         
         Assert1(N > 0, N, "Design variables must be greater than 0");
-        
-        std::vector<real_t>  XVAL(N, 0.), XOLD1(N, 0.), XOLD2(N, 0.),
-        XMMA(N, 0.), XMIN(N, 0.), XMAX(N, 0.), XLOW(N, 0.), XUPP(N, 0.),
+        Assert2(_XVAL.size() == N, _XVAL.size(), N, "Design variables must be initialized");
+        Assert2(_XMIN.size() == N, _XMIN.size(), N, "Design variables must be initialized");
+        Assert2(_XMAX.size() == N, _XMAX.size(), N, "Design variables must be initialized");
+
+        std::vector<real_t>  XOLD1(N, 0.), XOLD2(N, 0.),
+        XMMA(N, 0.), XLOW(N, 0.), XUPP(N, 0.),
         ALFA(N, 0.), BETA(N, 0.), DF0DX(N, 0.),
         A(M, 0.), B(M, 0.), C(M, 0.), Y(M, 0.), RAA(M, 0.), ULAM(M, 0.),
         FVAL(M, 0.), FAPP(M, 0.), FNEW(M, 0.), FMAX(M, 0.),
@@ -236,12 +257,12 @@ public:
          */
         // _initi(M,N,GEPS,XVAL,XMIN,XMAX,FMAX,A,C);
         // Assumed:  FMAX == A
-        _feval->init_dvar(XVAL, XMIN, XMAX);
+        //_feval->init_dvar(XVAL, XMIN, XMAX);
         // set the value of C[i] to be very large numbers
         real_t max_x = 0.;
         for (uint_t i=0; i<N; i++)
-            if (max_x < fabs(XVAL[i]))
-                max_x = fabs(XVAL[i]);
+            if (max_x < fabs(_XVAL[i]))
+                max_x = fabs(_XVAL[i]);
         
         int INNMAX=max_inner_iters, ITER=0, ITE=0, INNER=0, ICONSE=0;
         /*
@@ -255,6 +276,7 @@ public:
             GHDECR  = asymptote_reduction,
             GHINCR  = asymptote_expansion,
             
+            _total_iter++;
             ITER=ITER+1;
             ITE=ITE+1;
             /*
@@ -262,19 +284,19 @@ public:
              *  at XVAL. The result should be put in F0VAL,DF0DX,FVAL,DFDX.
              */
             std::fill(eval_grads.begin(), eval_grads.end(), true);
-            _evaluate_wrapper(XVAL,
-                             F0VAL, true, DF0DX,
-                             FVAL, eval_grads, DFDX);
+            _evaluate_wrapper(_XVAL,
+                              F0VAL, true, DF0DX,
+                              FVAL, eval_grads, DFDX);
             if (ITER == 1)
                 // output the very first iteration
-                _feval->output(0, XVAL, F0VAL, FVAL);
+                _feval->output(_total_iter, _XVAL, F0VAL, FVAL);
             
             /*
              *  RAA0,RAA,XLOW,XUPP,ALFA and BETA are calculated.
              */
-            raasta_(&M, &N, &RAA0, &RAA[0], &XMIN[0], &XMAX[0], &DF0DX[0], &DFDX[0]);
+            raasta_(&M, &N, &RAA0, &RAA[0], &_XMIN[0], &_XMAX[0], &DF0DX[0], &DFDX[0]);
             asympg_(&ITER, &M, &N, &ALBEFA, &GHINIT, &GHDECR, &GHINCR,
-                    &XVAL[0], &XMIN[0], &XMAX[0], &XOLD1[0], &XOLD2[0],
+                    &_XVAL[0], &_XMIN[0], &_XMAX[0], &XOLD1[0], &XOLD2[0],
                     &XLOW[0], &XUPP[0], &ALFA[0], &BETA[0]);
             /*
              *  The inner iterative process starts.
@@ -282,7 +304,7 @@ public:
             
             // write the asymptote data for the inneriterations
             if (write_internal_iteration_data)
-                _output_iteration_data(ITER, XVAL, XMIN, XMAX, XLOW, XUPP, ALFA, BETA);
+                _output_iteration_data(ITER, _XVAL, _XMIN, _XMAX, XLOW, XUPP, ALFA, BETA);
             
             INNER=0;
             inner_terminate = false;
@@ -291,8 +313,8 @@ public:
                 /*
                  *  The subproblem is generated and solved.
                  */
-                mmasug_(&ITER, &M, &N, &GEPS, &IYFREE[0], &XVAL[0], &XMMA[0],
-                        &XMIN[0], &XMAX[0], &XLOW[0], &XUPP[0], &ALFA[0], &BETA[0],
+                mmasug_(&ITER, &M, &N, &GEPS, &IYFREE[0], &_XVAL[0], &XMMA[0],
+                        &_XMIN[0], &_XMAX[0], &XLOW[0], &XUPP[0], &ALFA[0], &BETA[0],
                         &A[0], &B[0], &C[0], &Y[0], &Z, &RAA0, &RAA[0], &ULAM[0],
                         &F0VAL, &FVAL[0], &F0APP, &FAPP[0], &FMAX[0], &DF0DX[0], &DFDX[0],
                         &P[0], &Q[0], &P0[0], &Q0[0], &UU[0], &GRADF[0], &DSRCH[0], &HESSF[0]);
@@ -349,8 +371,8 @@ public:
                          *  are updated and one more inner iteration is started.
                          */
                         INNER=INNER+1;
-                        raaupd_( &M, &N, &GEPS, &XMMA[0], &XVAL[0],
-                                &XMIN[0], &XMAX[0], &XLOW[0], &XUPP[0],
+                        raaupd_( &M, &N, &GEPS, &XMMA[0], &_XVAL[0],
+                                &_XMIN[0], &_XMAX[0], &XLOW[0], &XUPP[0],
                                 &F0NEW, &FNEW[0], &F0APP, &FAPP[0], &RAA0, &RAA[0]);
                     }
                 }
@@ -362,12 +384,12 @@ public:
              *  The variables are updated so that XVAL stands for the new
              *  outer iteration point. The fuction values are also updated.
              */
-            xupdat_( &N, &ITER, &XMMA[0], &XVAL[0], &XOLD1[0], &XOLD2[0]);
+            xupdat_( &N, &ITER, &XMMA[0], &_XVAL[0], &XOLD1[0], &XOLD2[0]);
             fupdat_( &M, &F0NEW, &FNEW[0], &F0VAL, &FVAL[0]);
             /*
              *  The USER may now write the current solution.
              */
-            _feval->output(ITER, XVAL, F0VAL, FVAL);
+            _feval->output(_total_iter, _XVAL, F0VAL, FVAL);
             f0_iters[(ITE-1)%n_rel_change_iters] = F0VAL;
             
             /*
@@ -504,6 +526,8 @@ private:
     }
     
     FunctionEvaluationType *_feval;
+    uint_t                  _total_iter;
+    std::vector<real_t>     _XVAL, _XMIN, _XMAX;
 };
 
 } // namespace Solvers
