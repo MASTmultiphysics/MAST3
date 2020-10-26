@@ -57,9 +57,20 @@ public:
     /*!
      * a function to compute the filtered value for given scalar \p s
      */
-    inline ScalarType filter(ScalarType s) {
+    inline ScalarType filter(ScalarType s) const {
         
         return ((tanh(_beta*_eta)+tanh(_beta*(s-_eta))) /
+                (tanh(_beta*_eta)+tanh(_beta*(1.-_eta))));
+    }
+
+    
+    /*!
+     * a function to compute the filtered value for given scalar \p s
+     */
+    inline ScalarType filter_derivative(ScalarType s,
+                                        ScalarType ds) const {
+        
+        return ((1.-pow(tanh(_beta*(s-_eta)),2))* _beta * ds /
                 (tanh(_beta*_eta)+tanh(_beta*(1.-_eta))));
     }
 
