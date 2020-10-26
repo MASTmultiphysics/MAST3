@@ -605,7 +605,7 @@ public:
         MAST::Optimization::Topology::SIMP::libMeshWrapper::Volume<scalar_t>
         volume;
         
-        vol = volume.compute(_c, rho_filtered);
+        vol = volume.compute(_c, rho_filtered, *_e_ops.heaviside);
         
         // evaluate the output based on specified problem type
         obj       = comp;
@@ -658,6 +658,7 @@ public:
 
             volume.derivative(_c,
                               rho_filtered,
+                              *_e_ops.heaviside,
                               *_c.ex_init.filter,
                               *_dvs,
                               grads);
