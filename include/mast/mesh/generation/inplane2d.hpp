@@ -342,7 +342,7 @@ struct Inplane2D {
         real_t
         length      = c.input("length", "length of domain along x-axis", 1.0),
         frac        = c.input("loadlength_fraction", "fraction of boundary length on which pressure will act", 0.2),
-        p_val       = c.input("pressure", "pressure on side of domain",   2.e4);
+        p_val       = c.input("pressure", "pressure on side of domain",   2.e6);
         c.p_side_id = 2;
         
         std::unique_ptr<pressure_t<ScalarType>>
