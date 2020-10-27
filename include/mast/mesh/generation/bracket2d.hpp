@@ -562,28 +562,15 @@ struct Bracket2D {
 
                 dof_id = n.dof_number(sys_num, 0, 0);
 
-                if ((n(1)-filter_radius) <= y_lim &&
-                    (n(0)+filter_radius) >= length*(1.-frac)) {
-                    
-                    //
-                    // set value at the constrained points to be solid material
-                    //
-                    if (dof_id >= first_dof &&
-                        dof_id <  end_dof)
-                        c.rho_sys->solution->set(dof_id, 1.e0);
-                }
-                else {
-                    
-                    MAST::Optimization::DesignParameter<ScalarType>
-                    *dv = new MAST::Optimization::DesignParameter<ScalarType>(vf);
-                    dv->set_point(n(0), n(1), n(2));
-                    
-                    if (dof_id >= first_dof &&
-                        dof_id <  end_dof)
-                        dvs.add_topology_parameter(*dv, dof_id);
-                    else
-                        dvs.add_ghosted_topology_parameter(*dv, dof_id);
-                }
+                MAST::Optimization::DesignParameter<ScalarType>
+                *dv = new MAST::Optimization::DesignParameter<ScalarType>(vf);
+                dv->set_point(n(0), n(1), n(2));
+                
+                if (dof_id >= first_dof &&
+                    dof_id <  end_dof)
+                    dvs.add_topology_parameter(*dv, dof_id);
+                else
+                    dvs.add_ghosted_topology_parameter(*dv, dof_id);
             }
         }
 

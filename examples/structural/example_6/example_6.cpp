@@ -30,6 +30,7 @@
 #include <mast/physics/elasticity/pressure_load.hpp>
 #include <mast/physics/elasticity/linear_thermoelastic_load.hpp>
 #include <mast/physics/elasticity/libmesh/mat_null_space.hpp>
+#include <mast/optimization/topology/simp/heaviside_filter.hpp>
 #include <mast/optimization/topology/simp/penalized_density.hpp>
 #include <mast/optimization/topology/simp/penalized_scalar.hpp>
 #include <mast/optimization/topology/simp/libmesh/residual_and_jacobian.hpp>
@@ -87,7 +88,9 @@ public:
     rho_sys   (&eq_sys->add_system<libMesh::ExplicitSystem>("density")),
     filter    (nullptr),
     p_side_id (-1),
-    penalty   (0.) {
+    penalty   (0.),
+    beta      (0.),
+    eta       (0.) {
         
         model->init_analysis_mesh(*this, *mesh);
 
@@ -120,8 +123,8 @@ public:
         Mat m = dynamic_cast<libMesh::PetscMatrix<real_t>*>(sys->matrix)->mat();
         null_sp.attach_to_matrix(m);
         
-        penalty  = input("rho_penalty",
-                         "SIMP modulus of elasticity penalty", 3.);
+        eta      = input("heaviside_eta",
+                         "Smoothed heaviside eta parameter", 0.5);
     }
     
     virtual ~InitExample() {
@@ -146,6 +149,8 @@ public:
     MAST::Mesh::libMeshWrapper::GeometricFilter *filter;
     uint_t                                       p_side_id;
     real_t                                       penalty;
+    real_t                                       beta;
+    real_t                                       eta;
 };
 
 
@@ -215,7 +220,8 @@ struct Traits {
     using fe_var_t          = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, dim, dim, context_t, fe_shape_t>;
     using density_fe_var_t  = typename MAST::FEBasis::FEVarData<BasisScalarType, NodalScalarType, SolScalarType, 1, dim, context_t, fe_shape_t>;
     using density_field_t   = typename MAST::FEBasis::ScalarFieldWrapper<scalar_t, density_fe_var_t>;
-    using density_t         = typename MAST::Optimization::Topology::SIMP::PenalizedDensity<SolScalarType, density_field_t>;
+    using heaviside_t       = typename MAST::Optimization::Topology::SIMP::HeavisideFilter<SolScalarType, density_field_t>;
+    using density_t         = typename MAST::Optimization::Topology::SIMP::PenalizedDensity<SolScalarType, heaviside_t>;
     using modulus_t         = typename MAST::Optimization::Topology::SIMP::PenalizedScalar<SolScalarType, density_t>;
     using nu_t              = typename MAST::Base::ScalarConstant<SolScalarType>;
     using alpha_t           = typename MAST::Base::ScalarConstant<SolScalarType>;
@@ -245,6 +251,7 @@ public:
     using matrix_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     
     ElemOps(context_t  &c):
+    heaviside       (nullptr),
     density         (nullptr),
     E               (nullptr),
     dt              (nullptr),
@@ -302,6 +309,7 @@ public:
         _density_field->set_derivative_fe_object_and_component(*_density_sens_fe_var, 0);
 
         // variables for physics
+        heaviside= new typename TraitsType::heaviside_t;
         density  = new typename TraitsType::density_t;
         E        = new typename TraitsType::modulus_t;
         dt       = new typename TraitsType::temp_t;
@@ -311,12 +319,15 @@ public:
         area     = new typename TraitsType::area_t(1.0);
         _prop    = new typename TraitsType::prop_t;
         
+        heaviside->set_parameters(c.ex_init.beta, c.ex_init.eta);
+        heaviside->set_field(*_density_field);
         density->set_penalty(c.ex_init.penalty);
-        density->set_density_field(*_density_field);
+        density->set_density_field(*heaviside);
         E->set_density(*density);
         E->set_scalar(72.e9, 72.e2);
         dt->set_density(*density);
-        dt->set_scalar(100., 0.);
+        dt->set_scalar(c.ex_init.input("temperature",
+                                       "temperature over domain", 0.), 0.);
 
         _prop->set_modulus_and_nu(*E, *nu);
         _energy   = new typename TraitsType::energy_t;
@@ -344,6 +355,7 @@ public:
         delete E;
         delete dt;
         delete density;
+        delete heaviside;
 
         delete _energy;
         delete _prop;
@@ -444,6 +456,7 @@ public:
 
     
     // parameters
+    typename TraitsType::heaviside_t  *heaviside;
     typename TraitsType::density_t    *density;
     typename TraitsType::modulus_t    *E;
     typename TraitsType::temp_t       *dt;
@@ -653,7 +666,8 @@ public:
         MAST::Optimization::Topology::SIMP::libMeshWrapper::Volume<scalar_t>
         volume;
         
-        vol = volume.compute(_c, *_c.rho_sys->current_local_solution);
+        vol = volume.compute(_c, *_c.rho_sys->current_local_solution,
+                             *_e_ops.heaviside);
         std::cout << "volume: " << vol << std::endl;
         
         // evaluate the output based on specified problem type
@@ -711,6 +725,7 @@ public:
 
             volume.derivative(_c,
                               *_c.rho_sys->current_local_solution,
+                              *_e_ops.heaviside,
                               *_c.ex_init.filter,
                               *_dvs,
                               grads);
@@ -723,6 +738,16 @@ public:
                        const std::vector<real_t>  &dvars,
                        real_t                     &o,
                        std::vector<real_t>        &fvals) {
+
+        // pass all desntity values through the heaviside filter for plotting.
+        for (uint_t i=_c.rho_sys->solution->first_local_index();
+             i<_c.rho_sys->solution->last_local_index(); i++) {
+
+            real_t v = _c.rho_sys->solution->el(i);
+            _c.rho_sys->solution->set(i, _e_ops.heaviside->filter(v));
+        }
+        _c.rho_sys->solution->close();
+        _c.rho_sys->update();
         
         std::ostringstream oss;
         oss << "output_optim.e-s." << std::setfill('0') << std::setw(5) << iter ;
@@ -773,12 +798,27 @@ void run(libMesh::LibMeshInit& init, MAST::Utility::GetPotWrapper& input) {
     
     // create an optimizer, attach the function evaluation
     MAST::Optimization::Solvers::GCMMAInterface<func_eval_t> optimizer(init.comm());
+    optimizer.max_iters       = input("max_iters","maximum iterations for GCMMA", 50);
     optimizer.max_inner_iters = 6;
-    optimizer.constr_penalty  = 1.e5;
+    optimizer.constr_penalty  = input("constr_penalty","constraint penalty for GCMMA", 1.e5);
+    optimizer.initial_rel_step=1.e-2;
     optimizer.set_function_evaluation(f_eval);
+    optimizer.init();
     
-    // optimize
-    optimizer.optimize();
+    real_t
+    beta_base = input("heaviside_beta","Base value of beta parameter in Heaviside filter", 1.);
+    
+    // continuation approach to increase penalty parameters
+    for (uint_t i=0; i<8; i++) {
+        
+        ex_init.penalty = 1. + 0.5 * i;
+        ex_init.beta    = pow(beta_base, i);
+     
+        e_ops.heaviside->set_parameters(c.ex_init.beta, c.ex_init.eta);
+        e_ops.density->set_penalty(c.ex_init.penalty);
+
+        optimizer.optimize();
+    }
 }
 
 int main(int argc, char** argv) {
