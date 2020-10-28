@@ -32,17 +32,17 @@ namespace MAST {
 namespace Solvers {
 namespace SLEPcWrapper {
 
-class GeneralizedHermitianEigenSolver {
+class HermitianEigenSolver {
     
 public:
     
-    GeneralizedHermitianEigenSolver(EigenproblemType type):
+    HermitianEigenSolver(EigenproblemType type):
     _initialized(false),
     _n(0),
     _n_converged(0),
     _type(type) { }
     
-    virtual ~GeneralizedHermitianEigenSolver() {
+    virtual ~HermitianEigenSolver() {
         
         if (_initialized)
             EPSDestroy(&_eps);
@@ -89,7 +89,7 @@ public:
         VecZeroEntries(x);
 
         Vec vi;
-        VecCopy(x, &vi, PETSC_NULL);
+        VecCopy(x, &vi);
         
         eig = 0.;
         
@@ -104,45 +104,58 @@ public:
     }
     
     /// method for eigenvalue problems  \f$ A x = \lambda B x \f$
-    inline void solve(Mat    A_mat,
-                      Mat    B_mat,
-                      uint_t nev,
+    inline void solve(Mat               A_mat,
+                      Mat              *B_mat,
+                      uint_t            nev,
                       EigenSpectrumType spectrum,
-                      bool computeEigenvectors) {
+                      bool              computeEigenvectors) {
         
-        assert(!_initialized);
+        Assert0(_initialized);
+
+        PetscInt
+        m = 0,
+        n = 0;
         
-        assert(A_mat.rows() == A_mat.cols());
+        MatGetSize(A_mat, &m, &n);
+        
+        Assert2(m == n, m, n, "Matrix must be square");
+        
         if (B_mat) {
-            assert(_type == GENERALIZED_HERMITIAN ||
-                   _type == GENERALIZED_NON_HERMITIAN);
-            assert(A_mat.rows() == B_mat->rows());
-            assert(B_mat->rows() == B_mat->cols());
+            
+            PetscInt
+            m2 = 0,
+            n2 = 0;
+            
+            MatGetSize(B_mat, &m, &n);
+
+            Assert0(_type == GENERALIZED_HERMITIAN,
+                    "Eigensolver type must be Generalized Hermitian");
+            Assert2(m==m0 && n==n0, m0, n0, "A and B must be same size");
         }
         
-        _n = (int) A_mat.rows();
-        _init_mat(A_mat, _A);
-        if (B_mat)
-            _init_mat(*B_mat, _B);
-        
         EPSCreate(PETSC_COMM_SELF, &_eps);
+        
         if (!B_mat) {
-            EPSSetOperators(_eps, _A, PETSC_NULL);
+
+            EPSSetOperators(_eps, A_mat, PETSC_NULL);
+            
             if (_type == HERMITIAN)
                 EPSSetProblemType(_eps, EPS_HEP);
             else if (_type == NON_HERMITIAN)
                 EPSSetProblemType(_eps, EPS_NHEP);
             else
-                assert(false);
+                Aassert0(false, "Invalid EPS type");
         }
         else {
-            EPSSetOperators(_eps, _A, _B);
+
+            EPSSetOperators(_eps, A_mat, *B_mat);
+            
             if (_type == GENERALIZED_HERMITIAN)
                 EPSSetProblemType(_eps, EPS_GHEP);
             else if (_type == GENERALIZED_NON_HERMITIAN)
                 EPSSetProblemType(_eps, EPS_GNHEP);
             else
-                assert(false);
+                Aassert0(false, "Invalid EPS type");
         }
         
         if (spectrum == LARGEST_MAGNITUDE)
@@ -158,8 +171,8 @@ public:
         else if (spectrum == SMALLEST_REAL)
             EPSSetWhichEigenpairs(_eps, EPS_SMALLEST_REAL);
         else
-            assert (false);
-        
+            Aassert0(false, "Invalid spectrum type");
+
         EPSSetDimensions(_eps, nev, PETSC_DEFAULT, PETSC_DEFAULT);
         EPSSetFromOptions(_eps);
         EPSSolve(_eps);
@@ -185,12 +198,10 @@ public:
 
 protected:
     
-    void _init_mat(const RealMatrixX& A, Mat& mat);
-    bool _initialized;
-    int  _n, _n_converged;
-    EigenproblemType _type;
-    Mat _A, _B;
-    EPS _eps;
+    bool              _initialized;
+    int               _n, _n_converged;
+    EigenproblemType  _type;
+    EPS               _eps;
 };
 
 }  // namespace SLEPcWrapper
