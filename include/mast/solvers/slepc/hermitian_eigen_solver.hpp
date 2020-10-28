@@ -36,7 +36,7 @@ class HermitianEigenSolver {
     
 public:
     
-    HermitianEigenSolver(EigenproblemType type):
+    HermitianEigenSolver(EPSProblemType type):
     _initialized(false),
     _n(0),
     _n_converged(0),
@@ -61,17 +61,17 @@ public:
     inline real_t eig(uint_t i) {
         
         Assert0(_initialized, "solver not initialized");
-        Assert2(eigen_index < _n_converged,
-                eigen_index, _n_converged,
-                "Eigenvalue index index must be less than n_converged");
+        Assert2(i < _n_converged,
+                i, _n_converged,
+                "Eigenvalue index must be less than n_converged");
         
         real_t
         re = 0.,
         im = 0.;
-        EPSGetEigenvalue(_eps, eigen_index, &re, &im);
+        EPSGetEigenvalue(_eps, i, &re, &im);
         
         // assuming that im == 0 for Hermitian problem
-        return r;
+        return re;
     }
     
     
@@ -80,16 +80,16 @@ public:
                              real_t  &eig,
                              Vec      x) {
         
-        Assert0(_initialized);
-        Assert2(eigen_index < _n_converged,
-                eigen_index, _n_converged,
-                "Eigenvalue index index must be less than n_converged");
+        Assert0(_initialized, "solver not initialized");
+        Assert2(i < _n_converged,
+                i, _n_converged,
+                "Eigenvalue index must be less than n_converged");
 
         
         VecZeroEntries(x);
 
         Vec vi;
-        VecCopy(x, &vi);
+        VecCopy(x, vi);
         
         eig = 0.;
         
@@ -107,10 +107,10 @@ public:
     inline void solve(Mat               A_mat,
                       Mat              *B_mat,
                       uint_t            nev,
-                      EigenSpectrumType spectrum,
+                      EPSWhich          spectrum,
                       bool              computeEigenvectors) {
         
-        Assert0(_initialized);
+        Assert0(_initialized, "solver not initialized");
 
         PetscInt
         m = 0,
@@ -126,11 +126,11 @@ public:
             m2 = 0,
             n2 = 0;
             
-            MatGetSize(B_mat, &m, &n);
+            MatGetSize(*B_mat, &m, &n);
 
-            Assert0(_type == GENERALIZED_HERMITIAN,
+            Assert0(_type == EPS_GHEP,
                     "Eigensolver type must be Generalized Hermitian");
-            Assert2(m==m0 && n==n0, m0, n0, "A and B must be same size");
+            Assert2(m==m2 && n==n2, m2, n2, "A and B must be same size");
         }
         
         EPSCreate(PETSC_COMM_SELF, &_eps);
@@ -139,39 +139,39 @@ public:
 
             EPSSetOperators(_eps, A_mat, PETSC_NULL);
             
-            if (_type == HERMITIAN)
+            if (_type == EPS_HEP)
                 EPSSetProblemType(_eps, EPS_HEP);
-            else if (_type == NON_HERMITIAN)
+            else if (_type == EPS_NHEP)
                 EPSSetProblemType(_eps, EPS_NHEP);
             else
-                Aassert0(false, "Invalid EPS type");
+                Assert0(false, "Invalid EPS type");
         }
         else {
 
             EPSSetOperators(_eps, A_mat, *B_mat);
             
-            if (_type == GENERALIZED_HERMITIAN)
+            if (_type == EPS_GHEP)
                 EPSSetProblemType(_eps, EPS_GHEP);
-            else if (_type == GENERALIZED_NON_HERMITIAN)
+            else if (_type == EPS_GNHEP)
                 EPSSetProblemType(_eps, EPS_GNHEP);
             else
-                Aassert0(false, "Invalid EPS type");
+                Assert0(false, "Invalid EPS type");
         }
         
-        if (spectrum == LARGEST_MAGNITUDE)
+        if (spectrum == EPS_LARGEST_MAGNITUDE)
             EPSSetWhichEigenpairs(_eps, EPS_LARGEST_MAGNITUDE);
-        else if (spectrum == SMALLEST_MAGNITUDE)
+        else if (spectrum == EPS_SMALLEST_MAGNITUDE)
             EPSSetWhichEigenpairs(_eps, EPS_SMALLEST_MAGNITUDE);
-        else if (spectrum == LARGEST_IMAGINARY)
+        else if (spectrum == EPS_LARGEST_IMAGINARY)
             EPSSetWhichEigenpairs(_eps, EPS_LARGEST_IMAGINARY);
-        else if (spectrum == SMALLEST_IMAGINARY)
+        else if (spectrum == EPS_SMALLEST_IMAGINARY)
             EPSSetWhichEigenpairs(_eps, EPS_SMALLEST_IMAGINARY);
-        else if (spectrum == LARGEST_REAL)
+        else if (spectrum == EPS_LARGEST_REAL)
             EPSSetWhichEigenpairs(_eps, EPS_LARGEST_REAL);
-        else if (spectrum == SMALLEST_REAL)
+        else if (spectrum == EPS_SMALLEST_REAL)
             EPSSetWhichEigenpairs(_eps, EPS_SMALLEST_REAL);
         else
-            Aassert0(false, "Invalid spectrum type");
+            Assert0(false, "Invalid spectrum type");
 
         EPSSetDimensions(_eps, nev, PETSC_DEFAULT, PETSC_DEFAULT);
         EPSSetFromOptions(_eps);
@@ -190,7 +190,7 @@ public:
             EPSComputeError(_eps, i, EPS_ERROR_RELATIVE, &error);
             std::cout
             << std::setw(10) << i
-            << std::setw(30) << this->getEigenValue(i)
+            << std::setw(30) << this->eig(i)
             << std::setw(30) << error << std::endl;
         }
         
@@ -200,7 +200,7 @@ protected:
     
     bool              _initialized;
     int               _n, _n_converged;
-    EigenproblemType  _type;
+    EPSProblemType    _type;
     EPS               _eps;
 };
 
