@@ -30,6 +30,7 @@
 #include <mast/base/assembly/libmesh/residual_and_jacobian.hpp>
 #include <mast/base/assembly/libmesh/residual_sensitivity.hpp>
 #include <mast/numerics/libmesh/sparse_matrix_initialization.hpp>
+#include <mast/solvers/slepc/hermitian_eigen_solver.hpp>
 
 // libMesh includes
 #include <libmesh/replicated_mesh.h>
