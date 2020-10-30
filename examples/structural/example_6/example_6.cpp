@@ -49,6 +49,8 @@
 #include <mast/mesh/generation/inplane2d.hpp>
 #include <mast/mesh/generation/bracket2d.hpp>
 #include <mast/mesh/generation/bracket3d.hpp>
+#include <mast/mesh/generation/panel2d.hpp>
+#include <mast/mesh/generation/panel3d.hpp>
 
 // libMesh includes
 #include <libmesh/distributed_mesh.h>
@@ -841,6 +843,10 @@ int main(int argc, char** argv) {
         run<MAST::Mesh::Generation::Truss3D>(init, input);
     else if (nm == "inplane2d")
         run<MAST::Mesh::Generation::Inplane2D>(init, input);
+    else if (nm == "panel2d")
+        run<MAST::Mesh::Generation::Panel2D>(init, input);
+    else if (nm == "panel3d")
+        run<MAST::Mesh::Generation::Panel3D>(init, input);
     else
         std::cout << "Invalid model" << std::endl;
     
