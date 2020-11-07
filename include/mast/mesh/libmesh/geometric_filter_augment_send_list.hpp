@@ -36,20 +36,27 @@ public libMesh::DofMap::AugmentSendList {
 public:
     
     GeometricFilterAugmentSendList(const std::vector<uint_t>& v):
-    _list  (v)
+    _if_enable (true),
+    _list      (v)
     { }
 
     virtual ~GeometricFilterAugmentSendList() { }
 
+    inline void if_enable(bool f) { _if_enable = f; }
+    
     virtual void
     augment_send_list(std::vector<libMesh::dof_id_type>& send_list) override {
         
+        if (!_if_enable) return;
+        
+        libMesh::out << "**** augmend send list ****" << std::endl;
         for (uint_t i=0; i<_list.size(); i++)
             send_list.push_back(_list[i]);
     }
 
 private:
     
+    bool                       _if_enable;
     const std::vector<uint_t>& _list;
 };
 

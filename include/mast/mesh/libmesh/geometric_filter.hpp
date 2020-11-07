@@ -94,6 +94,12 @@ public:
     }
     
     
+    inline void disable_sendlist() {
+        
+        Assert0(_augment_send_list, "Send list object not initialized");
+        
+        _augment_send_list->if_enable(false);
+    }
     
     template <typename Vec1Type,
               typename Vec2Type>
