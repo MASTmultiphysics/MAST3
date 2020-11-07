@@ -96,6 +96,7 @@ public:
     max_inner_iters               (15),
     max_iters                     (1000),
     n_rel_change_iters            (5),
+    total_iter                    (0),
     write_internal_iteration_data (false),
     _feval                        (nullptr),
     _total_iter                   (0)
@@ -113,6 +114,7 @@ public:
     uint_t           max_inner_iters;
     uint_t           max_iters;
     uint_t           n_rel_change_iters;
+    uint_t           total_iter;
     bool             write_internal_iteration_data;
     
     inline void set_function_evaluation(FunctionEvaluationType& feval) {
@@ -131,7 +133,7 @@ public:
         Assert0(_feval, "Function evaluation object not set");
         int
         N                  = _feval->n_vars(),
-        _total_iter = 0;
+        total_iter = 0;
         
         _XVAL.resize(N, 0.);
         _XMIN.resize(N, 0.);
@@ -277,7 +279,7 @@ public:
             GHDECR  = asymptote_reduction,
             GHINCR  = asymptote_expansion,
             
-            _total_iter++;
+            total_iter++;
             ITER=ITER+1;
             ITE=ITE+1;
             /*
@@ -290,7 +292,7 @@ public:
                               FVAL, eval_grads, DFDX);
             if (ITER == 1)
                 // output the very first iteration
-                _feval->output(_total_iter, _XVAL, F0VAL, FVAL);
+                _feval->output(total_iter, _XVAL, F0VAL, FVAL);
             
             /*
              *  RAA0,RAA,XLOW,XUPP,ALFA and BETA are calculated.
@@ -390,7 +392,7 @@ public:
             /*
              *  The USER may now write the current solution.
              */
-            _feval->output(_total_iter, _XVAL, F0VAL, FVAL);
+            _feval->output(total_iter, _XVAL, F0VAL, FVAL);
             f0_iters[(ITE-1)%n_rel_change_iters] = F0VAL;
             
             /*
@@ -527,7 +529,6 @@ private:
     }
     
     FunctionEvaluationType *_feval;
-    uint_t                  _total_iter;
     std::vector<real_t>     _XVAL, _XMIN, _XMAX;
 };
 
