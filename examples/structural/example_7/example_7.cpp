@@ -60,15 +60,17 @@
 #include <libmesh/boundary_info.h>
 #include <libmesh/nemesis_io.h>
 #include <libmesh/petsc_matrix.h>
+#include "libmesh/mesh_refinement.h"
+#include "libmesh/error_vector.h"
 
 
-// BEGIN_TRANSLATE SIMP Minimum Compliance Topology Optimization with MPI based solvers
+// BEGIN_TRANSLATE SIMP h-adaptive Minimum Compliance Topology Optimization with MPI based solvers
 
 
 namespace MAST {
 namespace Examples {
 namespace Structural {
-namespace Example6 {
+namespace Example7 {
 
 template <typename ModelType>
 class InitExample {
@@ -112,19 +114,6 @@ public:
         mesh->print_info(std::cout);
         eq_sys->print_info(std::cout);
 
-        real_t
-        filter_r = input("filter_radius",
-                         "radius of geometric filter for level set field", 0.015);
-        filter = new MAST::Mesh::libMeshWrapper::GeometricFilter(*rho_sys, filter_r);
-        eq_sys->reinit();
-
-        // create and attach the null space to the matrix
-        MAST::Physics::Elasticity::libMeshWrapper::NullSpace
-        null_sp(*sys, ModelType::dim);
-        
-        Mat m = dynamic_cast<libMesh::PetscMatrix<real_t>*>(sys->matrix)->mat();
-        null_sp.attach_to_matrix(m);
-        
         eta      = input("heaviside_eta",
                          "Smoothed heaviside eta parameter", 0.5);
     }
@@ -135,6 +124,25 @@ public:
         delete mesh;
         delete model;
         delete filter;
+    }
+    
+    
+    inline void reinit_for_mesh() {
+        
+        real_t
+        filter_r = input("filter_radius",
+                         "radius of geometric filter for level set field", 0.015);
+
+        if (filter) delete filter;
+        filter = new MAST::Mesh::libMeshWrapper::GeometricFilter(*rho_sys, filter_r);
+        eq_sys->reinit();
+
+        // create and attach the null space to the matrix
+        MAST::Physics::Elasticity::libMeshWrapper::NullSpace
+        null_sp(*sys, ModelType::dim);
+        
+        Mat m = dynamic_cast<libMesh::PetscMatrix<real_t>*>(sys->matrix)->mat();
+        null_sp.attach_to_matrix(m);
     }
     
     libMesh::Parallel::Communicator             &comm;
@@ -210,7 +218,7 @@ typename ModelType>
 struct Traits {
     
     static const uint_t dim = ModelType::dim;
-    using traits_t          = MAST::Examples::Structural::Example6::Traits<BasisScalarType, NodalScalarType, SolScalarType, ModelType>;
+    using traits_t          = MAST::Examples::Structural::Example7::Traits<BasisScalarType, NodalScalarType, SolScalarType, ModelType>;
     using model_t           = ModelType;
     using context_t         = Context<traits_t>;
     using ex_init_t         = InitExample<model_t>;
@@ -493,25 +501,30 @@ public:
     using scalar_t  = typename TraitsType::scalar_t;
     using context_t = typename TraitsType::context_t;
     
-    FunctionEvaluation(ElemOps<TraitsType> &e_ops,
-                       context_t           &c):
+    FunctionEvaluation(ElemOps<TraitsType>                      &e_ops,
+                       context_t                                &c,
+                       std::ofstream                            &history,
+                       typename TraitsType::assembled_vector_t  *dv_vec = nullptr):
     _e_ops        (e_ops),
     _c            (c),
     _dvs          (new MAST::Optimization::DesignParameterVector<scalar_t>(c.rho_sys->comm())),
     _volume       (_c.ex_init.model->reference_volume(_c.ex_init)),
     _vf           (_c.ex_init.input("volume_fraction",
-                                    "upper limit for the volume fraction", 0.2)) {
+                                    "upper limit for the volume fraction", 0.2)),
+    _history      (history) {
         
         // initialize the design variable vector
         _c.ex_init.model->init_simp_dvs(_c.ex_init, *_dvs);
         
-        // open the file where the history will be stored
-        _history.open("optim_history.txt", std::ostream::out);
+        // if given a vector, update the DVs based on the provided vector
+        if (dv_vec) {
+            for (uint_t i=_dvs->local_begin(); i<_dvs->local_end(); i++)
+            (*_dvs)[i] = dv_vec->el(_dvs->get_data_for_parameter((*_dvs)[i]).template get<int>("dof_id"));
+        }
     }
     
     virtual ~FunctionEvaluation() {
         
-        _history.close();
         delete _dvs;
     }
     
@@ -752,7 +765,7 @@ public:
         _c.rho_sys->update();
         
         std::ostringstream oss;
-        oss << "output_optim.e-s." << std::setfill('0') << std::setw(5) << 0 ;
+        oss << "output_optim.e-s." << std::setfill('0') << std::setw(5) << iter ;
         
         _c.sys->time = iter;
         libMesh::Nemesis_IO writer(*_c.mesh);
@@ -776,9 +789,81 @@ private:
     MAST::Optimization::DesignParameterVector<scalar_t> *_dvs;
     real_t                                               _volume;
     real_t                                               _vf;
-    std::ofstream                                        _history;
+    std::ofstream                                       &_history;
 };
-} // namespace Example6
+
+
+
+
+template <typename TraitsType>
+class ElemFlag: public libMesh::MeshRefinement::ElementFlagging {
+    
+public:
+    
+    using scalar_t  = typename TraitsType::scalar_t;
+    using context_t = typename TraitsType::context_t;
+    
+    ElemFlag(ElemOps<TraitsType> &e_ops,
+             context_t           &c,
+             uint_t               max_h):
+    _e_ops        (e_ops),
+    _c            (c),
+    _max_h        (max_h)
+    { }
+
+    inline virtual ~ElemFlag() {}
+    
+    inline virtual void flag_elements () {
+        
+        scalar_t
+        volume = 0.,
+        rho    = 0.;
+
+        const uint_t
+        sys_num = _c.rho_sys->number();
+
+        libMesh::MeshBase::element_iterator
+        it  = _c.mesh->active_elements_begin(),
+        end = _c.mesh->active_elements_end();
+
+        std::vector<scalar_t> sol;
+        _c.rho_sys->solution->localize(sol);
+        
+        for ( ; it != end; it++) {
+            
+            libMesh::Elem* elem = *it;
+            
+            // compute the average element density value
+            real_t
+            rho = 0.;
+            
+            for (uint_t i=0; i<elem->n_nodes(); i++) {
+                
+                const libMesh::Node& n = *elem->node_ptr(i);
+                
+                rho +=
+                MAST::Numerics::Utility::get(sol,//*_c.rho_sys->current_local_solution,
+                                             n.dof_number(sys_num, 0, 0));
+            }
+            
+            rho /= (1. * elem->n_nodes());
+
+            if (rho >= 0.3 && elem->level() < _max_h)
+                elem->set_refinement_flag(libMesh::Elem::REFINE);
+            else
+                elem->set_refinement_flag(libMesh::Elem::COARSEN);
+        }
+    }
+
+protected:
+    
+    ElemOps<TraitsType>         &_e_ops;
+    context_t                   &_c;
+    uint_t                       _max_h;
+};
+
+
+} // namespace Example7
 } // namespace Structural
 } // namespace Examples
 } // namespace MAST
@@ -788,41 +873,84 @@ private:
 template <typename ModelType>
 void run(libMesh::LibMeshInit& init, MAST::Utility::GetPotWrapper& input) {
     
-    using traits_t    = MAST::Examples::Structural::Example6::Traits<real_t, real_t, real_t, ModelType>;
-    using elem_ops_t  = MAST::Examples::Structural::Example6::ElemOps<traits_t>;
-    using func_eval_t = MAST::Examples::Structural::Example6::FunctionEvaluation<traits_t>;
+    using traits_t    = MAST::Examples::Structural::Example7::Traits<real_t, real_t, real_t, ModelType>;
+    using elem_ops_t  = MAST::Examples::Structural::Example7::ElemOps<traits_t>;
+    using func_eval_t = MAST::Examples::Structural::Example7::FunctionEvaluation<traits_t>;
 
     typename traits_t::ex_init_t ex_init(init.comm(), input);
 
     typename traits_t::context_t  c(ex_init);
     elem_ops_t           e_ops(c);
-    func_eval_t          f_eval(e_ops, c);
     
-    // create an optimizer, attach the function evaluation
-    MAST::Optimization::Solvers::GCMMAInterface<func_eval_t> optimizer(init.comm());
-    optimizer.max_iters       = input("max_iters","maximum iterations for GCMMA", 50);
-    optimizer.max_inner_iters = 6;
-    optimizer.constr_penalty  = input("constr_penalty","constraint penalty for GCMMA", 1.e5);
-    optimizer.initial_rel_step=1.e-2;
-    optimizer.set_function_evaluation(f_eval);
-    optimizer.init();
-    
+    // open the file where the history will be stored
+    std::ofstream history;
+    history.open("optim_history.txt", std::ostream::out);
+
     real_t
     beta_base = input("heaviside_beta","Base value of beta parameter in Heaviside filter", 1.);
-    
+
+    uint_t
+    iter  = 0,
+    max_h = input("max_refinements","maximum levels of mesh refinement", 5);
+
     // continuation approach to increase penalty parameters
     for (uint_t i=0; i<10; i++) {
         
+        // adapt the mesh based on the previous optimized result
+        if (i > 0) {
+            
+            
+            MAST::Examples::Structural::Example7::ElemFlag<traits_t>
+            flag(e_ops, c, max_h);
+
+            libMesh::MeshRefinement refine(*c.mesh);
+            refine.max_h_level()      = max_h;
+            refine.refine_fraction()  = 1.;
+            refine.coarsen_fraction() = 0.5;
+            refine.flag_elements_by (flag);
+            
+            if (refine.refine_and_coarsen_elements()) {
+                ex_init.filter->disable_sendlist();
+                c.eq_sys->reinit ();
+            }
+            
+            c.mesh->print_info();
+        }
+        
+        ex_init.reinit_for_mesh();
+
+        // Create the function evaluation object. The last argument provides the
+        // density variable vector
+        func_eval_t  f_eval(e_ops,
+                            c,
+                            history,
+                            i>0?c.rho_sys->current_local_solution.get():nullptr);
+
+        // create an optimizer, attach the function evaluation
+        MAST::Optimization::Solvers::GCMMAInterface<func_eval_t> optimizer(init.comm());
+        optimizer.max_iters       = input("max_iters","maximum iterations for GCMMA", 50);
+        optimizer.max_inner_iters = 6;
+        optimizer.constr_penalty  = input("constr_penalty","constraint penalty for GCMMA", 1.e5);
+        optimizer.initial_rel_step=1.e-2;
+        optimizer.set_function_evaluation(f_eval);
+        optimizer.init();
+
         ex_init.penalty = 1. + 0.5 * i;
         ex_init.beta    = pow(beta_base, i);
      
         e_ops.heaviside->set_parameters(c.ex_init.beta, c.ex_init.eta);
         e_ops.density->set_penalty(c.ex_init.penalty);
 
+        // this will start the iteration count from iter
+        optimizer.total_iter = iter;
+        
         optimizer.optimize();
+        
+        // store the optimization iteration
+        iter = optimizer.total_iter;
     }
-    optimizer.max_iters       = 400;
-    optimizer.optimize();
+    
+    history.close();
 }
 
 int main(int argc, char** argv) {
