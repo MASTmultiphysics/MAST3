@@ -43,14 +43,13 @@ namespace GeometricFilter {
 
 inline void test_filter_transpose_operation()  {
 
-    std::vector<std::string> arguments = {"filter_radius=0.05"};
+    char *args[] = {
+        (char*)" ",
+        (char*)"filter_radius=0.05",
+        NULL
+    };
 
-    std::vector<char*> argv;
-    for (const auto& arg : arguments)
-        argv.push_back((char*)arg.data());
-    argv.push_back(nullptr);
-
-    MAST::Utility::GetPotWrapper input(argv.size() - 1, argv.data());
+    MAST::Utility::GetPotWrapper input(2, args);
 
     using traits_t    = MAST::Examples::Structural::Example6::Traits<real_t, real_t, real_t, MAST::Mesh::Generation::Bracket2D>;
     
