@@ -95,6 +95,7 @@ TEST_CASE("gcmma_interface",
     MAST::Optimization::Solvers::GCMMAInterface<RosenbrockFunction>
     opt(p_global_init->comm());
     opt.set_function_evaluation(f);
+    opt.init();
     
     opt.optimize();
     
