@@ -96,10 +96,11 @@ public:
         n_density_dofs = c.rho_sys->n_dofs();
 
         MAST::Numerics::Utility::setZero(sens);
-        std::vector<ScalarType>
-        v (n_density_dofs, ScalarType()),
-        v_filtered (n_density_dofs, ScalarType());
-        
+
+        std::unique_ptr<Vec2Type>
+        v (MAST::Numerics::Utility::build<Vec2Type>(*c.rho_sys).release()),
+        v_filtered (MAST::Numerics::Utility::build<Vec2Type>(*c.rho_sys).release());
+
         // iterate over each element, initialize it and get the relevant
         // analysis quantities
         typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, Vec1Type>
@@ -171,32 +172,28 @@ public:
                 
                 // next, we compute the partial derivative derivative of
                 // the output functional and add it to the sensitivity result
-                v[density_dof_ids[i]] += _output_e_ops->derivative(c,
-                                                                   dv,
-                                                                   sol_accessor,
-                                                                   density_accessor,
-                                                                   drho);
-                // finally, the adjoint vector is combined with the
-                // residual sensitivity to compute the result.
-                v[density_dof_ids[i]] += adj_accessor.dot(dres_e);
+                MAST::Numerics::Utility::add
+                (*v,
+                 density_dof_ids[i],
+                 _output_e_ops->derivative(c, // partial derivative of output
+                                           dv,
+                                           sol_accessor,
+                                           density_accessor,
+                                           drho)
+                 + adj_accessor.dot(dres_e)); // the adjoint vector combined w/ res sens
             }
         }
         
+        MAST::Numerics::Utility::finalize(*v);
+
         // Now, combine the sensitivty with the filtering data
-        filter.compute_reverse_filtered_values(dvs, v, v_filtered);
+        filter.compute_reverse_filtered_values(*v, *v_filtered);
 
         // copy the results back to sens
-        const typename MAST::Optimization::DesignParameterVector<ScalarType>::dv_id_param_map_t
-        &dv_id_map = dvs.get_dv_map();
-        
-        typename MAST::Optimization::DesignParameterVector<ScalarType>::dv_id_param_map_t::const_iterator
-        it   = dv_id_map.begin(),
-        end  = dv_id_map.end();
-                
-        for ( ; it != end; it++) {
-            
-            idx = dvs.get_data_for_parameter(*it->second).template get<int>("dof_id");
-            sens[it->first] = v_filtered[idx];
+        for (uint_t i=dvs.local_begin(); i<dvs.local_end(); i++) {
+
+            idx = dvs.get_data_for_parameter(dvs[i]).template get<int>("dof_id");
+            sens[i] = MAST::Numerics::Utility::get(*v_filtered, idx);
         }
         
         MAST::Numerics::Utility::comm_sum(c.rho_sys->comm(), sens);
