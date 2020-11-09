@@ -31,6 +31,7 @@
 #include <libmesh/numeric_vector.h>
 #include <libmesh/sparse_matrix.h>
 #include <libmesh/parallel.h>
+#include <libmesh/system.h>
 
 namespace MAST {
 namespace Numerics {
@@ -134,6 +135,41 @@ finalize(libMesh::SparseMatrix<real_t>& m) { m.close();}
 template <typename P1, int P2, typename P3>
 inline void
 finalize(Eigen::SparseMatrix<P1, P2, P3>& m) { m.makeCompressed();}
+
+
+template <typename ScalarType>
+inline void resize(std::vector<ScalarType>& v, uint_t n) {
+
+    v.resize(n, ScalarType());
+}
+
+
+template <typename ScalarType>
+inline void resize(Eigen::Matrix<ScalarType, Eigen::Dynamic, 1>& v, uint_t n) {
+
+    v = Eigen::Matrix<ScalarType, Eigen::Dynamic, 1>::Zero(n);
+}
+
+
+template <typename ValType>
+inline std::unique_ptr<ValType>
+build(const libMesh::System& sys) {
+
+    std::unique_ptr<ValType> rval(new ValType);
+    MAST::Numerics::Utility::resize(*rval, sys.n_dofs());
+    
+    return rval;
+}
+
+
+template <>
+inline std::unique_ptr<libMesh::NumericVector<real_t>>
+build(const libMesh::System& sys) {
+
+    return std::unique_ptr<libMesh::NumericVector<real_t>>
+    (sys.solution->zero_clone().release());
+}
+
 
 
 template <typename ScalarType, typename VecType>
