@@ -78,11 +78,8 @@ inline void test_filter_transpose_operation()  {
             rho_base->set(i, 1.);
             rho_base->close();
             
-            ex_init.filter->template compute_filtered_values
-            <traits_t::scalar_t,
-            typename traits_t::assembled_vector_t,
-            typename traits_t::assembled_vector_t>
-            (dvs, *rho_base, *vec1);
+            ex_init.filter->compute_filtered_values
+            (*rho_base, *vec1);
             
             vec1->close();
             
@@ -95,11 +92,8 @@ inline void test_filter_transpose_operation()  {
         rho_base->set(qoi_dof, 1.);
         rho_base->close();
         
-        ex_init.filter->template compute_reverse_filtered_values
-        <traits_t::scalar_t,
-        typename traits_t::assembled_vector_t,
-        typename traits_t::assembled_vector_t>
-        (dvs, *rho_base, *vec1);
+        ex_init.filter->compute_reverse_filtered_values
+        (*rho_base, *vec1);
         
         vec1->close();
         
