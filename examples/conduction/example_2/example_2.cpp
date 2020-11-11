@@ -508,11 +508,9 @@ public:
                           x[i]);
         rho_base->close();
         
-        _c.ex_init.filter->template compute_filtered_values
-        <scalar_t,
-        typename TraitsType::assembled_vector_t,
-        typename TraitsType::assembled_vector_t>
-        (*_dvs, *rho_base, *_c.rho_sys->solution);
+        _c.ex_init.filter->compute_filtered_values
+        (dynamic_cast<libMesh::PetscVector<scalar_t>*>(rho_base.get())->vec(),
+         dynamic_cast<libMesh::PetscVector<scalar_t>*>(_c.rho_sys->solution.get())->vec());
         _c.rho_sys->solution->close();
         
         // this will copy the solution to libMesh::System::current_local_soluiton
@@ -708,12 +706,22 @@ void run(libMesh::LibMeshInit& init, MAST::Utility::GetPotWrapper& input) {
     
     // create an optimizer, attach the function evaluation
     MAST::Optimization::Solvers::GCMMAInterface<func_eval_t> optimizer(init.comm());
+    optimizer.max_iters       = input("max_iters","maximum iterations for GCMMA", 50);
     optimizer.max_inner_iters = 6;
-    optimizer.constr_penalty  = 1.e5;
+    optimizer.constr_penalty  = input("constr_penalty","constraint penalty for GCMMA", 1.e5);
+    optimizer.initial_rel_step=1.e-2;
     optimizer.set_function_evaluation(f_eval);
+    optimizer.init();
     
-    // optimize
-    optimizer.optimize();
+    // continuation approach to increase penalty parameters
+    for (uint_t i=0; i<8; i++) {
+        
+        ex_init.penalty = 1. + 0.5 * i;
+     
+        e_ops.density->set_penalty(c.ex_init.penalty);
+
+        optimizer.optimize();
+    }
 }
 
 int main(int argc, char** argv) {

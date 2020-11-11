@@ -575,10 +575,9 @@ public:
         }
 
         _c.ex_init.filter->template compute_filtered_values
-        <scalar_t,
-        typename TraitsType::assembled_vector_t,
-        typename TraitsType::assembled_vector_t>
-        (*_dvs, rho_base, rho_filtered);
+        <typename TraitsType::assembled_vector_t,
+         typename TraitsType::assembled_vector_t>
+        (rho_base, rho_filtered);
         
         //////////////////////////////////////////////////////////////////////
         // check to see if the sensitivity of constraint is requested
