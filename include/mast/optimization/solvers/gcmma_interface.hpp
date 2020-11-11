@@ -97,7 +97,8 @@ public:
     max_iters                     (1000),
     n_rel_change_iters            (5),
     write_internal_iteration_data (false),
-    _feval                        (nullptr)
+    _feval                        (nullptr),
+    _total_iter                   (0)
     { }
 
     

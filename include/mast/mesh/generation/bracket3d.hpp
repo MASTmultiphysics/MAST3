@@ -85,7 +85,7 @@ struct Bracket3D {
         real_t
         length  = c.input("length", "length of domain along x-axis", 0.3),
         height  = c.input("height", "length of domain along y-axis", 0.3),
-        width   = c.input("width",  "length of domain along z-axis", 0.1);
+        width   = c.input("width",  "length of domain along z-axis", 0.06);
         
         return length * height * width;
     }
@@ -359,12 +359,12 @@ struct Bracket3D {
         real_t
         length  = c.input("length", "length of domain along x-axis", 0.3),
         height  = c.input("height", "length of domain along y-axis", 0.3),
-        width   = c.input("width",  "length of domain along z-axis", 0.1);
+        width   = c.input("width",  "length of domain along z-axis", 0.06);
         
         uint_t
         nx_divs = c.input("nx_divs", "number of elements along x-axis", 10),
         ny_divs = c.input("ny_divs", "number of elements along y-axis", 10),
-        nz_divs = c.input("nz_divs", "number of elements along z-axis", 4),
+        nz_divs = c.input("nz_divs", "number of elements along z-axis", 2),
         n_refine= c.input("n_uniform_refinement", "number of times the mesh is uniformly refined", 0);
         
         if (nx_divs%10 != 0 || ny_divs%10 != 0)
@@ -448,14 +448,6 @@ struct Bracket3D {
         
         real_t
         tol           = 1.e-12,
-        l_frac        = 0.4,
-        h_frac        = 0.4,
-        length        = c.input("length", "length of domain along x-axis", 0.3),
-        height        = c.input("height", "length of domain along y-axis", 0.3),
-        x_lim         = length * l_frac,
-        y_lim         = height * (1.-h_frac),
-        frac          = c.input("loadlength_fraction", "fraction of boundary length on which pressure will act", 0.125),
-        filter_radius = c.input("filter_radius", "radius of geometric filter for level set field", 0.015),
         rho_min       = c.input("rho_min", "lower limit on density variable", 0.),
         vf            = c.input("volume_fraction", "upper limit for the volume fraction", 0.2);
         

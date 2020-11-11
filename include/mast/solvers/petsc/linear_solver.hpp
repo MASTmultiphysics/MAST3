@@ -60,7 +60,7 @@ public:
      * pass this to the \p KSPSetOptionsPrefix method. This allows specific
      * selection of solver options for different linear solvers in a code.
      */
-    inline void init(Mat A, std::string* scope = nullptr) {
+    inline void init(Mat A, const std::string* scope = nullptr) {
 
         Assert0(!_A, "solver already initialized");
 
@@ -75,7 +75,8 @@ public:
 
         if (scope) {
             
-            ierr = KSPSetOptionsPrefix(_ksp, scope->c_str());
+            std::string nm = *scope + "_";
+            ierr = KSPSetOptionsPrefix(_ksp, nm.c_str());
             CHKERRABORT(_comm, ierr);
         }
 

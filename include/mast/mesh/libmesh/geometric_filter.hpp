@@ -34,7 +34,7 @@
 #include "libmesh/node.h"
 #include "libmesh/elem.h"
 #include "libmesh/mesh_base.h"
-#include "libmesh/numeric_vector.h"
+#include "libmesh/petsc_vector.h"
 #ifdef LIBMESH_HAVE_NANOFLANN
 #include "libmesh/nanoflann.hpp"
 #endif
@@ -88,129 +88,23 @@ public:
     virtual ~GeometricFilter() {
         
         if (_augment_send_list) delete _augment_send_list;
-    }
-    
-    /*!
-     *   computes the filtered output from the provided input.
-     */
-    inline void
-    compute_filtered_values
-    (const MAST::Optimization::DesignParameterVector<real_t> &dvs,
-     const libMesh::NumericVector<real_t>            &input,
-     libMesh::NumericVector<real_t>                  &output,
-     bool                                            close_vec) const {
         
-        Assert2(input.size() == _system.n_dofs(),
-                input.size(), _system.n_dofs(),
-                "Incompatible vector sizes");
-        Assert2(output.size() == _system.n_dofs(),
-                output.size(), _system.n_dofs(),
-                "Incompatible vector sizes");
-        
-        output.zero();
-        
-        std::vector<real_t> input_vals(input.size(), 0.);
-        input.localize(input_vals);
-
-        const uint_t
-        first_local_dof = _system.get_dof_map().first_dof(_system.comm().rank()),
-        last_local_dof  = _system.get_dof_map().end_dof(_system.comm().rank());
-
-        std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>::const_iterator
-        map_it   = _filter_map.begin(),
-        map_end  = _filter_map.end();
-        
-        for ( ; map_it != map_end; map_it++) {
-            
-            if (map_it->first >= first_local_dof &&
-                map_it->first <  last_local_dof) {
-                
-                std::vector<std::pair<uint_t, real_t>>::const_iterator
-                vec_it  = map_it->second.begin(),
-                vec_end = map_it->second.end();
-                
-                for ( ; vec_it != vec_end; vec_it++) {
-                    if (map_it->first >= input.first_local_index() &&
-                        map_it->first <  input.last_local_index()) {
-                        
-                        if (dvs.is_design_parameter_index(map_it->first))
-                            output.add(map_it->first, input_vals[vec_it->first] * vec_it->second);
-                        else
-                            output.set(map_it->first, input_vals[map_it->first]);
-                    }
-                }
-            }
-        }
-        
-        if (close_vec)
-            output.close();
-    }
-    
-    /*!
-     *  for large problems it is more efficient to specify only the non-zero entries in the input vector in
-     *  \p nonzero_vals. Here, \p output is expected to be of type SERIAL vector. All ranks in the
-     *  communicator will perform the same operaitons and provide an identical \p output vector.
-     *  If \p close_vector is \p true then \p output.close() will be called in this
-     *  routines, otherwise not.
-     */
-    template <typename ScalarType, typename VecType>
-    inline void
-    compute_filtered_values
-    (const MAST::Optimization::DesignParameterVector<ScalarType> &dvs,
-     const std::map<uint_t, ScalarType>              &nonzero_vals,
-     VecType                                         &output) const {
-        
-        Assert2(output.size() == _system.n_dofs(),
-                output.size(), _system.n_dofs(),
-                "Incompatible vector sizes");
-        Assert2(output.type() == libMesh::SERIAL,
-                output.type(), libMesh::SERIAL,
-                "Incompatible vector");
-        
-        MAST::Numerics::Utility::setZero(output);
-        
-        const uint_t
-        first_local_dof = _system.get_dof_map().first_dof(_system.comm().rank()),
-        last_local_dof  = _system.get_dof_map().end_dof(_system.comm().rank());
-
-        std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>::const_iterator
-        map_it   = _filter_map.begin(),
-        map_end  = _filter_map.end();
-        
-        for ( ; map_it != map_end; map_it++) {
-            
-            if (map_it->first >= first_local_dof &&
-                map_it->first <  last_local_dof) {
-                
-                std::vector<std::pair<uint_t, real_t>>::const_iterator
-                vec_it  = map_it->second.begin(),
-                vec_end = map_it->second.end();
-                
-                for ( ; vec_it != vec_end; vec_it++) {
-                    if (nonzero_vals.count(vec_it->first)) {
-                        
-                        if (dvs.is_design_parameter(map_it->first))
-                            MAST::Numerics::Utility::add
-                            (output, map_it->first, nonzero_vals[vec_it->first] * vec_it->second);
-                        else
-                            MAST::Numerics::Utility::set
-                            (output, map_it->first, nonzero_vals[map_it->first]);
-                    }
-                }
-            }
-        }
+        // delete the matrix
+        MatDestroy(&_weight_matrix);
     }
     
     
-    template <typename ScalarType,
-              typename Vec1Type,
+    
+    template <typename Vec1Type,
               typename Vec2Type>
     inline void
     compute_filtered_values
-    (const MAST::Optimization::DesignParameterVector<ScalarType> &dvs,
-     const Vec1Type       &input,
+    (const Vec1Type       &input,
      Vec2Type             &output) const {
         
+        Assert1(_system.comm().size() == 1,
+                _system.comm().size(),
+                "Method only for scalar runs");
         Assert2(input.size() == _system.n_dofs(),
                 input.size(), _system.n_dofs(),
                 "Incompatible vector sizes");
@@ -239,32 +133,68 @@ public:
                 vec_end = map_it->second.end();
                 
                 for ( ; vec_it != vec_end; vec_it++) {
-                    if (dvs.is_design_parameter_index(map_it->first))
+                    //if (dvs.is_design_parameter_index(map_it->first))
                         MAST::Numerics::Utility::add
                         (output, map_it->first,
                          MAST::Numerics::Utility::get(input, vec_it->first) * vec_it->second);
-                    else
+                    /*else
                         MAST::Numerics::Utility::set
                         (output, map_it->first,
-                         MAST::Numerics::Utility::get(input, vec_it->first));
+                         MAST::Numerics::Utility::get(input, vec_it->first));*/
                 }
             }
         }
     }
+
+
+    inline void
+    compute_filtered_values(Vec       input,
+                            Vec       output) const {
+        
+//        Assert2(input.size() == _system.n_dofs(),
+//                input.size(), _system.n_dofs(),
+//                "Incompatible vector sizes");
+//        Assert2(output.size() == _system.n_dofs(),
+//                output.size(), _system.n_dofs(),
+//                "Incompatible vector sizes");
+        
+        //MAST::Numerics::Utility::setZero(output);
+        
+        MatMult(_weight_matrix, input, output);
+    }
     
+    inline void
+    compute_filtered_values(libMesh::NumericVector<real_t>  &input,
+                            libMesh::NumericVector<real_t>  &output) const {
+        
+//        Assert2(input.size() == _system.n_dofs(),
+//                input.size(), _system.n_dofs(),
+//                "Incompatible vector sizes");
+//        Assert2(output.size() == _system.n_dofs(),
+//                output.size(), _system.n_dofs(),
+//                "Incompatible vector sizes");
+        
+        //MAST::Numerics::Utility::setZero(output);
+        
+        this->compute_filtered_values
+        (dynamic_cast<libMesh::PetscVector<real_t>&>(input).vec(),
+         dynamic_cast<libMesh::PetscVector<real_t>&>(output).vec());
+    }
+
+
     /*!
      *  Applies the reverse map, which is used for sensitivity analysis by first computing the sensitivty wrt filtered coefficients
      *  and then using the columns of the filter coefficient mattix to compute the sensitivity of unfiltered coefficients.
      */
-    template <typename ScalarType,
-              typename Vec1Type,
+    template <typename Vec1Type,
               typename Vec2Type>
     inline void
-    compute_reverse_filtered_values
-    (const MAST::Optimization::DesignParameterVector<ScalarType> &dvs,
-     const Vec1Type       &input,
-     Vec2Type             &output) const {
+    compute_reverse_filtered_values(const Vec1Type       &input,
+                                    Vec2Type             &output) const {
         
+        Assert1(_system.comm().size() == 1,
+                _system.comm().size(),
+                "Method only for scalar runs");
         Assert2(input.size() == _system.n_dofs(),
                 input.size(), _system.n_dofs(),
                 "Incompatible vector sizes");
@@ -292,17 +222,57 @@ public:
                 vec_end = map_it->second.end();
                 
                 for ( ; vec_it != vec_end; vec_it++) {
-                    if (dvs.is_design_parameter_index(map_it->first))
+                    //if (dvs.is_design_parameter_index(map_it->first))
                         MAST::Numerics::Utility::add
                         (output, map_it->first,
                          MAST::Numerics::Utility::get(input, vec_it->first) * vec_it->second);
-                    else
+                    /*else
                         MAST::Numerics::Utility::set
                         (output, map_it->first,
-                         MAST::Numerics::Utility::get(input, vec_it->first));
+                         MAST::Numerics::Utility::get(input, vec_it->first));*/
                 }
             }
         }
+    }
+
+    
+    /*!
+     *  Applies the reverse map, which is used for sensitivity analysis by first computing the sensitivty wrt filtered coefficients
+     *  and then using the columns of the filter coefficient mattix to compute the sensitivity of unfiltered coefficients.
+     */
+    inline void
+    compute_reverse_filtered_values(Vec       input,
+                                    Vec       output) const {
+        
+//        Assert2(input.size() == _system.n_dofs(),
+//                input.size(), _system.n_dofs(),
+//                "Incompatible vector sizes");
+//        Assert2(output.size() == _system.n_dofs(),
+//                output.size(), _system.n_dofs(),
+//                "Incompatible vector sizes");
+        
+        //MAST::Numerics::Utility::setZero(output);
+        
+        MatMultTranspose(_weight_matrix, input, output);
+    }
+
+    
+    inline void
+    compute_reverse_filtered_values(libMesh::NumericVector<real_t>  &input,
+                                    libMesh::NumericVector<real_t>  &output) const {
+        
+//        Assert2(input.size() == _system.n_dofs(),
+//                input.size(), _system.n_dofs(),
+//                "Incompatible vector sizes");
+//        Assert2(output.size() == _system.n_dofs(),
+//                output.size(), _system.n_dofs(),
+//                "Incompatible vector sizes");
+        
+        //MAST::Numerics::Utility::setZero(output);
+
+        this->compute_reverse_filtered_values
+        (dynamic_cast<libMesh::PetscVector<real_t>&>(input).vec(),
+         dynamic_cast<libMesh::PetscVector<real_t>&>(output).vec());
     }
 
     
@@ -334,50 +304,6 @@ public:
         // if this distance is outside the domain of influence, then this
         // element is not influenced by the design variable
         return (d>_radius+_fe_size);
-    }
-    
-    
-    
-    /*!
-     *  prints the filter data.
-     */
-    template <typename ScalarType>
-    inline void
-    print(//const MAST::Optimization::DesignParameterVector<ScalarType> &dvs,
-          std::ostream         &o) const {
-        
-        o << "Filter radius: " << _radius << std::endl;
-        
-        o
-        << std::setw(20) << "Filtered ID"
-        << std::setw(20) << "Dependent Vars" << std::endl;
-        
-        std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>::const_iterator
-        map_it   = _filter_map.begin(),
-        map_end  = _filter_map.end();
-        
-        for ( ; map_it != map_end; map_it++) {
-            
-            o
-            << std::setw(20) << map_it->first;
-            
-            std::vector<std::pair<uint_t, real_t>>::const_iterator
-            vec_it  = map_it->second.begin(),
-            vec_end = map_it->second.end();
-            
-            for ( ; vec_it != vec_end; vec_it++) {
-                
-                //if (dvs.is_design_parameter_index(map_it->first))
-                    o
-                    << " : " << std::setw(8) << vec_it->first
-                    << " (" << std::setw(8) << vec_it->second << " )";
-                o << " [ " << _system.get_dof_map().semilocal_index(vec_it->first) << " ] ";
-                //else
-                //    std::cout
-                //    << " : " << std::setw(8) << map_it->first;
-            }
-            std::cout << std::endl;
-        }
     }
     
     
@@ -563,7 +489,7 @@ private:
         
         std::map<const libMesh::Node*, real_t>
         node_sum;
-        
+                
         libMesh::MeshBase::const_node_iterator
         node_it      =  mesh.local_nodes_begin(),
         node_end     =  mesh.local_nodes_end();
@@ -772,7 +698,7 @@ private:
                     dof_2 = mesh_adaptor.nodes[indices_dists[r].first]->dof_number(_system.number(), 0, 0);
                     
                     _filter_map[dof_1].push_back(std::pair<uint_t, real_t>
-                                                 (dof_2, _radius - d_12));
+                                                (dof_2, _radius - d_12));
 
                     // add this dof to the local send list
                     if (dof_2 < first_local_dof ||
@@ -831,7 +757,7 @@ private:
                     
                     // add information to dof_1 node about this remote node
                     _filter_map[dof_1].push_back(std::pair<uint_t, real_t>
-                                                 (dof_2, _radius - d_12));
+                                                (dof_2, _radius - d_12));
                     
                     // add this dof to the local send list
                     send_list.insert(dof_2);
@@ -873,6 +799,10 @@ private:
             }
         }
 
+        // use the prepared filtering data to initialize the sparse matrix.
+        _init_filter_matrix(_filter_map);
+        
+        
         // now prepare the reverse map. The send list is sorted for later use.
         std::set<uint_t>::const_iterator
         s_it  = send_list.begin(),
@@ -906,13 +836,12 @@ private:
      */
     inline void _init() {
         
-        Assert0(!_filter_map.size(), "Filter already initialized");
-        
         libMesh::MeshBase& mesh = _system.get_mesh();
         
         // currently implemented for replicated mesh
         Assert0(mesh.is_replicated(), "Function implemented only for replicated mesh");
         
+
         // iterate over all nodes to compute the
         libMesh::MeshBase::const_node_iterator
         node_it_1    =  mesh.nodes_begin(),
@@ -984,6 +913,10 @@ private:
             }
         }
         
+        // use the prepared filtering data to initialize the sparse matrix.
+        _init_filter_matrix(_filter_map);
+
+        
         // now prepare the reverse map. The send list is sorted for later use.
         std::set<uint_t>::const_iterator
         s_it  = send_list.begin(),
@@ -1006,7 +939,6 @@ private:
             if (_fe_size < d_12)
                 _fe_size = d_12;
         }
-        
     }
     
     
@@ -1028,6 +960,95 @@ private:
                 reverse_map[vec[i].first].push_back(std::pair<uint_t, real_t>(it->first, vec[i].second));
         }
     }
+    
+    inline void
+    _init_filter_matrix
+    (const std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>& filter_map) {
+        
+        const uint_t
+        n_vals          = _system.n_dofs(),
+        n_local         = _system.get_dof_map().n_dofs_on_processor(_system.processor_id()),
+        first_local_dof = _system.get_dof_map().first_dof(_system.comm().rank()),
+        last_local_dof  = _system.get_dof_map().end_dof(_system.comm().rank());
+
+        PetscErrorCode   ierr;
+     
+        std::vector<int>
+        n_nz(n_local, 0),
+        n_oz(n_local, 0);
+
+        // initialize the data for the sparsity pattern of the matrix
+        std::map<uint_t, std::vector<std::pair<uint_t, real_t>>>::const_iterator
+        it   =  filter_map.begin(),
+        end  =  filter_map.end();
+        
+        for ( ; it!=end; it++) {
+            
+            const std::vector<std::pair<uint_t, real_t>>
+            &vec = it->second;
+            
+            for (uint_t i=0; i<vec.size(); i++) {
+                uint_t
+                dof_id = vec[i].first;
+                if (dof_id >= first_local_dof && dof_id <  last_local_dof)
+                    n_nz[it->first - first_local_dof]++;
+                else
+                    n_oz[it->first - first_local_dof]++;
+            }
+        }
+
+        
+        ierr = MatCreate(_system.comm().get(), &_weight_matrix);
+        CHKERRABORT(_system.comm().get(), ierr);
+        ierr = MatSetSizes(_weight_matrix, n_local, n_local, n_vals, n_vals);
+        CHKERRABORT(_system.comm().get(), ierr);
+
+        std::string nm = _system.name() + "_";
+        ierr = MatSetOptionsPrefix(_weight_matrix, nm.c_str());
+        CHKERRABORT(_system.comm().get(), ierr);
+
+        ierr = MatSetFromOptions(_weight_matrix);
+        CHKERRABORT(_system.comm().get(), ierr);
+        
+        ierr = MatSeqAIJSetPreallocation(_weight_matrix,
+                                         n_vals,
+                                         (PetscInt*)&n_nz[0]);
+        CHKERRABORT(_system.comm().get(), ierr);
+        ierr = MatMPIAIJSetPreallocation(_weight_matrix,
+                                         0,
+                                         (PetscInt*)&n_nz[0],
+                                         0,
+                                         (PetscInt*)&n_oz[0]);
+        CHKERRABORT(_system.comm().get(), ierr);
+        ierr = MatSetOption(_weight_matrix,
+                            MAT_NEW_NONZERO_ALLOCATION_ERR,
+                            PETSC_TRUE);
+        CHKERRABORT(_system.comm().get(), ierr);
+
+        // now populate the matrix
+        it   =  filter_map.begin();
+        end  =  filter_map.end();
+        
+        for ( ; it!=end; it++) {
+            
+            const std::vector<std::pair<uint_t, real_t>>
+            &vec = it->second;
+            
+            for (uint_t i=0; i<vec.size(); i++) {
+                MatSetValue(_weight_matrix,
+                            it->first,
+                            vec[i].first,
+                            vec[i].second,
+                            INSERT_VALUES);
+            }
+        }
+        
+        MatAssemblyBegin(_weight_matrix, MAT_FINAL_ASSEMBLY);
+        CHKERRABORT(_system.comm().get(), ierr);
+        MatAssemblyEnd(_weight_matrix, MAT_FINAL_ASSEMBLY);
+        CHKERRABORT(_system.comm().get(), ierr);
+    }
+    
     
     /*!
      *   system on which the level set discrete function is defined
@@ -1061,12 +1082,16 @@ private:
      * this map stores the columns of the matrix, which is required for sensitivity analysis
      */
     std::map<uint_t, std::vector<std::pair<uint_t, real_t>>> _reverse_map;
-    
+
     /*!
      *   vector of dof ids that the current processor depends on.
      */
     std::vector<uint_t> _forward_send_list;
     
+    /*!
+     * Sparse Matrix object that stores the filtering matrix. This is used for both both forward and reverse operations
+     */
+    Mat _weight_matrix;
 };
 
 
