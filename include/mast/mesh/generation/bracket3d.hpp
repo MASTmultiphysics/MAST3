@@ -260,65 +260,67 @@ struct Bracket3D {
                 
                 for (uint_t k=0; k<(2*nz); k += 2)
                     for (uint_t j=0; j<(2*ny); j += 2)
-                        for (uint_t i=0; i<(2*nx); i += 2)
-                        {
-                            libMesh::Elem
-                            *elem = libMesh::Elem::build(libMesh::HEX27).release();
-                            elem->set_id(elem_id++);
-                            mesh.add_elem(elem);
-                            
-                            elem->set_node(0)  = nodes[idx(type,nx,ny,i,  j,  k)  ];
-                            elem->set_node(1)  = nodes[idx(type,nx,ny,i+2,j,  k)  ];
-                            elem->set_node(2)  = nodes[idx(type,nx,ny,i+2,j+2,k)  ];
-                            elem->set_node(3)  = nodes[idx(type,nx,ny,i,  j+2,k)  ];
-                            elem->set_node(4)  = nodes[idx(type,nx,ny,i,  j,  k+2)];
-                            elem->set_node(5)  = nodes[idx(type,nx,ny,i+2,j,  k+2)];
-                            elem->set_node(6)  = nodes[idx(type,nx,ny,i+2,j+2,k+2)];
-                            elem->set_node(7)  = nodes[idx(type,nx,ny,i,  j+2,k+2)];
-                            elem->set_node(8)  = nodes[idx(type,nx,ny,i+1,j,  k)  ];
-                            elem->set_node(9)  = nodes[idx(type,nx,ny,i+2,j+1,k)  ];
-                            elem->set_node(10) = nodes[idx(type,nx,ny,i+1,j+2,k)  ];
-                            elem->set_node(11) = nodes[idx(type,nx,ny,i,  j+1,k)  ];
-                            elem->set_node(12) = nodes[idx(type,nx,ny,i,  j,  k+1)];
-                            elem->set_node(13) = nodes[idx(type,nx,ny,i+2,j,  k+1)];
-                            elem->set_node(14) = nodes[idx(type,nx,ny,i+2,j+2,k+1)];
-                            elem->set_node(15) = nodes[idx(type,nx,ny,i,  j+2,k+1)];
-                            elem->set_node(16) = nodes[idx(type,nx,ny,i+1,j,  k+2)];
-                            elem->set_node(17) = nodes[idx(type,nx,ny,i+2,j+1,k+2)];
-                            elem->set_node(18) = nodes[idx(type,nx,ny,i+1,j+2,k+2)];
-                            elem->set_node(19) = nodes[idx(type,nx,ny,i,  j+1,k+2)];
-                            
-                            elem->set_node(20) = nodes[idx(type,nx,ny,i+1,j+1,k)  ];
-                            elem->set_node(21) = nodes[idx(type,nx,ny,i+1,j,  k+1)];
-                            elem->set_node(22) = nodes[idx(type,nx,ny,i+2,j+1,k+1)];
-                            elem->set_node(23) = nodes[idx(type,nx,ny,i+1,j+2,k+1)];
-                            elem->set_node(24) = nodes[idx(type,nx,ny,i,  j+1,k+1)];
-                            elem->set_node(25) = nodes[idx(type,nx,ny,i+1,j+1,k+2)];
-                            elem->set_node(26) = nodes[idx(type,nx,ny,i+1,j+1,k+1)];
-                            
-                            if (k == 0)
-                                boundary_info.add_side(elem, 0, 0);
-                            
-                            if (k == 2*(nz-1))
-                                boundary_info.add_side(elem, 5, 5);
-                            
-                            if (j == 0)
-                                boundary_info.add_side(elem, 1, 1);
-                            
-                            if (j == 2*(ny-1))
-                                boundary_info.add_side(elem, 3, 3);
-                            
-                            if (i == 0)
-                                boundary_info.add_side(elem, 4, 4);
-                            
-                            if (i == 2*(nx-1))
-                                boundary_info.add_side(elem, 2, 2);
+                        for (uint_t i=0; i<(2*nx); i += 2) {
+                            if (i < 2*nx*4/10 || j>=2*ny*6/10) {
 
-                            if (i==nx*4/10)
-                                boundary_info.add_side(elem, 2, 6);
-                            
-                            if (j==ny*6/10)
-                                boundary_info.add_side(elem, 1, 7);
+                                libMesh::Elem
+                                *elem = libMesh::Elem::build(libMesh::HEX27).release();
+                                elem->set_id(elem_id++);
+                                mesh.add_elem(elem);
+                                
+                                elem->set_node(0)  = nodes[idx(type,nx,ny,i,  j,  k)  ];
+                                elem->set_node(1)  = nodes[idx(type,nx,ny,i+2,j,  k)  ];
+                                elem->set_node(2)  = nodes[idx(type,nx,ny,i+2,j+2,k)  ];
+                                elem->set_node(3)  = nodes[idx(type,nx,ny,i,  j+2,k)  ];
+                                elem->set_node(4)  = nodes[idx(type,nx,ny,i,  j,  k+2)];
+                                elem->set_node(5)  = nodes[idx(type,nx,ny,i+2,j,  k+2)];
+                                elem->set_node(6)  = nodes[idx(type,nx,ny,i+2,j+2,k+2)];
+                                elem->set_node(7)  = nodes[idx(type,nx,ny,i,  j+2,k+2)];
+                                elem->set_node(8)  = nodes[idx(type,nx,ny,i+1,j,  k)  ];
+                                elem->set_node(9)  = nodes[idx(type,nx,ny,i+2,j+1,k)  ];
+                                elem->set_node(10) = nodes[idx(type,nx,ny,i+1,j+2,k)  ];
+                                elem->set_node(11) = nodes[idx(type,nx,ny,i,  j+1,k)  ];
+                                elem->set_node(12) = nodes[idx(type,nx,ny,i,  j,  k+1)];
+                                elem->set_node(13) = nodes[idx(type,nx,ny,i+2,j,  k+1)];
+                                elem->set_node(14) = nodes[idx(type,nx,ny,i+2,j+2,k+1)];
+                                elem->set_node(15) = nodes[idx(type,nx,ny,i,  j+2,k+1)];
+                                elem->set_node(16) = nodes[idx(type,nx,ny,i+1,j,  k+2)];
+                                elem->set_node(17) = nodes[idx(type,nx,ny,i+2,j+1,k+2)];
+                                elem->set_node(18) = nodes[idx(type,nx,ny,i+1,j+2,k+2)];
+                                elem->set_node(19) = nodes[idx(type,nx,ny,i,  j+1,k+2)];
+                                
+                                elem->set_node(20) = nodes[idx(type,nx,ny,i+1,j+1,k)  ];
+                                elem->set_node(21) = nodes[idx(type,nx,ny,i+1,j,  k+1)];
+                                elem->set_node(22) = nodes[idx(type,nx,ny,i+2,j+1,k+1)];
+                                elem->set_node(23) = nodes[idx(type,nx,ny,i+1,j+2,k+1)];
+                                elem->set_node(24) = nodes[idx(type,nx,ny,i,  j+1,k+1)];
+                                elem->set_node(25) = nodes[idx(type,nx,ny,i+1,j+1,k+2)];
+                                elem->set_node(26) = nodes[idx(type,nx,ny,i+1,j+1,k+1)];
+                                
+                                if (k == 0)
+                                    boundary_info.add_side(elem, 0, 0);
+                                
+                                if (k == 2*(nz-1))
+                                    boundary_info.add_side(elem, 5, 5);
+                                
+                                if (j == 0)
+                                    boundary_info.add_side(elem, 1, 1);
+                                
+                                if (j == 2*(ny-1))
+                                    boundary_info.add_side(elem, 3, 3);
+                                
+                                if (i == 0)
+                                    boundary_info.add_side(elem, 4, 4);
+                                
+                                if (i == 2*(nx-1))
+                                    boundary_info.add_side(elem, 2, 2);
+
+                                if (i==2*nx*3/10 && j<2*ny*6/10)
+                                    boundary_info.add_side(elem, 2, 6);
+                                
+                                if (j==2*ny*6/10 && i>2*nx*3/10)
+                                    boundary_info.add_side(elem, 1, 7);
+                            }
                         }
                 break;
             }
