@@ -91,6 +91,13 @@ public:
     p_side_id (-1),
     penalty   (0.) {
         
+        std::string
+        t = input("q_order", "quadrature order", "second");
+        q_order = libMesh::Utility::string_to_enum<libMesh::Order>(t);
+
+        t = input("fe_order", "finite element interpolation order", "first");
+        fe_order = libMesh::Utility::string_to_enum<libMesh::Order>(t);
+        
         model->init_analysis_mesh(*this, *mesh);
 
         // displacement variables for elasticity solution
