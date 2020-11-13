@@ -818,7 +818,7 @@ void run(libMesh::LibMeshInit& init, MAST::Utility::GetPotWrapper& input) {
     // continuation approach to increase penalty parameters
     for (uint_t i=0; i<8; i++) {
         
-        ex_init.penalty = 1. + 0.5 * i;
+        ex_init.penalty = 1. + i;
         ex_init.beta    = pow(beta_base, i);
      
         e_ops.heaviside->set_parameters(c.ex_init.beta, c.ex_init.eta);
