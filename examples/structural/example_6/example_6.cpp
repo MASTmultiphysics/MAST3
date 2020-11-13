@@ -94,6 +94,13 @@ public:
     beta      (0.),
     eta       (0.) {
         
+        std::string
+        t = input("q_order", "quadrature order", "second");
+        q_order = libMesh::Utility::string_to_enum<libMesh::Order>(t);
+
+        t = input("fe_order", "finite element interpolation order", "first");
+        fe_order = libMesh::Utility::string_to_enum<libMesh::Order>(t);
+
         model->init_analysis_mesh(*this, *mesh);
 
         // displacement variables for elasticity solution
@@ -811,7 +818,7 @@ void run(libMesh::LibMeshInit& init, MAST::Utility::GetPotWrapper& input) {
     // continuation approach to increase penalty parameters
     for (uint_t i=0; i<8; i++) {
         
-        ex_init.penalty = 1. + 0.5 * i;
+        ex_init.penalty = 1. + i;
         ex_init.beta    = pow(beta_base, i);
      
         e_ops.heaviside->set_parameters(c.ex_init.beta, c.ex_init.eta);

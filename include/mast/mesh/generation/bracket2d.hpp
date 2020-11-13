@@ -240,39 +240,41 @@ struct Bracket2D {
                 
                 for (uint_t j=0; j<(2*ny); j += 2)
                     for (uint_t i=0; i<(2*nx); i += 2) {
-                        
-                        libMesh::Elem
-                        *elem = libMesh::Elem::build(libMesh::QUAD9).release();
-                        elem->set_id(elem_id++);
-                        mesh.add_elem(elem);
-                        
-                        elem->set_node(0)  = nodes[idx(type,nx,i,  j)  ];
-                        elem->set_node(1)  = nodes[idx(type,nx,i+2,j)  ];
-                        elem->set_node(2)  = nodes[idx(type,nx,i+2,j+2)  ];
-                        elem->set_node(3)  = nodes[idx(type,nx,i,  j+2)  ];
-                        elem->set_node(4)  = nodes[idx(type,nx,i+1,j)  ];
-                        elem->set_node(5)  = nodes[idx(type,nx,i+2,j+1)  ];
-                        elem->set_node(6)  = nodes[idx(type,nx,i+1,j+2)  ];
-                        elem->set_node(7)  = nodes[idx(type,nx,i,  j+1)  ];
-                        elem->set_node(8)  = nodes[idx(type,nx,i+1,j+1)  ];
-                        
-                        if (j == 0)
-                            boundary_info.add_side(elem, 0, 0);
-                        
-                        if (j == 2*(ny-1))
-                            boundary_info.add_side(elem, 2, 2);
-                        
-                        if (i == 0)
-                            boundary_info.add_side(elem, 3, 3);
-                        
-                        if (i == 2*(nx-1))
-                            boundary_info.add_side(elem, 1, 1);
-                        
-                        if (i==nx*4/10)
-                            boundary_info.add_side(elem, 1, 4);
-                        
-                        if (j==ny*6/10)
-                            boundary_info.add_side(elem, 0, 5);
+                        if (i < 2*nx*4/10 || j>= 2*ny*6/10) {
+
+                            libMesh::Elem
+                            *elem = libMesh::Elem::build(libMesh::QUAD9).release();
+                            elem->set_id(elem_id++);
+                            mesh.add_elem(elem);
+                            
+                            elem->set_node(0)  = nodes[idx(type,nx,i,  j)  ];
+                            elem->set_node(1)  = nodes[idx(type,nx,i+2,j)  ];
+                            elem->set_node(2)  = nodes[idx(type,nx,i+2,j+2)  ];
+                            elem->set_node(3)  = nodes[idx(type,nx,i,  j+2)  ];
+                            elem->set_node(4)  = nodes[idx(type,nx,i+1,j)  ];
+                            elem->set_node(5)  = nodes[idx(type,nx,i+2,j+1)  ];
+                            elem->set_node(6)  = nodes[idx(type,nx,i+1,j+2)  ];
+                            elem->set_node(7)  = nodes[idx(type,nx,i,  j+1)  ];
+                            elem->set_node(8)  = nodes[idx(type,nx,i+1,j+1)  ];
+                            
+                            if (j == 0)
+                                boundary_info.add_side(elem, 0, 0);
+                            
+                            if (j == 2*(ny-1))
+                                boundary_info.add_side(elem, 2, 2);
+                            
+                            if (i == 0)
+                                boundary_info.add_side(elem, 3, 3);
+                            
+                            if (i == 2*(nx-1))
+                                boundary_info.add_side(elem, 1, 1);
+                            
+                            if (i==2*nx*3/10 && j<2*ny*6/10)
+                                boundary_info.add_side(elem, 1, 4);
+                            
+                            if (j==2*ny*6/10 && i>2*nx*3/10)
+                                boundary_info.add_side(elem, 0, 5);
+                        }
                     }
                 break;
             }
