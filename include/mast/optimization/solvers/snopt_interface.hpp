@@ -151,7 +151,7 @@ public:
     _funcon      (nullptr) {
         
 #if MAST_ENABLE_SNOPT == 0
-        Erro(false, "MAST configured without SNOPT support.");
+        Error(false, "MAST configured without SNOPT support.");
 #endif
         
         _exit_message[0] = "Finished successfully";
