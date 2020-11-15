@@ -612,11 +612,9 @@ public:
                           x[i]);
         rho_base->close();
         
-        _c.ex_init.filter->template compute_filtered_values
-        <scalar_t,
-        typename TraitsType::assembled_vector_t,
-        typename TraitsType::assembled_vector_t>
-        (*_dvs, *rho_base, *_c.rho_sys->solution);
+        _c.ex_init.filter->compute_filtered_values
+        (dynamic_cast<libMesh::PetscVector<scalar_t>*>(rho_base.get())->vec(),
+         dynamic_cast<libMesh::PetscVector<scalar_t>*>(_c.rho_sys->solution.get())->vec());
         _c.rho_sys->solution->close();
         
         // this will copy the solution to libMesh::System::current_local_soluiton

@@ -98,8 +98,7 @@ public:
     n_rel_change_iters            (5),
     total_iter                    (0),
     write_internal_iteration_data (false),
-    _feval                        (nullptr),
-    _total_iter                   (0)
+    _feval                        (nullptr)
     { }
 
     
