@@ -815,8 +815,11 @@ void run(libMesh::LibMeshInit& init, MAST::Utility::GetPotWrapper& input) {
     real_t
     beta_base = input("heaviside_beta","Base value of beta parameter in Heaviside filter", 1.);
     
+    uint_t
+    n_cont    = input("n_continuation_steps","Number of continuation steps", 8);
+    
     // continuation approach to increase penalty parameters
-    for (uint_t i=0; i<8; i++) {
+    for (uint_t i=0; i<n_cont; i++) {
         
         ex_init.penalty = 1. + i;
         ex_init.beta    = pow(beta_base, i);
