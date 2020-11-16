@@ -61,12 +61,9 @@ public:
     GeometricFilter(libMesh::System         &sys,
                     const real_t            radius):
     _system            (sys),
-    _radius            (radius),
-    _fe_size           (0.),
     _augment_send_list (nullptr) {
         
-        Assert1(radius > 0., radius,
-                "geometric filter radius must be greater than 0.");
+        _init_filter_radius();
         
 #ifdef LIBMESH_HAVE_NANOFLANN
         _init2();  // KD-tree search using NanoFlann
@@ -282,35 +279,6 @@ public:
     }
 
     
-    /*!
-     *   function identifies if the given element is within the domain of
-     *   influence of this specified level set design variable. Currently,
-     *   this is identified based on the filter radius, the distance of
-     *   element nodes from the specified level set design variable location
-     *   and the element sizes.
-     */
-    inline bool if_elem_in_domain_of_influence(const libMesh::Elem& elem,
-                                               const libMesh::Node& node) const {
-        
-        real_t
-        d    = 1.e12; // arbitrarily large value to initialize the search
-        
-        libMesh::Point
-        pt;
-        
-        // first get the smallest distance from the node to the element nodes
-        for (uint_t i=0; i<elem.n_nodes(); i++) {
-            pt  = elem.point(i);
-            pt -= node;
-            
-            if (pt.norm() < d)
-                d = pt.norm();
-        }
-        
-        // if this distance is outside the domain of influence, then this
-        // element is not influenced by the design variable
-        return (d>_radius+_fe_size);
-    }
     
     
 private:
@@ -472,8 +440,9 @@ private:
         
         
         real_t
-        d_12 = 0.,
-        sum  = 0.;
+        d_12      = 0.,
+        sum       = 0.,
+        nd_radius = 0.;
 
         std::set<uint_t> send_list;
         
@@ -487,7 +456,8 @@ private:
         size            = mesh.comm().size(),
         rank            = mesh.comm().rank(),
         first_local_dof = dof_map.first_dof(rank),
-        last_local_dof  = dof_map.end_dof(rank);
+        last_local_dof  = dof_map.end_dof(rank),
+        sys_num         = _system.number();
 
         uint_t
         dof_1,
@@ -506,7 +476,8 @@ private:
         for (; node_it != node_end; node_it++) {
 
             const libMesh::Node* node = *node_it;
-
+            nd_radius = _radius->el(node->dof_number(sys_num, 0, 0));
+            
             // check if this node is near the bbox of each rank
             for (uint_t i=0; i<size; i++) {
                 
@@ -514,14 +485,14 @@ private:
                 
                 
                 if (// within _radius of x-box on rank i
-                    (*node)(0) >= rank_boxes[6*i+0]-_radius &&
-                    (*node)(0) <= rank_boxes[6*i+1]+_radius &&
+                    (*node)(0) >= rank_boxes[6*i+0]-nd_radius &&
+                    (*node)(0) <= rank_boxes[6*i+1]+nd_radius &&
                     // within _radius of y-box on rank i
-                    (*node)(1) >= rank_boxes[6*i+2]-_radius &&
-                    (*node)(1) <= rank_boxes[6*i+3]+_radius &&
+                    (*node)(1) >= rank_boxes[6*i+2]-nd_radius &&
+                    (*node)(1) <= rank_boxes[6*i+3]+nd_radius &&
                     // within _radius of z-box on rank i
-                    (*node)(2) >= rank_boxes[6*i+4]-_radius &&
-                    (*node)(2) <= rank_boxes[6*i+5]+_radius) {
+                    (*node)(2) >= rank_boxes[6*i+4]-nd_radius &&
+                    (*node)(2) <= rank_boxes[6*i+5]+nd_radius) {
                     
                     remote_node_dependency[i].push_back(node);
                 }
@@ -531,10 +502,12 @@ private:
         
         // now communicate with all processors about the filtered nodes
         std::vector<real_t>
-        coords_send(size);
+        coords_send(size),
+        radius_send(size);
 
         std::vector<std::vector<real_t>>
         coords_recv(size),
+        radius_recv(size),
         filter_data_node_loc_send(size),
         filter_data_node_loc_recv(size);
         
@@ -559,25 +532,33 @@ private:
                         // here, we pack the (x,y,z) coordinates of nodes that the
                         // ith processor wants the jth processor to check
                         coords_send.resize(remote_node_dependency[j].size()*3, 0.);
+                        radius_send.resize(remote_node_dependency[j].size(), 0.);
                         
                         for (uint_t k=0; k<remote_node_dependency[j].size(); k++) {
                             
                             coords_send[k*3 + 0] = (*remote_node_dependency[j][k])(0);
                             coords_send[k*3 + 1] = (*remote_node_dependency[j][k])(1);
                             coords_send[k*3 + 2] = (*remote_node_dependency[j][k])(2);
+                            radius_send[k]       =
+                            _radius->el(remote_node_dependency[j][k]->dof_number
+                                        (sys_num,0,0));
                         }
                         
                         // send information from i to j
                         mesh.comm().send(j, coords_send);
+                        mesh.comm().send(j, radius_send);
 
                         // clear the vector, since we dont need it
                         coords_send.clear();
+                        radius_send.clear();
                     }
                     else if (j == rank) {
                         
                         coords_recv[i].clear();
+                        radius_recv[i].clear();
                         // get information from i
                         mesh.comm().receive(i, coords_recv[i]);
+                        mesh.comm().receive(i, radius_recv[i]);
                         
                         Assert1(coords_recv[i].size()%3 == 0,
                                 coords_recv[i].size(),
@@ -610,7 +591,7 @@ private:
                 std::vector<std::pair<size_t, real_t>>
                 indices_dists;
                 nanoflann::RadiusResultSet<real_t, size_t>
-                resultSet(_radius*_radius, indices_dists);
+                resultSet(radius_recv[i][j]*radius_recv[i][j], indices_dists);
                 
                 kd_tree.findNeighbors(resultSet, &coords_recv[i][j*3], nanoflann::SearchParams());
 
@@ -673,7 +654,8 @@ private:
             
             const libMesh::Node* node = *node_it;
             
-            dof_1 = node->dof_number(_system.number(), 0, 0);
+            dof_1     = node->dof_number(_system.number(), 0, 0);
+            nd_radius = _radius->el(dof_1);
 
             // only local dofs are processed.
             if (dof_map.semilocal_index(dof_1)) {
@@ -685,7 +667,7 @@ private:
                 indices_dists.push_back(std::pair<size_t, real_t>
                                         (mesh_adaptor.node_id_to_vec_index[node->id()], 0.));
                 nanoflann::RadiusResultSet<real_t, size_t>
-                resultSet(_radius*_radius, indices_dists);
+                resultSet(nd_radius*nd_radius, indices_dists);
                 
                 kd_tree.findNeighbors(resultSet, query_pt, nanoflann::SearchParams());
                 
@@ -697,14 +679,14 @@ private:
                     
                     // the distance of this node should be less than or equal to the
                     // specified search radius
-                    Assert2(d_12 <= _radius, d_12, _radius,
+                    Assert2(d_12 <= nd_radius, d_12, nd_radius,
                             "Node distance must be <= search radius");
                     
-                    sum  += _radius - d_12;
+                    sum  += nd_radius - d_12;
                     dof_2 = mesh_adaptor.nodes[indices_dists[r].first]->dof_number(_system.number(), 0, 0);
                     
                     _filter_map[dof_1].push_back(std::pair<uint_t, real_t>
-                                                (dof_2, _radius - d_12));
+                                                (dof_2, nd_radius - d_12));
 
                     // add this dof to the local send list
                     if (dof_2 < first_local_dof ||
@@ -736,7 +718,8 @@ private:
                 const libMesh::Node*
                 node = remote_node_dependency[i][j];
 
-                dof_1  = node->dof_number(_system.number(), 0, 0);
+                dof_1     = node->dof_number(sys_num, 0, 0);
+                nd_radius = _radius->el(dof_1);
                 
                 // check the number of nodes on the remote node that this
                 // node's filtered values will depend on
@@ -759,11 +742,11 @@ private:
                          pow((*node)(2) - filter_data_node_loc_recv[i][idx*3+2], 2));
                     
                     // contribution to the sum
-                    sum += _radius - d_12;
+                    sum += nd_radius - d_12;
                     
                     // add information to dof_1 node about this remote node
                     _filter_map[dof_1].push_back(std::pair<uint_t, real_t>
-                                                (dof_2, _radius - d_12));
+                                                (dof_2, nd_radius - d_12));
                     
                     // add this dof to the local send list
                     send_list.insert(dof_2);
@@ -858,8 +841,9 @@ private:
         d;
         
         real_t
-        d_12 = 0.,
-        sum  = 0.;
+        d_12      = 0.,
+        sum       = 0.,
+        nd_radius = 0.;
         
         std::set<uint_t> send_list;
         
@@ -871,12 +855,14 @@ private:
         last_local_dof  = _system.get_dof_map().end_dof(_system.comm().rank());
 
         uint_t
+        sys_num = _system.number(),
         dof_1,
         dof_2;
         
         for ( ; node_it_1 != node_end; node_it_1++) {
             
-            dof_1 = (*node_it_1)->dof_number(_system.number(), 0, 0);
+            dof_1     = (*node_it_1)->dof_number(sys_num, 0, 0);
+            nd_radius = _radius->el(dof_1);
 
             // only local dofs are processed.
             if (dof_map.semilocal_index(dof_1)) {
@@ -891,12 +877,12 @@ private:
                     d_12 = d.norm();
                     
                     // if the nodes is within the filter radius, add it to the map
-                    if (d_12 <= _radius) {
+                    if (d_12 <= nd_radius) {
                         
-                        sum  += _radius - d_12;
-                        dof_2 = (*node_it_2)->dof_number(_system.number(), 0, 0);
+                        sum  += nd_radius - d_12;
+                        dof_2 = (*node_it_2)->dof_number(sys_num, 0, 0);
                         
-                        _filter_map[dof_1].push_back(std::pair<uint_t, real_t>(dof_2, _radius - d_12));
+                        _filter_map[dof_1].push_back(std::pair<uint_t, real_t>(dof_2, nd_radius - d_12));
                         
                         // add this dof to the local send list if it is not a local dof
                         if (dof_2 < first_local_dof ||
@@ -966,6 +952,56 @@ private:
                 reverse_map[vec[i].first].push_back(std::pair<uint_t, real_t>(it->first, vec[i].second));
         }
     }
+    
+    
+    
+    inline void
+    _init_filter_radius() {
+        
+        std::unique_ptr<libMesh::NumericVector<real_t>>
+        n_elem_sum(_system.solution->zero_clone().release());
+        _radius.reset(_system.solution->zero_clone().release());
+        
+        // nominal radius is equal to the average element size about a node
+        libMesh::MeshBase::const_element_iterator
+        it  = _system.get_mesh().active_local_elements_begin(),
+        end = _system.get_mesh().active_local_elements_end();
+        
+        uint_t
+        first_local_dof = _system.get_dof_map().first_dof(_system.comm().rank()),
+        last_local_dof  = _system.get_dof_map().end_dof(_system.comm().rank()),
+        sys_num         = _system.number(),
+        dof_num         = 0;
+        
+        
+        real_t
+        elem_h = 0.;
+        
+        for ( ; it!=end; it++) {
+            
+            const libMesh::Elem *e = *it;
+            elem_h = e->hmax();
+            
+            for (uint_t i=0; i<e->n_nodes(); i++) {
+                
+                dof_num = e->node_ptr(i)->dof_number(sys_num, 0, 0);
+                
+                _radius->add(dof_num, elem_h);
+                n_elem_sum->add(dof_num, 1.);
+            }
+        }
+        
+        _radius->close();
+        n_elem_sum->close();
+        
+        // now compute the average
+        for (uint_t i=first_local_dof; i<last_local_dof; i++) {
+            _radius->set(i, _radius->el(i)/n_elem_sum->el(i));
+        }
+        _radius->close();
+    }
+    
+    
     
     inline void
     _init_filter_matrix
@@ -1064,7 +1100,7 @@ private:
     /*!
      *   radius of the filter.
      */
-    real_t _radius;
+    std::unique_ptr<libMesh::NumericVector<real_t>> _radius;
     
     
     /*!
