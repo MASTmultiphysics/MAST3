@@ -96,6 +96,13 @@ public:
     beta      (0.),
     eta       (0.) {
         
+        std::string
+        t = input("q_order", "quadrature order", "second");
+        q_order = libMesh::Utility::string_to_enum<libMesh::Order>(t);
+
+        t = input("fe_order", "finite element interpolation order", "first");
+        fe_order = libMesh::Utility::string_to_enum<libMesh::Order>(t);
+
         model->init_analysis_mesh(*this, *mesh);
 
         // displacement variables for elasticity solution
@@ -139,7 +146,7 @@ public:
 
         // create and attach the null space to the matrix
         MAST::Physics::Elasticity::libMeshWrapper::NullSpace
-        null_sp(*sys, ModelType::dim);
+        null_sp(*sys, ModelType::dim, false);
         
         Mat m = dynamic_cast<libMesh::PetscMatrix<real_t>*>(sys->matrix)->mat();
         null_sp.attach_to_matrix(m);
@@ -661,7 +668,7 @@ public:
         
         MAST::Solvers::PETScWrapper::LinearSolver
         linear_solver(_c.eq_sys->comm().get());
-        linear_solver.init(m);
+        linear_solver.init(m, &_c.sys->name());
         linear_solver.solve(sol, b);
 
         _c.sys->update();
@@ -847,7 +854,7 @@ public:
             
             rho /= (1. * elem->n_nodes());
 
-            if (rho >= 0.4 &&
+            if (rho >= 0.3 &&
                 rho <= 0.9 &&
                 elem->level() < _max_h)
                 elem->set_refinement_flag(libMesh::Elem::REFINE);
