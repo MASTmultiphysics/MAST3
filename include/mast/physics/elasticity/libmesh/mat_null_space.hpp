@@ -46,9 +46,10 @@ class NullSpace {
   
 public:
     
-    NullSpace(libMesh::System& sys, uint_t dim):
+    NullSpace(libMesh::System& sys, uint_t dim, bool enable_rotation):
     _sys    (sys),
-    _dim    (dim) {
+    _dim    (dim),
+    _if_rot (enable_rotation) {
 
         Assert1(_dim > 0, _dim, "Invalid dimension");
         Assert2(_sys.n_vars() == _dim,
@@ -61,7 +62,10 @@ public:
                     "Variables are expected to be LAGRANGE");
 
         // now initialize
-        _init();
+        if (_if_rot)
+            _init_with_rotation();
+        else
+            _init_without_rotation();
     }
     
     virtual ~NullSpace() {
@@ -91,7 +95,7 @@ public:
     
 private:
     
-    inline void _init() {
+    inline void _init_with_rotation() {
 
         PetscErrorCode
         ierr = 0;
@@ -193,6 +197,70 @@ private:
             }
         }
         
+        _orthonormalize_and_create_basis(vecs);
+
+        // now delete the vectors
+        for (uint_t i=0; i<vecs.size(); i++)
+            delete vecs[i];
+    }
+    
+    
+    inline void _init_without_rotation() {
+
+        PetscErrorCode
+        ierr = 0;
+        
+        uint_t
+        n_translation = _dim;
+                
+        
+        std::vector<libMesh::NumericVector<real_t>*>
+        vecs(n_translation, nullptr);
+        
+        std::vector<libMesh::dof_id_type>
+        dof_ids(_dim, 0);
+        
+        // create and initialize the vectors
+        for (uint_t i=0; i<vecs.size(); i++)
+            vecs[i] = _sys.solution->zero_clone().release();
+                
+        libMesh::MeshBase::const_node_iterator
+        it   = _sys.get_mesh().local_nodes_begin(),
+        end  = _sys.get_mesh().local_nodes_end();
+        
+        for ( ; it != end; it++) {
+            
+            const libMesh::Node& n = **it;
+
+            // assuming that the dofs are sequentially numbered
+            dof_ids.clear();
+            _sys.get_dof_map().dof_indices(&n, dof_ids);
+            
+            // make sure that the correct number of dofs is found
+            Assert2(dof_ids.size() == n_translation,
+                    dof_ids.size(), n_translation,
+                    "Invalid number of dofs on node");
+            
+            // rigid-body translation
+            for (uint_t i=0; i<n_translation; i++)
+                vecs[i]->set(dof_ids[i], 1.);
+        }
+        
+        _orthonormalize_and_create_basis(vecs);
+        
+        // now delete the vectors
+        for (uint_t i=0; i<vecs.size(); i++)
+            delete vecs[i];
+    }
+    
+
+    inline void
+    _orthonormalize_and_create_basis
+    (std::vector<libMesh::NumericVector<real_t>*>& vecs) {
+
+        PetscErrorCode
+        ierr = 0;
+
         // close the vectors and scale them to unit norm
         for (uint_t i=0; i<vecs.size(); i++) {
             
@@ -239,10 +307,6 @@ private:
                                   &v[0],
                                   &_mns);
         CHKERRABORT(_sys.comm().get(), ierr);
-        
-        // now delete the vectors
-        for (uint_t i=0; i<vecs.size(); i++)
-            delete vecs[i];
     }
     
     
@@ -250,6 +314,7 @@ private:
     
     libMesh::System    &_sys;
     const uint_t        _dim;
+    const bool          _if_rot;
     MatNullSpace        _mns;
 
 };
