@@ -479,8 +479,8 @@ struct Panel3D {
         val     = 0.;
         
         libMesh::MeshBase::const_element_iterator
-        e_it  = c.mesh->local_elements_begin(),
-        e_end = c.mesh->local_elements_end();
+        e_it  = c.mesh->active_local_elements_begin(),
+        e_end = c.mesh->active_local_elements_end();
 
         std::set<const libMesh::Node*> nodes;
         
