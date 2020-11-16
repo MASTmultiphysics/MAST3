@@ -824,6 +824,7 @@ public:
         it  = _c.mesh->active_elements_begin(),
         end = _c.mesh->active_elements_end();
 
+        // TODO: use localized vectors with dofs from non-local active elements
         std::vector<scalar_t> sol;
         _c.rho_sys->solution->localize(sol);
         
@@ -846,9 +847,11 @@ public:
             
             rho /= (1. * elem->n_nodes());
 
-            if (rho >= 0.3 && elem->level() < _max_h)
+            if (rho >= 0.4 &&
+                rho <= 0.9 &&
+                elem->level() < _max_h)
                 elem->set_refinement_flag(libMesh::Elem::REFINE);
-            else
+            else if (rho < 0.2)
                 elem->set_refinement_flag(libMesh::Elem::COARSEN);
         }
     }
