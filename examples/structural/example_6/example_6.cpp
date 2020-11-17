@@ -658,6 +658,8 @@ public:
         linear_solver.init(m, &_c.sys->name());
         linear_solver.solve(sol, b);
 
+        _c.sys->get_dof_map().enforce_constraints_exactly(*_c.sys, _c.sys->solution.get());
+
         _c.sys->update();
 
         // compliance is defined using the external work done \f$ c = x^T f \f$

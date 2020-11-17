@@ -566,6 +566,8 @@ public:
         linear_solver.init(m);
         linear_solver.solve(sol, b);
 
+        _c.sys->get_dof_map().enforce_constraints_exactly(*_c.sys, _c.sys->solution.get());
+
         _c.sys->update();
 
         scalar_t
