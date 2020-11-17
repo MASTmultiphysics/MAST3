@@ -670,6 +670,8 @@ public:
         linear_solver(_c.eq_sys->comm().get());
         linear_solver.init(m, &_c.sys->name());
         linear_solver.solve(sol, b);
+        
+        _c.sys->get_dof_map().enforce_constraints_exactly(*_c.sys, _c.sys->solution.get());
 
         _c.sys->update();
 
@@ -943,7 +945,7 @@ void run(libMesh::LibMeshInit& init, MAST::Utility::GetPotWrapper& input) {
         optimizer.set_function_evaluation(f_eval);
         optimizer.init();
 
-        ex_init.penalty = 1. + 0.5 * i;
+        ex_init.penalty = 1. + i;
         ex_init.beta    = pow(beta_base, i);
      
         e_ops.heaviside->set_parameters(c.ex_init.beta, c.ex_init.eta);
