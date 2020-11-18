@@ -28,6 +28,7 @@
 #include <mast/numerics/utility.hpp>
 #include <mast/optimization/design_parameter_vector.hpp>
 #include <mast/mesh/libmesh/geometric_filter_augment_send_list.hpp>
+#include <mast/mesh/libmesh/utility.hpp>
 
 // libMesh includes
 #include "libmesh/system.h"
@@ -977,7 +978,7 @@ private:
             const libMesh::Elem *e = *it;
             elem_h = e->hmax();
             
-            for (uint_t i=0; i<_n_nodes_on_elem(*e); i++) {
+            for (uint_t i=0; i<MAST::Mesh::libMeshWrapper::Utility::n_linear_basis_nodes_on_elem(*e); i++) {
                 
                 const libMesh::Node* nd = e->node_ptr(i);
                 dof_num = nd->dof_number(sys_num, 0, 0);
@@ -1102,27 +1103,6 @@ private:
         CHKERRABORT(_system.comm().get(), ierr);
     }
     
-    
-    /*!
-     * identifies number of ndoes on element
-     */
-    inline uint_t _n_nodes_on_elem(const libMesh::Elem& e) const {
-        
-        switch (e.type()) {
-            case libMesh::QUAD4:
-            case libMesh::QUAD9:
-                return 4;
-                break;
-                
-            case libMesh::HEX8:
-            case libMesh::HEX27:
-                return 8;
-                break;
-                
-            default:
-                Error(false, "Elem type must be QUAD4/QUAD9 for 2D or HEX8/HEX27 for 3D");
-        }
-    }
     
     /*!
      *   system on which the level set discrete function is defined
