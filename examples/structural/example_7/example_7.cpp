@@ -79,40 +79,42 @@ public:
 
     InitExample(libMesh::Parallel::Communicator &mpi_comm,
                 MAST::Utility::GetPotWrapper    &inp):
-    comm      (mpi_comm),
-    input     (inp),
-    model     (new ModelType),
-    q_type    (libMesh::QGAUSS),
-    q_order   (libMesh::SECOND),
-    fe_order  (libMesh::FIRST),
-    fe_family (libMesh::LAGRANGE),
-    mesh      (new libMesh::DistributedMesh(comm)),
-    eq_sys    (new libMesh::EquationSystems(*mesh)),
-    sys       (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("structural")),
-    rho_sys   (&eq_sys->add_system<libMesh::ExplicitSystem>("density")),
-    filter    (nullptr),
-    p_side_id (-1),
-    penalty   (0.),
-    beta      (0.),
-    eta       (0.) {
+    comm          (mpi_comm),
+    input         (inp),
+    model         (new ModelType),
+    sol_q_type    (libMesh::QGAUSS),
+    sol_q_order   (libMesh::SECOND),
+    sol_fe_order  (libMesh::FIRST),
+    sol_fe_family (libMesh::LAGRANGE),
+    rho_fe_order  (libMesh::FIRST),
+    rho_fe_family (libMesh::LAGRANGE),
+    mesh          (new libMesh::DistributedMesh(comm)),
+    eq_sys        (new libMesh::EquationSystems(*mesh)),
+    sys           (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("structural")),
+    rho_sys       (&eq_sys->add_system<libMesh::ExplicitSystem>("density")),
+    filter        (nullptr),
+    p_side_id     (-1),
+    penalty       (0.),
+    beta          (0.),
+    eta           (0.) {
         
         std::string
         t = input("q_order", "quadrature order", "second");
-        q_order = libMesh::Utility::string_to_enum<libMesh::Order>(t);
+        sol_q_order = libMesh::Utility::string_to_enum<libMesh::Order>(t);
 
         t = input("fe_order", "finite element interpolation order", "first");
-        fe_order = libMesh::Utility::string_to_enum<libMesh::Order>(t);
+        sol_fe_order = libMesh::Utility::string_to_enum<libMesh::Order>(t);
 
         model->init_analysis_mesh(*this, *mesh);
 
         // displacement variables for elasticity solution
-        sys->add_variable("u_x", libMesh::FEType(fe_order, fe_family));
-        sys->add_variable("u_y", libMesh::FEType(fe_order, fe_family));
+        sys->add_variable("u_x", libMesh::FEType(sol_fe_order, sol_fe_family));
+        sys->add_variable("u_y", libMesh::FEType(sol_fe_order, sol_fe_family));
         if (ModelType::dim == 3)
-            sys->add_variable("u_z", libMesh::FEType(fe_order, fe_family));
+            sys->add_variable("u_z", libMesh::FEType(sol_fe_order, sol_fe_family));
         
         // density field
-        rho_sys->add_variable("rho", libMesh::FEType(fe_order, fe_family));
+        rho_sys->add_variable("rho", libMesh::FEType(rho_fe_order, rho_fe_family));
         
         model->init_analysis_dirichlet_conditions(*this);
         
@@ -155,10 +157,12 @@ public:
     libMesh::Parallel::Communicator             &comm;
     MAST::Utility::GetPotWrapper                &input;
     ModelType                                   *model;
-    libMesh::QuadratureType                      q_type;
-    libMesh::Order                               q_order;
-    libMesh::Order                               fe_order;
-    libMesh::FEFamily                            fe_family;
+    libMesh::QuadratureType                      sol_q_type;
+    libMesh::Order                               sol_q_order;
+    libMesh::Order                               sol_fe_order;
+    libMesh::FEFamily                            sol_fe_family;
+    libMesh::Order                               rho_fe_order;
+    libMesh::FEFamily                            rho_fe_family;
     libMesh::DistributedMesh                    *mesh;
     libMesh::EquationSystems                    *eq_sys;
     libMesh::NonlinearImplicitSystem            *sys;
@@ -268,61 +272,69 @@ public:
     using matrix_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     
     ElemOps(context_t  &c):
-    heaviside            (nullptr),
-    density              (nullptr),
-    E                    (nullptr),
-    dt                   (nullptr),
-    nu                   (nullptr),
-    alpha                (nullptr),
-    press                (nullptr),
-    area                 (nullptr),
-    _fe_data             (nullptr),
-    _fe_side_data        (nullptr),
-    _fe_var              (nullptr),
-    _fe_side_var         (nullptr),
-    _density_fe_var      (nullptr),
-    _density_sens_fe_var (nullptr),
-    _density_field       (nullptr),
-    _prop                (nullptr),
-    _energy              (nullptr),
-    _temp_load           (nullptr),
-    _p_load              (nullptr) {
+    heaviside           (nullptr),
+    density             (nullptr),
+    E                   (nullptr),
+    dt                  (nullptr),
+    nu                  (nullptr),
+    alpha               (nullptr),
+    press               (nullptr),
+    area                (nullptr),
+    _sol_fe_data        (nullptr),
+    _sol_fe_side_data   (nullptr),
+    _sol_fe_var         (nullptr),
+    _sol_fe_side_var    (nullptr),
+    _density_fe_basis   (nullptr),
+    _density_fe_deriv   (nullptr),
+    _density_fe_var     (nullptr),
+    _density_sens_fe_var(nullptr),
+    _density_field      (nullptr),
+    _prop               (nullptr),
+    _energy             (nullptr),
+    _temp_load          (nullptr),
+    _p_load             (nullptr) {
+
+        _sol_fe_data       = new typename TraitsType::fe_data_t;
+        _sol_fe_data->init(c.ex_init.sol_q_order,
+                           c.ex_init.sol_q_type,
+                           c.ex_init.sol_fe_order,
+                           c.ex_init.sol_fe_family);
+        _sol_fe_side_data  = new typename TraitsType::fe_side_data_t;
+        _sol_fe_side_data->init(c.ex_init.sol_q_order,
+                                c.ex_init.sol_q_type,
+                                c.ex_init.sol_fe_order,
+                                c.ex_init.sol_fe_family);
+        _sol_fe_var        = new typename TraitsType::fe_var_t;
+        _sol_fe_side_var   = new typename TraitsType::fe_var_t;
         
-        _fe_data       = new typename TraitsType::fe_data_t;
-        _fe_data->init(c.ex_init.q_order,
-                       c.ex_init.q_type,
-                       c.ex_init.fe_order,
-                       c.ex_init.fe_family);
-        _fe_side_data  = new typename TraitsType::fe_side_data_t;
-        _fe_side_data->init(c.ex_init.q_order,
-                            c.ex_init.q_type,
-                            c.ex_init.fe_order,
-                            c.ex_init.fe_family);
-        _fe_var        = new typename TraitsType::fe_var_t;
-        _fe_side_var   = new typename TraitsType::fe_var_t;
-        
+        _density_fe_basis  = new typename
+        TraitsType::fe_basis_t(libMesh::FEType(c.ex_init.rho_fe_order,
+                                               c.ex_init.rho_fe_family));
+        _density_fe_deriv  = new typename TraitsType::fe_shape_t;
+
         _density_fe_var      = new typename TraitsType::density_fe_var_t;
         _density_sens_fe_var = new typename TraitsType::density_fe_var_t;
         _density_field       = new typename TraitsType::density_field_t;
         
         // associate variables with the shape functions
-        _fe_var->set_fe_shape_data(_fe_data->fe_derivative());
-        _fe_side_var->set_fe_shape_data(_fe_side_data->fe_derivative());
+        _sol_fe_var->set_fe_shape_data(_sol_fe_data->fe_derivative());
+        _sol_fe_side_var->set_fe_shape_data(_sol_fe_side_data->fe_derivative());
         
         // tell the FE computations which quantities are needed for computation
-        _fe_data->fe_basis().set_compute_dphi_dxi(true);
+        _sol_fe_data->fe_basis().set_compute_dphi_dxi(true);
         
-        _fe_data->fe_derivative().set_compute_dphi_dx(true);
-        _fe_data->fe_derivative().set_compute_detJxW(true);
+        _sol_fe_data->fe_derivative().set_compute_dphi_dx(true);
+        _sol_fe_data->fe_derivative().set_compute_detJxW(true);
         
-        _fe_side_data->fe_basis().set_compute_dphi_dxi(true);
-        _fe_side_data->fe_derivative().set_compute_normal(true);
-        _fe_side_data->fe_derivative().set_compute_detJxW(true);
+        _sol_fe_side_data->fe_basis().set_compute_dphi_dxi(true);
+        _sol_fe_side_data->fe_derivative().set_compute_normal(true);
+        _sol_fe_side_data->fe_derivative().set_compute_detJxW(true);
         
-        _fe_var->set_compute_du_dx(true);
+        _sol_fe_var->set_compute_du_dx(true);
         
-        _density_fe_var->set_fe_shape_data(_fe_data->fe_derivative());
-        _density_sens_fe_var->set_fe_shape_data(_fe_data->fe_derivative());
+        _density_fe_deriv->set_fe_basis(*_density_fe_basis);
+        _density_fe_var->set_fe_shape_data(*_density_fe_deriv);
+        _density_sens_fe_var->set_fe_shape_data(*_density_fe_deriv);
         _density_field->set_fe_object_and_component(*_density_fe_var, 0);
         _density_field->set_derivative_fe_object_and_component(*_density_sens_fe_var, 0);
 
@@ -359,9 +371,9 @@ public:
         _temp_load->set_temperature(*dt);
         
         // tell physics kernels about the FE discretization information
-        _energy->set_fe_var_data(*_fe_var);
-        _p_load->set_fe_var_data(*_fe_side_var);
-        _temp_load->set_fe_var_data(*_fe_var);
+        _energy->set_fe_var_data(*_sol_fe_var);
+        _p_load->set_fe_var_data(*_sol_fe_side_var);
+        _temp_load->set_fe_var_data(*_sol_fe_var);
     }
     
     virtual ~ElemOps() {
@@ -383,12 +395,13 @@ public:
         delete _density_field;
         delete _density_fe_var;
         delete _density_sens_fe_var;
+        delete _density_fe_deriv;
+        delete _density_fe_basis;
 
-        
-        delete _fe_var;
-        delete _fe_side_var;
-        delete _fe_side_data;
-        delete _fe_data;
+        delete _sol_fe_var;
+        delete _sol_fe_side_var;
+        delete _sol_fe_side_data;
+        delete _sol_fe_data;
     }
     
     
@@ -402,9 +415,11 @@ public:
                         typename TraitsType::element_matrix_t *jac) {
         
 
-        c.fe = &_fe_data->fe_derivative();
-        _fe_data->reinit(c);
-        _fe_var->init(c, sol_v);
+        c.fe = &_sol_fe_data->fe_derivative();
+        _sol_fe_data->reinit(c);
+        _sol_fe_var->init(c, sol_v);
+        _density_fe_basis->reinit(*c.elem, _sol_fe_data->quadrature());
+        _density_fe_deriv->reinit(c);
         _density_fe_var->init(c, density_v);
 
         _energy->compute(c, res, jac);
@@ -413,9 +428,9 @@ public:
         for (uint_t s=0; s<c.elem->n_sides(); s++)
             if (c.if_compute_pressure_load_on_side(s)) {
                 
-                c.fe = &_fe_side_data->fe_derivative();
-                _fe_side_data->reinit_for_side(c, s);
-                _fe_side_var->init(c, sol_v);
+                c.fe = &_sol_fe_side_data->fe_derivative();
+                _sol_fe_side_data->reinit_for_side(c, s);
+                _sol_fe_side_var->init(c, sol_v);
                 _p_load->compute(c, res, jac);
             }
     }
@@ -434,9 +449,11 @@ public:
                            typename TraitsType::element_vector_t &res,
                            typename TraitsType::element_matrix_t *jac) {
         
-        c.fe = &_fe_data->fe_derivative();
-        _fe_data->reinit(c);
-        _fe_var->init(c, sol_v);
+        c.fe = &_sol_fe_data->fe_derivative();
+        _sol_fe_data->reinit(c);
+        _sol_fe_var->init(c, sol_v);
+        _density_fe_basis->reinit(*c.elem, _sol_fe_data->quadrature());
+        _density_fe_deriv->reinit(c);
         _density_fe_var->init(c, density_v);
         _density_sens_fe_var->init(c, density_sens);
 
@@ -460,9 +477,11 @@ public:
         // pressure load is independent of design parameters but thermoelastic load
         // depends on it. So, we compute the partial derivative of compliance contribution
         // from that term
-        c.fe = &_fe_data->fe_derivative();
-        _fe_data->reinit(c);
-        _fe_var->init(c, sol_v);
+        c.fe = &_sol_fe_data->fe_derivative();
+        _sol_fe_data->reinit(c);
+        _sol_fe_var->init(c, sol_v);
+        _density_fe_basis->reinit(*c.elem, _sol_fe_data->quadrature());
+        _density_fe_deriv->reinit(c);
         _density_fe_var->init(c, density_v);
         _density_sens_fe_var->init(c, density_sens);
 
@@ -488,13 +507,17 @@ public:
 private:
     
     // variables for quadrature and shape function
-    typename TraitsType::fe_data_t         *_fe_data;
-    typename TraitsType::fe_side_data_t    *_fe_side_data;
-    typename TraitsType::fe_var_t          *_fe_var;
-    typename TraitsType::fe_var_t          *_fe_side_var;
+    typename TraitsType::fe_data_t         *_sol_fe_data;
+    typename TraitsType::fe_side_data_t    *_sol_fe_side_data;
+    typename TraitsType::fe_var_t          *_sol_fe_var;
+    typename TraitsType::fe_var_t          *_sol_fe_side_var;
+
+    typename TraitsType::fe_basis_t        *_density_fe_basis;
+    typename TraitsType::fe_shape_t        *_density_fe_deriv;
     typename TraitsType::density_fe_var_t  *_density_fe_var;
     typename TraitsType::density_fe_var_t  *_density_sens_fe_var;
     typename TraitsType::density_field_t   *_density_field;
+
     typename TraitsType::prop_t            *_prop;
     typename TraitsType::energy_t          *_energy;
     typename TraitsType::temp_load_t       *_temp_load;
