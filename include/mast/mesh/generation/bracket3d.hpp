@@ -382,9 +382,9 @@ struct Bracket3D {
         // if high order FE is used, libMesh requires atleast a second order
         // geometric element.
         //
-        if (c.fe_order > 1 && e_type == libMesh::HEX8)
+        if (c.sol_fe_order > 1 && e_type == libMesh::HEX8)
             e_type = libMesh::HEX27;
-        else if (c.fe_order > 1 && e_type == libMesh::TET4)
+        else if (c.sol_fe_order > 1 && e_type == libMesh::TET4)
             e_type = libMesh::TET10;
         
         //
@@ -444,10 +444,13 @@ struct Bracket3D {
         //
         // this assumes that density variable has a constant value per element
         //
-        Assert2(c.fe_family == libMesh::LAGRANGE,
-                c.fe_family, libMesh::LAGRANGE,
+        Assert2(c.rho_fe_family == libMesh::LAGRANGE,
+                c.rho_fe_family, libMesh::LAGRANGE,
                 "Method assumes Lagrange interpolation function for density");
-        
+        Assert2(c.rho_fe_order == libMesh::FIRST,
+                c.rho_fe_order, libMesh::FIRST,
+                "Method assumes Lagrange interpolation function for density");
+
         real_t
         tol           = 1.e-12,
         rho_min       = c.input("rho_min", "lower limit on density variable", 0.),
@@ -472,7 +475,12 @@ struct Bracket3D {
             
             const libMesh::Elem* e = *e_it;
             
-            for (uint_t i=0; i<e->n_nodes(); i++) {
+            Assert0(e->type() == libMesh::HEX8 ||
+                    e->type() == libMesh::HEX27,
+                    "Method requires Hex8/Hex27 element");
+            
+            // only the first eight nodes of the hex element are used
+            for (uint_t i=0; i<8; i++) {
 
                 const libMesh::Node& n = *e->node_ptr(i);
                 
