@@ -295,23 +295,13 @@ private:
         uint_t                      _n_nodes;
 
     public:
-        NanoflannMeshAdaptor (const libMesh::MeshBase & mesh) :
-        _mesh           (mesh),
-        _n_local_nodes  (mesh.n_local_nodes()),
-        _n_nodes        (mesh.n_nodes()) {
-            
-            nodes.reserve(_n_local_nodes);
-            
-            libMesh::MeshBase::const_node_iterator
-            it   = mesh.local_nodes_begin(),
-            end  = mesh.local_nodes_end();
-            
-            for ( ; it != end; it++) {
-                
-                nodes.push_back(*it);
-                node_id_to_vec_index[(*it)->id()] = nodes.size()-1;
-            }
-        }
+        NanoflannMeshAdaptor (const libMesh::MeshBase                 &mesh,
+                              const std::vector<const libMesh::Node*> &nodes) :
+        _mesh                 (mesh),
+        _n_local_nodes        (nodes.size()),
+        _n_nodes              (mesh.n_nodes()),
+        _nodes                (nodes)
+        { }
         
         /**
          * libMesh \p Point coordinate type
@@ -362,7 +352,7 @@ private:
                     "Invalid node index");
             Assert1(dim < 3, dim, "Invalid dimension");
 
-            return (*nodes[idx])(dim);
+            return (*_nodes[idx])(dim);
         }
         
         /**
@@ -374,8 +364,7 @@ private:
         template <class BBOX>
         inline bool kdtree_get_bbox(BBOX & /* bb */) const { return false; }
         
-        std::vector<libMesh::Node*> nodes;
-        std::map<uint_t, uint_t>    node_id_to_vec_index;
+        const std::vector<const libMesh::Node*>  &_nodes;
     };
     
     // Declare a type templated on NanoflannMeshAdaptor
@@ -409,7 +398,7 @@ private:
         // contrib/nanoflann/examples/pointcloud_adaptor_example.cpp
         
         // Build adaptor and tree objects
-        NanoflannMeshAdaptor<3> mesh_adaptor(mesh);
+        NanoflannMeshAdaptor<3> mesh_adaptor(mesh, _nodes);
         kd_tree_t kd_tree(3, mesh_adaptor, nanoflann::KDTreeSingleIndexAdaptorParams(/*max leaf=*/10));
         
         // Construct the tree
@@ -466,9 +455,9 @@ private:
         std::map<const libMesh::Node*, real_t>
         node_sum;
                 
-        libMesh::MeshBase::const_node_iterator
-        node_it      =  mesh.local_nodes_begin(),
-        node_end     =  mesh.local_nodes_end();
+        std::vector<const libMesh::Node*>::const_iterator
+        node_it      =  _nodes.begin(),
+        node_end     =  _nodes.end();
         
         std::vector<std::vector<const libMesh::Node*>>
         remote_node_dependency(size);
@@ -600,7 +589,7 @@ private:
                 
                 for (unsigned r=0; r<indices_dists.size(); ++r) {
                     
-                    const libMesh::Node* nd = mesh_adaptor.nodes[indices_dists[r].first];
+                    const libMesh::Node* nd = _nodes[indices_dists[r].first];
                     
                     // location of the node
                     filter_data_node_loc_send[i].push_back((*nd)(0));
@@ -648,7 +637,7 @@ private:
         // For every node in the mesh, search the KDtree and find any
         // nodes at _radius distance from the current
         // node being searched... this will be added to the .
-        node_it      =  mesh.local_nodes_begin();
+        node_it      =  _nodes.begin();
             
         for (; node_it != node_end; node_it++) {
             
@@ -665,7 +654,7 @@ private:
                 std::vector<std::pair<size_t, real_t>>
                 indices_dists;
                 indices_dists.push_back(std::pair<size_t, real_t>
-                                        (mesh_adaptor.node_id_to_vec_index[node->id()], 0.));
+                                        (_node_id_to_vec_index[node->id()], 0.));
                 nanoflann::RadiusResultSet<real_t, size_t>
                 resultSet(nd_radius*nd_radius, indices_dists);
                 
@@ -683,7 +672,7 @@ private:
                             "Node distance must be <= search radius");
                     
                     sum  += nd_radius - d_12;
-                    dof_2 = mesh_adaptor.nodes[indices_dists[r].first]->dof_number(_system.number(), 0, 0);
+                    dof_2 = _nodes[indices_dists[r].first]->dof_number(_system.number(), 0, 0);
                     
                     _filter_map[dof_1].push_back(std::pair<uint_t, real_t>
                                                 (dof_2, nd_radius - d_12));
@@ -763,7 +752,7 @@ private:
         // now normalize the weights with respect to the sum
         // with the coefficients computed for dof_1, divide each coefficient
         // with the sum
-        node_it      =  mesh.local_nodes_begin();
+        node_it      =  _nodes.begin();
             
         for (; node_it != node_end; node_it++) {
             
@@ -973,6 +962,12 @@ private:
         sys_num         = _system.number(),
         dof_num         = 0;
         
+
+        _nodes.clear();
+        _nodes.reserve(_system.get_mesh().n_local_nodes());
+        
+        std::set<const libMesh::Node*>
+        all_local_nodes;
         
         real_t
         elem_h = 0.;
@@ -982,12 +977,18 @@ private:
             const libMesh::Elem *e = *it;
             elem_h = e->hmax();
             
-            for (uint_t i=0; i<e->n_nodes(); i++) {
+            for (uint_t i=0; i<_n_nodes_on_elem(*e); i++) {
                 
-                dof_num = e->node_ptr(i)->dof_number(sys_num, 0, 0);
+                const libMesh::Node* nd = e->node_ptr(i);
+                dof_num = nd->dof_number(sys_num, 0, 0);
                 
                 _radius->add(dof_num, elem_h);
                 n_elem_sum->add(dof_num, 1.);
+
+                // if the node is a local node, add it to the set
+                if (dof_num >= first_local_dof &&
+                    dof_num <  last_local_dof)
+                    all_local_nodes.insert(nd);
             }
         }
         
@@ -999,6 +1000,16 @@ private:
             _radius->set(i, _radius->el(i)/n_elem_sum->el(i));
         }
         _radius->close();
+        
+        // initialize the local nodes
+        std::set<const libMesh::Node*>::const_iterator
+        n_it  = all_local_nodes.begin(),
+        n_end = all_local_nodes.end();
+        
+        for ( ; n_it != n_end; n_it++) {
+            _nodes.push_back(*n_it);
+            _node_id_to_vec_index[(*n_it)->id()] = _nodes.size()-1;
+        }
     }
     
     
@@ -1093,6 +1104,27 @@ private:
     
     
     /*!
+     * identifies number of ndoes on element
+     */
+    inline uint_t _n_nodes_on_elem(const libMesh::Elem& e) const {
+        
+        switch (e.type()) {
+            case libMesh::QUAD4:
+            case libMesh::QUAD9:
+                return 4;
+                break;
+                
+            case libMesh::HEX8:
+            case libMesh::HEX27:
+                return 8;
+                break;
+                
+            default:
+                Error(false, "Elem type must be QUAD4/QUAD9 for 2D or HEX8/HEX27 for 3D");
+        }
+    }
+    
+    /*!
      *   system on which the level set discrete function is defined
      */
     libMesh::System& _system;
@@ -1130,6 +1162,17 @@ private:
      */
     std::vector<uint_t> _forward_send_list;
     
+    /*!
+     *   Local nodes that belong to the first-order Lagrange basis on the elements
+     */
+    std::vector<const libMesh::Node*> _nodes;
+
+    
+    /*!
+     *   id of local nodes for use in kd-tree search
+     */
+    std::map<uint_t, uint_t>          _node_id_to_vec_index;
+
     /*!
      * Sparse Matrix object that stores the filtering matrix. This is used for both both forward and reverse operations
      */
