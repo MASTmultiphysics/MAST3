@@ -268,24 +268,25 @@ public:
     using matrix_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     
     ElemOps(context_t  &c):
-    heaviside       (nullptr),
-    density         (nullptr),
-    E               (nullptr),
-    dt              (nullptr),
-    nu              (nullptr),
-    alpha           (nullptr),
-    press           (nullptr),
-    area            (nullptr),
-    _fe_data        (nullptr),
-    _fe_side_data   (nullptr),
-    _fe_var         (nullptr),
-    _fe_side_var    (nullptr),
-    _density_fe_var (nullptr),
-    _density_field  (nullptr),
-    _prop           (nullptr),
-    _energy         (nullptr),
-    _temp_load      (nullptr),
-    _p_load         (nullptr) {
+    heaviside            (nullptr),
+    density              (nullptr),
+    E                    (nullptr),
+    dt                   (nullptr),
+    nu                   (nullptr),
+    alpha                (nullptr),
+    press                (nullptr),
+    area                 (nullptr),
+    _fe_data             (nullptr),
+    _fe_side_data        (nullptr),
+    _fe_var              (nullptr),
+    _fe_side_var         (nullptr),
+    _density_fe_var      (nullptr),
+    _density_sens_fe_var (nullptr),
+    _density_field       (nullptr),
+    _prop                (nullptr),
+    _energy              (nullptr),
+    _temp_load           (nullptr),
+    _p_load              (nullptr) {
         
         _fe_data       = new typename TraitsType::fe_data_t;
         _fe_data->init(c.ex_init.q_order,
@@ -381,6 +382,8 @@ public:
 
         delete _density_field;
         delete _density_fe_var;
+        delete _density_sens_fe_var;
+
         
         delete _fe_var;
         delete _fe_side_var;
