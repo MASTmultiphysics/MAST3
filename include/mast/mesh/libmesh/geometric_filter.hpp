@@ -80,6 +80,10 @@ public:
         
         // now we tell the function to
         _system.get_dof_map().reinit_send_list(_system.get_mesh());
+        
+        // now clear the node list to save memory
+        _nodes.clear();
+        _node_id_to_vec_index.clear();
     }
     
     
