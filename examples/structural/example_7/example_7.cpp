@@ -852,8 +852,9 @@ public:
         volume = 0.,
         rho    = 0.;
 
-        const uint_t
-        sys_num = _c.rho_sys->number();
+        uint_t
+        sys_num = _c.rho_sys->number(),
+        n_nodes = 0;
 
         libMesh::MeshBase::element_iterator
         it  = _c.mesh->active_elements_begin(),
@@ -871,9 +872,9 @@ public:
             real_t
             rho = 0.;
             
-            for (uint_t i=0;
-                 i<MAST::Mesh::libMeshWrapper::Utility::n_linear_basis_nodes_on_elem(**it);
-                 i++) {
+            n_nodes = MAST::Mesh::libMeshWrapper::Utility::n_linear_basis_nodes_on_elem(**it);
+            
+            for (uint_t i=0; i<n_nodes; i++) {
                 
                 const libMesh::Node& n = *elem->node_ptr(i);
                 
@@ -882,7 +883,7 @@ public:
                                              n.dof_number(sys_num, 0, 0));
             }
             
-            rho /= (1. * elem->n_nodes());
+            rho /= (1. * n_nodes);
 
             if (rho >= 0.3 &&
                 rho <= 0.9 &&
