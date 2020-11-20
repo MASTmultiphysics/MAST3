@@ -871,7 +871,9 @@ public:
             real_t
             rho = 0.;
             
-            for (uint_t i=0; i<elem->n_nodes(); i++) {
+            for (uint_t i=0;
+                 i<MAST::Mesh::libMeshWrapper::Utility::n_linear_basis_nodes_on_elem(**it);
+                 i++) {
                 
                 const libMesh::Node& n = *elem->node_ptr(i);
                 
@@ -971,7 +973,7 @@ void run(libMesh::LibMeshInit& init, MAST::Utility::GetPotWrapper& input) {
         optimizer.set_function_evaluation(f_eval);
         optimizer.init();
 
-        ex_init.penalty = 1. + i;
+        ex_init.penalty = 1. + 0.5 * i;
         ex_init.beta    = pow(beta_base, i);
      
         e_ops.heaviside->set_parameters(c.ex_init.beta, c.ex_init.eta);
