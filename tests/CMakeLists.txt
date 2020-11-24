@@ -20,6 +20,7 @@ add_subdirectory(fe)
 add_subdirectory(mesh)
 add_subdirectory(optimization)
 add_subdirectory(physics)
+add_subdirectory(solvers)
 
 message(NOTICE "It is recommended to run 'make check' instead of 'make test'. Alternatively, for 'ctest' or \
 'make test' to output Catch2 error messages when a failure occurs, you must set the environment variable \
