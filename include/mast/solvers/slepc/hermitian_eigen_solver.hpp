@@ -138,24 +138,16 @@ public:
         if (!B_mat) {
 
             EPSSetOperators(_eps, A_mat, PETSC_NULL);
-            
-            if (_type == EPS_HEP)
-                EPSSetProblemType(_eps, EPS_HEP);
-            else if (_type == EPS_NHEP)
-                EPSSetProblemType(_eps, EPS_NHEP);
-            else
-                Assert0(false, "Invalid EPS type");
+            EPSSetProblemType(_eps, _type);
+
+            Assert0(_type == EPS_HEP || _type == EPS_NHEP, "Invalid EPS type");
         }
         else {
 
             EPSSetOperators(_eps, A_mat, *B_mat);
-            
-            if (_type == EPS_GHEP)
-                EPSSetProblemType(_eps, EPS_GHEP);
-            else if (_type == EPS_GNHEP)
-                EPSSetProblemType(_eps, EPS_GNHEP);
-            else
-                Assert0(false, "Invalid EPS type");
+            EPSSetProblemType(_eps, _type);
+
+            Assert0(_type == EPS_GHEP || _type == EPS_GNHEP, "Invalid EPS type");
         }
         
         if (spectrum == EPS_LARGEST_MAGNITUDE)
