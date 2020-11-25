@@ -92,7 +92,7 @@ public:
         VecZeroEntries(x);
 
         Vec vi;
-        VecCopy(x, vi);
+        VecDuplicate(x, &vi);
         
         eig = 0.;
         
@@ -106,7 +106,9 @@ public:
         VecDestroy(&vi);
     }
     
-    /// method for eigenvalue problems  \f$ A x = \lambda B x \f$
+    /*!
+     *  method for eigenvalue problems  \f$ A x = \lambda B x \f$
+     */
     inline void solve(Mat               A_mat,
                       Mat              *B_mat,
                       uint_t            nev,
@@ -175,6 +177,53 @@ public:
         
         _initialized = true;
     }
+    
+
+    /*!
+     *  compute the sensitivity of \p i th eigenvalue
+     *  \f[  \frac{d \lambda_i}{d p} = \frac{ x^T \left(\frac{\partial A}{\partial p} -
+     *   \lambda_i \frac{\partial B}{\partial p}\right) x}{x_i^T B x_i } \f]
+     */
+    inline real_t sensitivity_solve(Mat          B,
+                                    Mat          A_sens,
+                                    Mat          *B_sens,
+                                    uint_t       i) {
+
+        Vec v1, v2, v3;
+        MatCreateVecs(B, &v1, PETSC_NULL);
+        MatCreateVecs(B, &v2, PETSC_NULL);
+        MatCreateVecs(B, &v3, PETSC_NULL);
+        
+        real_t
+        eig   = 0.,
+        num   = 0.,
+        denom = 0.;
+        
+        this->getEigenPair(i, eig, v1);
+
+        // compute the denominator x^T B x
+        MatMult(B, v1, v2);
+        VecDot(v1, v2, &denom);
+        
+        // numerator  dA/dp x
+        MatMult(A_sens, v1, v2);
+        
+        if (B_sens) {
+            // numerator dB/dp x
+            MatMult(*B_sens, v1, v3);
+            
+            // dA/dp x - eig dB/dp x
+            VecAXPY(v2, -eig, v3);
+        }
+        else
+            // dA/dp x - eig x
+            VecAXPY(v2, -eig, v1);
+        
+        VecDot(v1, v2, &num);
+        
+        return num/denom;
+    }
+    
     
     inline void printResidualForEigenPairs() {
         

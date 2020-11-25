@@ -109,19 +109,27 @@ TEST_CASE("slepc_hermitian_interface",
     eig_analytical = 0.,
     pi             = acos(-1.);
     
-    Mat A, B;
+    Mat A, B, Asens, Bsens;
     
-    setup_matrices(L, EA, rhoA, &A, &B);
-    
+    setup_matrices(L, EA, rhoA,     &A,     &B);
+    setup_matrices(L, 1.,   0., &Asens, &Bsens);
+
     MAST::Solvers::SLEPcWrapper::HermitianEigenSolver eig_solver(EPS_GHEP);
     
     eig_solver.solve(A, &B, n_ev, EPS_SMALLEST_REAL, true);
     
     for (uint_t i=0; i<n_ev; i++) {
         
+        // check the eigenvalues
         eig            = eig_solver.eig(i);
         eig_analytical = EA/rhoA* pow((i+1)*pi/L, 2);
         
+        CHECK(eig == Catch::Detail::Approx(eig_analytical).margin(1.e-1*eig_analytical));
+
+        // check sensitivity values
+        eig            = eig_solver.sensitivity_solve(B, Asens, &Bsens, i);
+        eig_analytical = 1./rhoA* pow((i+1)*pi/L, 2);
+
         CHECK(eig == Catch::Detail::Approx(eig_analytical).margin(1.e-1*eig_analytical));
     }
 }
