@@ -25,7 +25,7 @@
 #include <mast/base/exceptions.hpp>
 
 // PETSc includes
-#include <petscmat.h>
+#include <petsc.h>
 
 
 namespace MAST {
