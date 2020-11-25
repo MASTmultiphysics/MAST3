@@ -1,6 +1,6 @@
 target_sources(mast_catch_tests
                PUBLIC
-               ${CMAKE_CURRENT_LIST_DIR}/hermitian_eigen_solver.hpp)
+               ${CMAKE_CURRENT_LIST_DIR}/hermitian_eigen_solver.cpp)
 
 #SLEPc Hermitian eigensolver interface
 add_test(NAME SLEPcHermitianEigenSolver
