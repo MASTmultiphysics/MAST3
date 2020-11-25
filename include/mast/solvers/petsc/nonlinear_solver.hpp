@@ -79,7 +79,7 @@ public:
         
         VecZeroEntries(res);
 
-        func.residual(x0, res);
+        func.residual(x, res);
         jac = func.matrix();
 
         bool
@@ -106,8 +106,8 @@ public:
             func.jacobian(x, *jac);
 
             MAST::Solvers::PETScWrapper::LinearSolver solver(_comm);
-            init(jac, _nm.size()?&_nm:nullptr);
-            solve(dx, res);
+            solver.init(*jac, _nm.size()?&_nm:nullptr);
+            solver.solve(dx, res);
             
             VecNorm(dx, NORM_2, &dx_l2);
 
