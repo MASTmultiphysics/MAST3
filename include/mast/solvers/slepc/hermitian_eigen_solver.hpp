@@ -20,6 +20,9 @@
 #ifndef __mast_slepc_eigen_solver_h__
 #define __mast_slepc_eigen_solver_h__
 
+// C++ includes
+#include <iomanip>
+
 // MAST includes
 #include <mast/base/mast_data_types.h>
 #include <mast/base/exceptions.hpp>
@@ -110,7 +113,7 @@ public:
                       EPSWhich          spectrum,
                       bool              computeEigenvectors) {
         
-        Assert0(_initialized, "solver not initialized");
+        Assert0(!_initialized, "solver not initialized");
 
         PetscInt
         m = 0,
@@ -126,7 +129,7 @@ public:
             m2 = 0,
             n2 = 0;
             
-            MatGetSize(*B_mat, &m, &n);
+            MatGetSize(*B_mat, &m2, &n2);
 
             Assert0(_type == EPS_GHEP,
                     "Eigensolver type must be Generalized Hermitian");
