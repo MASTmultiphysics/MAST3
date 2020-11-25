@@ -20,6 +20,9 @@
 #ifndef __mast_petsc_nonlinear_solver_h__
 #define __mast_petsc_nonlinear_solver_h__
 
+// C++ includes
+#include <iomanip>
+
 // MAST includes
 #include <mast/base/mast_data_types.h>
 #include <mast/base/exceptions.hpp>
@@ -45,7 +48,7 @@ public:
     NonlinearSolver(const MPI_Comm comm):
     tol      (1.e-6),
     rtol     (1.e-6),
-    max_iter (20)
+    max_iter (20),
     _comm    (comm),
     _func    (nullptr) {
         
@@ -55,18 +58,6 @@ public:
     virtual ~NonlinearSolver() {
         
     }
-
-    
-    inline void init() {
-
-        Assert0(!_func, "solver already initialized");
-
-        _func = &func;
-        
-        if (_scope)
-            _nm = *scope;
-    }
-    
     
     /*!
      * initialize the solver for function object \p func that provides the residual and jacobian evaluation.
@@ -106,7 +97,7 @@ public:
         res0_l2 = res_l2;
         
         std::cout
-        << " Iter: " << setw(5) << iter
+        << " Iter: " << std::setw(5) << iter
         << " : || res ||_2 = "
         << std::setw(15) << res_l2;
         
@@ -139,7 +130,7 @@ public:
             VecNorm(res, NORM_2, &res_l2);
 
             std::cout
-            << " Iter: " << setw(5) << iter
+            << " Iter: " << std::setw(5) << iter
             << " : || res ||_2 = "
             << std::setw(15) << res_l2;
 
