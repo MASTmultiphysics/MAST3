@@ -125,7 +125,7 @@ TEST_CASE("petsc_nonlinear_solver",
 
     
     CHECK_THAT(std::vector<real_t>(vals, vals+f.n),
-               Catch::Approx(std::vector<real_t>(f.n, 0.)));
+               Catch::Approx(std::vector<real_t>(f.n, 0.)).margin(1.e-3));
 }
 
 } // namespace PETSc
