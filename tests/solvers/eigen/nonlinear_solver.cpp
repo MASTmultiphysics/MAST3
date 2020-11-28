@@ -61,6 +61,8 @@ public:
     
     inline void ref_solution(vector_t &x) {x.setZero(n); x(perturb_idx) = dp;}
     
+    inline void ref_solution_sens(vector_t &x) {x.setZero(n); x(perturb_idx) = 1.;}
+
     inline void residual(vector_t &x, vector_t &res) {
         
         res.setZero(n);
@@ -79,7 +81,7 @@ public:
     inline void residual_sensitivity(vector_t &x, vector_t &dresdp) {
 
         dresdp.setZero(n);
-        res(perturb_idx) = -2.*(x(perturb_idx)-dp);
+        dresdp(perturb_idx) = -2.*(x(perturb_idx)-dp);
     }
 
     inline void jacobian(vector_t &x,
@@ -122,8 +124,6 @@ TEST_CASE("eigen_nonlinear_solver",
     dx    = vector_t::Zero(f.n),
     dx_cs = vector_t::Zero(f.n);
 
-    f.ref_solution(x_ref);
-    
     MAST::Solvers::EigenWrapper::NonlinearSolver<real_t, linear_solver_t, func_t>
     solver;
     solver.rtol = 1.e-10;
@@ -131,17 +131,21 @@ TEST_CASE("eigen_nonlinear_solver",
     solver.solve(f, x);
 
     // check the accuracy of solution
+    f.ref_solution(x_ref);
     CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(x),
                Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(x_ref)).margin(1.e-3));
 
 
     // analytical sensitivity
-    /*f.residual_sensitivity(x, dres);
+    f.residual_sensitivity(x, dres);
     matrix_t jac;
     f.jacobian(x, jac);
     
     dx = -linear_solver_t(jac).solve(dres);
-    */
+    f.ref_solution_sens(x_ref);
+    CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(dx),
+               Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(x_ref)).margin(1.e-3));
+
     
     // complex-step sensitivity
     {
