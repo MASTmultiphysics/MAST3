@@ -126,14 +126,22 @@ TEST_CASE("eigen_nonlinear_solver",
     
     MAST::Solvers::EigenWrapper::NonlinearSolver<real_t, linear_solver_t, func_t>
     solver;
+    solver.rtol = 1.e-10;
+    solver.tol  = 1.e-10;
     solver.solve(f, x);
 
-    // analytical sensitivity
-    
-    
+    // check the accuracy of solution
     CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(x),
-               Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(x_ref)).margin(1.e-2));
+               Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(x_ref)).margin(1.e-3));
 
+
+    // analytical sensitivity
+    /*f.residual_sensitivity(x, dres);
+    matrix_t jac;
+    f.jacobian(x, jac);
+    
+    dx = -linear_solver_t(jac).solve(dres);
+    */
     
     // complex-step sensitivity
     {
