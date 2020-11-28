@@ -54,10 +54,7 @@ public:
     uint_t   perturb_idx; // index where the origin is perturbed
     scalar_t dp;
 
-    Function(): n (10), perturb_idx(n/2), dp(0.) {
-        
-        MAST::Test::Solvers::EigenWrapper::perturb(dp);
-    }
+    Function(const ScalarType &dp_val): n (10), perturb_idx(n/2), dp(dp_val) { }
 
     virtual ~Function() { }
     
@@ -75,12 +72,12 @@ public:
         
         for (int_t i=0; i<n; i++) {
             
-            res(i) = std::pow(x(i), 2);
+            res(i) = pow(x(i), 2);
         }
         
         // coordinate that is petturbed will need a different residual
         // an arbitrary perturbation of the coordinate is included
-        res(perturb_idx) = std::pow(x(perturb_idx)-dp, 2.);
+        res(perturb_idx) = pow(x(perturb_idx)-dp, 2.);
     }
 
     
@@ -127,12 +124,24 @@ void xinit(FuncType                                 &f,
 }
 
 
+template <typename FuncType>
+void xinit(FuncType                                       &f,
+           Eigen::Matrix<adouble_tl_t, Eigen::Dynamic, 1> &x) {
+    
+    x.setZero(f.n);
+    Eigen::Matrix<real_t, Eigen::Dynamic, 1>
+    x_rand = Eigen::Matrix<real_t, Eigen::Dynamic, 1>::Random(f.n);
+
+    for (uint_t i=0; i<x.size(); i++) x(i) = x_rand(i);
+}
+
+
 
 template <typename ScalarType>
 void
-solution(Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> &x,
-         Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> &x_ref,
-         ScalarType &dp) {
+solution(const ScalarType                             &dp,
+         Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> &x,
+         Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> &x_ref) {
     
     // data types for real-valued computation
     using func_t   = MAST::Test::Solvers::EigenWrapper::Function<ScalarType>;
@@ -140,7 +149,7 @@ solution(Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> &x,
     using matrix_t = typename func_t::matrix_t;
     using linear_solver_t = typename Eigen::FullPivLU<matrix_t>;
 
-    func_t f;
+    func_t f(dp);
     
     vector_t
     dres  = vector_t::Zero(f.n),
@@ -156,26 +165,24 @@ solution(Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> &x,
     solver.solve(f, x);
 
     f.ref_solution(x_ref);
-    
-    dp = f.dp;
 }
 
 
 
 
-template <typename ScalarType>
 void
-sensitivity(const Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> &x,
-            Eigen::Matrix<ScalarType, Eigen::Dynamic, 1>       &dx,
-            Eigen::Matrix<ScalarType, Eigen::Dynamic, 1>       &dx_ref) {
+sensitivity(const real_t                                   &dp,
+            const Eigen::Matrix<real_t, Eigen::Dynamic, 1> &x,
+            Eigen::Matrix<real_t, Eigen::Dynamic, 1>       &dx,
+            Eigen::Matrix<real_t, Eigen::Dynamic, 1>       &dx_ref) {
     
     // data types for real-valued computation
-    using func_t   = MAST::Test::Solvers::EigenWrapper::Function<ScalarType>;
+    using func_t   = MAST::Test::Solvers::EigenWrapper::Function<real_t>;
     using vector_t = typename func_t::vector_t;
     using matrix_t = typename func_t::matrix_t;
     using linear_solver_t = typename Eigen::FullPivLU<matrix_t>;
 
-    func_t f;
+    func_t f(dp);
     
     vector_t
     dres  = vector_t::Zero(f.n);
@@ -192,41 +199,76 @@ sensitivity(const Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> &x,
 
 
 TEST_CASE("eigen_nonlinear_solver",
-          "[Algebra][Solvers][Nonlinear][Eigen][Complex-Step]") {
+          "[Algebra][Solvers][Nonlinear][Eigen][ComplexStep][AdolC]") {
 
     Eigen::Matrix<real_t, Eigen::Dynamic, 1>
     x,
     dx,
     x_ref,
     dx_ref;
+
     real_t
     dp;
-    
+    MAST::Test::Solvers::EigenWrapper::perturb(dp);
+
     // check the accuracy of solution
-    MAST::Test::Solvers::EigenWrapper::solution(x, x_ref, dp);
+    MAST::Test::Solvers::EigenWrapper::solution(dp, x, x_ref);
     CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(x),
                Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(x_ref)).margin(1.e-3));
 
 
     // check the accuracy of solution sensitivity
-    MAST::Test::Solvers::EigenWrapper::sensitivity(x, dx, dx_ref);
+    MAST::Test::Solvers::EigenWrapper::sensitivity(dp, x, dx, dx_ref);
     CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(dx),
                Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(dx_ref)).margin(1.e-3));
 
 
+    ////////////////////////////////////////////////////////////
     // complex-step sensitivity
-    Eigen::Matrix<complex_t, Eigen::Dynamic, 1>
-    x_cs,
-    x_ref_cs;
-    complex_t
-    dp_cs;
+    ////////////////////////////////////////////////////////////
+    {
+        Eigen::Matrix<complex_t, Eigen::Dynamic, 1>
+        x_cs,
+        x_ref_cs;
+        complex_t
+        dp_cs;
+        MAST::Test::Solvers::EigenWrapper::perturb(dp_cs);
 
-    MAST::Test::Solvers::EigenWrapper::solution(x_cs, x_ref_cs, dp_cs);
-    dx = x_cs.imag()/imag(dp_cs);
+        MAST::Test::Solvers::EigenWrapper::solution(dp_cs, x_cs, x_ref_cs);
+        dx = x_cs.imag()/imag(dp_cs);
+        
+        CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(dx),
+                   Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(dx_ref)).margin(1.e-6));
+    }
+    
+    
+    ////////////////////////////////////////////////////////////
+    // Adol-C sensitivity of Newton solver
+    ////////////////////////////////////////////////////////////
+#if MAST_ENABLE_ADOLC == 1
+    {
+        Eigen::Matrix<adouble_tl_t, Eigen::Dynamic, 1>
+        x_ad,
+        x_ref_ad;
+        adouble_tl_t
+        dp_ad;
+        real_t
+        unit_sens = 1.;
+        // tell the perturbation about its value and its sensitivity wrt the parameter,
+        // which is itself. Therefore, the latter value = 1.
+        dp_ad = dp;
+        dp_ad.setADValue(&unit_sens);
+        
+        MAST::Test::Solvers::EigenWrapper::solution(dp_ad, x_ad, x_ref_ad);
+        
+        // extract the sensitivity values.
+        for (uint_t i=0; i<x.size(); i++)
+        dx(i) = *x_ad(i).getADValue();
 
-    CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(dx),
-               Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(dx_ref)).margin(1.e-3));
-
+        CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(dx),
+                   Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(dx_ref)).margin(1.e-3));
+    }
+#endif
 }
 
 } // namespace EigenWrapper
