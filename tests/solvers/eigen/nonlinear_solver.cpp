@@ -47,15 +47,19 @@ public:
     using vector_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using matrix_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     
-    uint_t n;
+    uint_t n;           // total system size
+    uint_t perturb_idx; // index where the origin is perturbed
+    real_t dp;
 
-    Function(): n (10) { }
+    Function(): n (10), perturb_idx(n/2), dp(2.5) { }
 
     virtual ~Function() { }
     
     inline void init_vector(vector_t &v) { v.setZero(n);}
     
     inline void init_matrix(matrix_t &m) { m.setZero(n,n);}
+    
+    inline void ref_solution(vector_t &x) {x.setZero(n); x(perturb_idx) = dp;}
     
     inline void residual(vector_t &x, vector_t &res) {
         
@@ -65,8 +69,19 @@ public:
             
             res(i) = std::pow(x(i), 2);
         }
+        
+        // coordinate that is petturbed will need a different residual
+        // an arbitrary perturbation of the coordinate is included
+        res(perturb_idx) = std::pow(x(perturb_idx)-dp, 2.);
     }
+
     
+    inline void residual_sensitivity(vector_t &x, vector_t &dresdp) {
+
+        dresdp.setZero(n);
+        res(perturb_idx) = -2.*(x(perturb_idx)-dp);
+    }
+
     inline void jacobian(vector_t &x,
                          matrix_t &jac) {
 
@@ -76,6 +91,9 @@ public:
             
             jac(i, i) = 2.*x(i);
         }
+
+        // coordinate that is petturbed will need a different residual/jacobian
+        jac(perturb_idx, perturb_idx) = 2.*(x(perturb_idx)-dp);
     }
 
 protected:
@@ -86,7 +104,7 @@ protected:
 
 
 TEST_CASE("eigen_nonlinear_solver",
-          "[Algebra][Solvers][Nonlinear][Eigen]") {
+          "[Algebra][Solvers][Nonlinear][Eigen][Complex-Step]") {
 
 
     // data types for real-valued computation
@@ -100,19 +118,28 @@ TEST_CASE("eigen_nonlinear_solver",
     vector_t
     x     = vector_t::Random(f.n),
     x_ref = vector_t::Zero(f.n),
+    dres  = vector_t::Zero(f.n),
     dx    = vector_t::Zero(f.n),
     dx_cs = vector_t::Zero(f.n);
 
+    f.ref_solution(x_ref);
+    
     MAST::Solvers::EigenWrapper::NonlinearSolver<real_t, linear_solver_t, func_t>
     solver;
     solver.solve(f, x);
 
-    // data types for complex values computation
-    //using func_cs_t= MAST::Test::Solvers::Eigen::Function<complex_t>;
-    //f_type<complex_t> f_c;
-
+    // analytical sensitivity
+    
+    
     CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(x),
-               Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(x_ref)).margin(1.e-3));
+               Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(x_ref)).margin(1.e-2));
+
+    
+    // complex-step sensitivity
+    {
+        
+        
+    }
 }
 
 } // namespace EigenWrapper
