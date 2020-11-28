@@ -35,6 +35,9 @@ namespace Test {
 namespace Solvers {
 namespace EigenWrapper {
 
+inline void perturb(real_t    &dp) { dp = 2.5;}
+inline void perturb(complex_t &dp) { dp = complex_t(2.5, 1.e-12);}
+
 /*!
  * a quadratic n-dimensional function \f$ f(x_1, \ldots, x_n) = \sum_i x_i^2 \f$
  */
@@ -47,11 +50,14 @@ public:
     using vector_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using matrix_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     
-    uint_t n;           // total system size
-    uint_t perturb_idx; // index where the origin is perturbed
-    real_t dp;
+    uint_t   n;           // total system size
+    uint_t   perturb_idx; // index where the origin is perturbed
+    scalar_t dp;
 
-    Function(): n (10), perturb_idx(n/2), dp(2.5) { }
+    Function(): n (10), perturb_idx(n/2), dp(0.) {
+        
+        MAST::Test::Solvers::EigenWrapper::perturb(dp);
+    }
 
     virtual ~Function() { }
     
@@ -103,11 +109,30 @@ protected:
 
 
 
+template <typename FuncType>
+void xinit(FuncType                                 &f,
+           Eigen::Matrix<real_t, Eigen::Dynamic, 1> &x) {
+    
+    x = Eigen::Matrix<real_t, Eigen::Dynamic, 1>::Random(f.n);
+}
+
+
+
+template <typename FuncType>
+void xinit(FuncType                                 &f,
+           Eigen::Matrix<complex_t, Eigen::Dynamic, 1> &x) {
+    
+    x.setZero(f.n);
+    x.real() = Eigen::Matrix<real_t, Eigen::Dynamic, 1>::Random(f.n);
+}
+
+
 
 template <typename ScalarType>
 void
 solution(Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> &x,
-         Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> &x_ref) {
+         Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> &x_ref,
+         ScalarType &dp) {
     
     // data types for real-valued computation
     using func_t   = MAST::Test::Solvers::EigenWrapper::Function<ScalarType>;
@@ -121,15 +146,18 @@ solution(Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> &x,
     dres  = vector_t::Zero(f.n),
     dx    = vector_t::Zero(f.n),
     dx_cs = vector_t::Zero(f.n);
-    x     = vector_t::Random(f.n);
     
-    MAST::Solvers::EigenWrapper::NonlinearSolver<real_t, linear_solver_t, func_t>
+    MAST::Test::Solvers::EigenWrapper::xinit(f, x);
+    
+    MAST::Solvers::EigenWrapper::NonlinearSolver<ScalarType, linear_solver_t, func_t>
     solver;
     solver.rtol = 1.e-10;
     solver.tol  = 1.e-10;
     solver.solve(f, x);
 
     f.ref_solution(x_ref);
+    
+    dp = f.dp;
 }
 
 
@@ -171,9 +199,11 @@ TEST_CASE("eigen_nonlinear_solver",
     dx,
     x_ref,
     dx_ref;
-
+    real_t
+    dp;
+    
     // check the accuracy of solution
-    MAST::Test::Solvers::EigenWrapper::solution(x, x_ref);
+    MAST::Test::Solvers::EigenWrapper::solution(x, x_ref, dp);
     CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(x),
                Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(x_ref)).margin(1.e-3));
 
@@ -184,11 +214,19 @@ TEST_CASE("eigen_nonlinear_solver",
                Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(dx_ref)).margin(1.e-3));
 
 
-    Eigen::Matrix<real_t, Eigen::Dynamic, 1>
+    // complex-step sensitivity
+    Eigen::Matrix<complex_t, Eigen::Dynamic, 1>
     x_cs,
     x_ref_cs;
-    
-    // complex-step sensitivity
+    complex_t
+    dp_cs;
+
+    MAST::Test::Solvers::EigenWrapper::solution(x_cs, x_ref_cs, dp_cs);
+    dx = x_cs.imag()/imag(dp_cs);
+
+    CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(dx),
+               Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(dx_ref)).margin(1.e-3));
+
 }
 
 } // namespace EigenWrapper
