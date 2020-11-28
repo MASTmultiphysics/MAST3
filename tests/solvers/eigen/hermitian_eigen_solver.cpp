@@ -54,8 +54,8 @@ void setup_matrices (real_t                                                     
     B = matrix_t::Zero(n, n);
 
     Eigen::Matrix<ScalarType, 2, 2>
-    k_e = Eigen::Matrix<real_t, 2, 2>::Zero(),
-    m_e = Eigen::Matrix<real_t, 2, 2>::Zero();
+    k_e = Eigen::Matrix<ScalarType, 2, 2>::Zero(),
+    m_e = Eigen::Matrix<ScalarType, 2, 2>::Zero();
     
     k_e << 1, -1, -1, 1,
     m_e << 2./3., 1./3., 1./3., 2./3.;
@@ -115,7 +115,6 @@ TEST_CASE("eigen_hermitian_eigen_solver",
     matrix_t
     A,
     B,
-    eig_vec,
     Asens,
     Bsens;
     
@@ -144,6 +143,52 @@ TEST_CASE("eigen_hermitian_eigen_solver",
 
         CHECK(eig == Catch::Detail::Approx(eig_analytical).margin(1.e-1*eig_analytical));
     }
+    
+    ////////////////////////////////////////////////////////////
+    // Adol-C sensitivity of Eigen solver
+    ////////////////////////////////////////////////////////////
+#if MAST_ENABLE_ADOLC == 1
+    {
+        adouble_tl_t
+        EA_ad          = EA,
+        rhoA_ad        = rhoA,
+        eig_ad         = 0.;
+
+        using vector_ad_t = Eigen::Matrix<adouble_tl_t, Eigen::Dynamic, 1>;
+        using matrix_ad_t = Eigen::Matrix<adouble_tl_t, Eigen::Dynamic, Eigen::Dynamic>;
+        
+        matrix_ad_t
+        A_ad,
+        B_ad;
+
+        real_t
+        unit_sens = 1.;
+        
+        // tell the perturbation about its value and its sensitivity wrt the parameter,
+        // which is itself. Therefore, the latter value = 1.
+        EA_ad.setADValue(&unit_sens);
+        
+        setup_matrices<adouble_tl_t>(L,   EA_ad,    rhoA_ad,   A_ad,    B_ad);
+
+        Eigen::GeneralizedSelfAdjointEigenSolver<matrix_ad_t>
+        solver_ad(A_ad, B_ad, Eigen::ComputeEigenvectors|Eigen::Ax_lBx);
+
+        for (uint_t i=0; i<n_ev; i++) {
+            
+            // check the eigenvalues
+            eig            = solver_ad.eigenvalues()(i).getValue();
+            eig_analytical = EA/rhoA* pow((i+1)*pi/L, 2);
+            
+            CHECK(eig == Catch::Detail::Approx(eig_analytical).margin(1.e-1*eig_analytical));
+
+            // check sensitivity values
+            eig            = *solver_ad.eigenvalues()(i).getADValue();
+            eig_analytical = 1./rhoA* pow((i+1)*pi/L, 2);
+
+            CHECK(eig == Catch::Detail::Approx(eig_analytical).margin(1.e-1*eig_analytical));
+        }
+    }
+#endif
 }
 
 } // namespace EigenWrapper
