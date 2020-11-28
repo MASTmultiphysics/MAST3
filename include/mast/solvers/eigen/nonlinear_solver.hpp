@@ -26,6 +26,7 @@
 // MAST includes
 #include <mast/base/mast_data_types.h>
 #include <mast/base/exceptions.hpp>
+#include <mast/numerics/utility.hpp>
 
 // PETSc includes
 #include <petscmat.h>
@@ -105,7 +106,7 @@ public:
         uint_t
         iter = 0;
         
-        res0_l2 = res_l2 = res.norm();
+        res0_l2 = res_l2 = MAST::Numerics::Utility::real_norm(res);
         
         std::cout
         << " Iter: " << std::setw(5) << iter
@@ -118,7 +119,7 @@ public:
 
             dx    = LinearSolverType(jac).solve(res);
             
-            dx_l2 = dx.norm();
+            dx_l2 = MAST::Numerics::Utility::real_norm(dx);
 
             // output
             std::cout
@@ -136,7 +137,7 @@ public:
             func.residual(x, res);
             
             // check for convergence
-            res_l2 = res.norm();
+            res_l2 = MAST::Numerics::Utility::real_norm(res);
 
             std::cout
             << " Iter: " << std::setw(5) << iter
