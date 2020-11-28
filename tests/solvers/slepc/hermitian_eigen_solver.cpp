@@ -72,11 +72,18 @@ void setup_matrices (real_t L, real_t EA, real_t rhoA, Mat *A, Mat *B) {
             for (uint_t k=0; k<2; k++) {
                 
                 // first node of first element is not included
-                if ((i == 0 && j>0  && k>0 ) ||
-                    (i == n && j==0 && k==0)) {
-                    
-                    MatSetValue(*A, i+j-1, i+k-1, k_e(j,k), ADD_VALUES);
-                    MatSetValue(*B, i+j-1, i+k-1, m_e(j,k), ADD_VALUES);
+                if (i == 0) {
+                    if (j>0  && k>0) {
+                        MatSetValue(*A, i+j-1, i+k-1, k_e(j,k), ADD_VALUES);
+                        MatSetValue(*B, i+j-1, i+k-1, m_e(j,k), ADD_VALUES);
+                    }
+                }
+                // last node of last element is not included
+                else if (i == n) {
+                    if (j==0 && k==0) {
+                        MatSetValue(*A, i+j-1, i+k-1, k_e(j,k), ADD_VALUES);
+                        MatSetValue(*B, i+j-1, i+k-1, m_e(j,k), ADD_VALUES);
+                    }
                 }
                 else {
                     
