@@ -75,6 +75,7 @@ void setup_matrices (real_t                                                     
                         B(i+j-1, i+k-1) += m_e(j,k);
                     }
                 }
+                // last node of last element is not included
                 else if (i == n) {
                     if (j==0 && k==0) {
                         A(i+j-1, i+k-1) += k_e(j,k);
