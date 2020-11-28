@@ -63,7 +63,7 @@ public:
     
     inline void ref_solution_sens(vector_t &x) {x.setZero(n); x(perturb_idx) = 1.;}
 
-    inline void residual(vector_t &x, vector_t &res) {
+    inline void residual(const vector_t &x, vector_t &res) {
         
         res.setZero(n);
         
@@ -78,14 +78,13 @@ public:
     }
 
     
-    inline void residual_sensitivity(vector_t &x, vector_t &dresdp) {
+    inline void residual_sensitivity(const vector_t &x, vector_t &dresdp) {
 
         dresdp.setZero(n);
         dresdp(perturb_idx) = -2.*(x(perturb_idx)-dp);
     }
 
-    inline void jacobian(vector_t &x,
-                         matrix_t &jac) {
+    inline void jacobian(const vector_t &x, matrix_t &jac) {
 
         jac.setZero(n, n);
         
@@ -105,12 +104,13 @@ protected:
 
 
 
-TEST_CASE("eigen_nonlinear_solver",
-          "[Algebra][Solvers][Nonlinear][Eigen][Complex-Step]") {
-
-
+template <typename ScalarType>
+void
+solution(Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> &x,
+         Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> &x_ref) {
+    
     // data types for real-valued computation
-    using func_t   = MAST::Test::Solvers::EigenWrapper::Function<real_t>;
+    using func_t   = MAST::Test::Solvers::EigenWrapper::Function<ScalarType>;
     using vector_t = typename func_t::vector_t;
     using matrix_t = typename func_t::matrix_t;
     using linear_solver_t = typename Eigen::FullPivLU<matrix_t>;
@@ -118,23 +118,39 @@ TEST_CASE("eigen_nonlinear_solver",
     func_t f;
     
     vector_t
-    x     = vector_t::Random(f.n),
-    x_ref = vector_t::Zero(f.n),
     dres  = vector_t::Zero(f.n),
     dx    = vector_t::Zero(f.n),
     dx_cs = vector_t::Zero(f.n);
-
+    x     = vector_t::Random(f.n);
+    
     MAST::Solvers::EigenWrapper::NonlinearSolver<real_t, linear_solver_t, func_t>
     solver;
     solver.rtol = 1.e-10;
     solver.tol  = 1.e-10;
     solver.solve(f, x);
 
-    // check the accuracy of solution
     f.ref_solution(x_ref);
-    CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(x),
-               Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(x_ref)).margin(1.e-3));
+}
 
+
+
+
+template <typename ScalarType>
+void
+sensitivity(const Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> &x,
+            Eigen::Matrix<ScalarType, Eigen::Dynamic, 1>       &dx,
+            Eigen::Matrix<ScalarType, Eigen::Dynamic, 1>       &dx_ref) {
+    
+    // data types for real-valued computation
+    using func_t   = MAST::Test::Solvers::EigenWrapper::Function<ScalarType>;
+    using vector_t = typename func_t::vector_t;
+    using matrix_t = typename func_t::matrix_t;
+    using linear_solver_t = typename Eigen::FullPivLU<matrix_t>;
+
+    func_t f;
+    
+    vector_t
+    dres  = vector_t::Zero(f.n);
 
     // analytical sensitivity
     f.residual_sensitivity(x, dres);
@@ -142,16 +158,37 @@ TEST_CASE("eigen_nonlinear_solver",
     f.jacobian(x, jac);
     
     dx = -linear_solver_t(jac).solve(dres);
-    f.ref_solution_sens(x_ref);
-    CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(dx),
+    f.ref_solution_sens(dx_ref);
+}
+
+
+
+TEST_CASE("eigen_nonlinear_solver",
+          "[Algebra][Solvers][Nonlinear][Eigen][Complex-Step]") {
+
+    Eigen::Matrix<real_t, Eigen::Dynamic, 1>
+    x,
+    dx,
+    x_ref,
+    dx_ref;
+
+    // check the accuracy of solution
+    MAST::Test::Solvers::EigenWrapper::solution(x, x_ref);
+    CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(x),
                Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(x_ref)).margin(1.e-3));
 
+
+    // check the accuracy of solution sensitivity
+    MAST::Test::Solvers::EigenWrapper::sensitivity(x, dx, dx_ref);
+    CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(dx),
+               Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(dx_ref)).margin(1.e-3));
+
+
+    Eigen::Matrix<real_t, Eigen::Dynamic, 1>
+    x_cs,
+    x_ref_cs;
     
     // complex-step sensitivity
-    {
-        
-        
-    }
 }
 
 } // namespace EigenWrapper
