@@ -123,7 +123,7 @@ void xinit(FuncType                                 &f,
     x.real() = Eigen::Matrix<real_t, Eigen::Dynamic, 1>::Random(f.n);
 }
 
-
+#if MAST_ENABLE_ADOLC == 1
 template <typename FuncType>
 void xinit(FuncType                                       &f,
            Eigen::Matrix<adouble_tl_t, Eigen::Dynamic, 1> &x) {
@@ -134,7 +134,7 @@ void xinit(FuncType                                       &f,
 
     for (uint_t i=0; i<x.size(); i++) x(i) = x_rand(i);
 }
-
+#endif
 
 
 template <typename ScalarType>
