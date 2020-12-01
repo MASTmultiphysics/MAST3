@@ -73,6 +73,7 @@ real_norm(const VecType& v) {
 }
 
 
+#if MAST_ENABLE_ADOLC == 1
 template <typename VecType>
 inline typename
 std::enable_if<std::is_same<typename Eigen::internal::traits<VecType>::Scalar,
@@ -80,7 +81,7 @@ std::enable_if<std::is_same<typename Eigen::internal::traits<VecType>::Scalar,
 real_norm(const VecType& v) {
     return v.norm().getValue();
 }
-
+#endif
 
 template <typename ScalarType>
 inline void
