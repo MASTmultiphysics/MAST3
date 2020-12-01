@@ -28,7 +28,7 @@
 
 // libMesh includes
 #include <libmesh/libmesh.h>
-#include <timpi/communicator.h>
+#include <libmesh/parallel.h>
 
 extern libMesh::LibMeshInit *p_global_init;
 
