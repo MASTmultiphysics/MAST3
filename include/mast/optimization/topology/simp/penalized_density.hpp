@@ -75,4 +75,4 @@ private:
 } // namespace Optimization
 } // namespace MAST
 
-#endif  // __mast_simp_penalized_density_h__
+#endif  // __mast_simp_penalized_density_h__ 
