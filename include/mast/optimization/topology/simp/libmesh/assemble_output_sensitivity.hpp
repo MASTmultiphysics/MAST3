@@ -27,6 +27,7 @@
 #include <mast/base/assembly/libmesh/accessor.hpp>
 #include <mast/numerics/utility.hpp>
 #include <mast/optimization/design_parameter_vector.hpp>
+#include <mast/mesh/libmesh/utility.hpp>
 
 // libMesh includes
 #include <libmesh/nonlinear_implicit_system.h>
@@ -92,8 +93,9 @@ public:
                 dvs.size(), sens.size(),
                 "DV and sensitivity vectors must have same size");
            
-        const uint_t
-        n_density_dofs = c.rho_sys->n_dofs();
+        uint_t
+        n_density_dofs = c.rho_sys->n_dofs(),
+        n_nodes        = 0;
 
         MAST::Numerics::Utility::setZero(sens);
 
@@ -139,7 +141,9 @@ public:
             const std::vector<libMesh::dof_id_type>
             &density_dof_ids = density_accessor.dof_indices();
 
-            for (uint_t i=0; i<c.elem->n_nodes(); i++) {
+            n_nodes = MAST::Mesh::libMeshWrapper::Utility::n_linear_basis_nodes_on_elem(**el);
+            
+            for (uint_t i=0; i<n_nodes; i++) {
                 
                 if (!dvs.is_design_parameter_dof_id(density_dof_ids[i]))
                     continue;

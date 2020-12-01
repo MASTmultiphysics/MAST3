@@ -121,9 +121,6 @@ public:
         
         // for this class the number of basis functions should be equal to the number
         // of nodes
-        Assert2(c.n_nodes() == _fe_basis->n_basis(),
-                c.n_nodes(), _fe_basis->n_basis(),
-                "Number of shape functions assumed equal to number of nodes");
         Assert2(c.elem_dim() == ElemDim,
                 c.elem_dim(), ElemDim,
                 "Incorrect dimension of element.");
@@ -163,9 +160,6 @@ public:
         
         // for this class the number of basis functions should be equal to the number
         // of nodes
-        Assert2(c.n_nodes() == _fe_basis->n_basis(),
-                c.n_nodes(), _fe_basis->n_basis(),
-                "Number of shape functions assumed equal to number of nodes");
         Assert2(c.elem_dim() == ElemDim,
                 c.elem_dim(), ElemDim,
                 "Incorrect dimension of element.");

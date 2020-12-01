@@ -322,7 +322,7 @@ struct Panel2D {
         // if high order FE is used, libMesh requires atleast a second order
         // geometric element.
         //
-        if (c.fe_order > 1 && e_type == libMesh::QUAD4)
+        if (c.sol_fe_order > 1 && e_type == libMesh::QUAD4)
             e_type = libMesh::QUAD9;
         
         //
@@ -375,10 +375,13 @@ struct Panel2D {
         //
         // this assumes that density variable has a constant value per element
         //
-        Assert2(c.fe_family == libMesh::LAGRANGE,
-                c.fe_family, libMesh::LAGRANGE,
+        Assert2(c.rho_fe_family == libMesh::LAGRANGE,
+                c.rho_fe_family, libMesh::LAGRANGE,
                 "Method assumes Lagrange interpolation function for density");
-        
+        Assert2(c.rho_fe_order == libMesh::FIRST,
+                c.rho_fe_order, libMesh::FIRST,
+                "Method assumes Lagrange interpolation function for density");
+
         real_t
         vf            = c.input("volume_fraction", "upper limit for the volume fraction", 0.2);
         
@@ -401,7 +404,12 @@ struct Panel2D {
             
             const libMesh::Elem* e = *e_it;
             
-            for (uint_t i=0; i<e->n_nodes(); i++) {
+            Assert0(e->type() == libMesh::QUAD4 ||
+                    e->type() == libMesh::QUAD9,
+                    "Method requires Quad4/Quad9 element");
+            
+            // only the first four nodes of the quad element are used
+            for (uint_t i=0; i<4; i++) {
                 
                 const libMesh::Node& n = *e->node_ptr(i);
                 

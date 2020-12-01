@@ -24,6 +24,7 @@
 #include <mast/base/mast_data_types.h>
 #include <mast/base/exceptions.hpp>
 #include <mast/numerics/utility.hpp>
+#include <mast/mesh/libmesh/utility.hpp>
 
 // libMesh includes
 #include <libmesh/nonlinear_implicit_system.h>
@@ -53,8 +54,9 @@ public:
         volume = 0.,
         rho    = 0.;
         
-        const uint_t
-        sys_num = c.rho_sys->number();
+        uint_t
+        sys_num = c.rho_sys->number(),
+        n_nodes = 0;
         
         typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, VecType>
         density_accessor (*c.rho_sys, density);
@@ -70,7 +72,9 @@ public:
             // compute the average element density value
             rho = 0.;
             
-            for (uint_t i=0; i<e.n_nodes(); i++) {
+            n_nodes = MAST::Mesh::libMeshWrapper::Utility::n_linear_basis_nodes_on_elem(e);
+            
+            for (uint_t i=0; i<n_nodes; i++) {
                 
                 const libMesh::Node& n = *e.node_ptr(i);
                 
@@ -79,7 +83,7 @@ public:
                                              n.dof_number(sys_num, 0, 0));
             }
             
-            rho /= (1. * e.n_nodes());
+            rho /= (1. * n_nodes);
             
             // use this density value to compute the volume
             volume  +=  e.volume() * rho;
@@ -100,8 +104,9 @@ public:
         volume = 0.,
         rho    = 0.;
         
-        const uint_t
-        sys_num = c.rho_sys->number();
+        uint_t
+        sys_num = c.rho_sys->number(),
+        n_nodes = 0;
         
         typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, VecType>
         density_accessor (*c.rho_sys, density);
@@ -117,7 +122,9 @@ public:
             // compute the average element density value
             rho = 0.;
             
-            for (uint_t i=0; i<e.n_nodes(); i++) {
+            n_nodes = MAST::Mesh::libMeshWrapper::Utility::n_linear_basis_nodes_on_elem(e);
+            
+            for (uint_t i=0; i<n_nodes; i++) {
                 
                 const libMesh::Node& n = *e.node_ptr(i);
                 
@@ -125,7 +132,7 @@ public:
                                      (density, n.dof_number(sys_num, 0, 0)));
             }
             
-            rho /= (1. * e.n_nodes());
+            rho /= (1. * n_nodes);
             
             // use this density value to compute the volume
             volume  +=  e.volume() * rho;
@@ -152,8 +159,9 @@ public:
                 dvs.size(), sens.size(),
                 "DV and sensitivity vectors must have same size");
 
-        const uint_t
-        n_density_dofs = c.rho_sys->n_dofs();
+        uint_t
+        n_density_dofs = c.rho_sys->n_dofs(),
+        n_nodes        = 0;
 
         MAST::Numerics::Utility::setZero(sens);
         std::unique_ptr<VecType>
@@ -186,7 +194,9 @@ public:
             const std::vector<libMesh::dof_id_type>
             &density_dof_ids = density_accessor.dof_indices();
 
-            for (uint_t i=0; i<c.elem->n_nodes(); i++) {
+            n_nodes = MAST::Mesh::libMeshWrapper::Utility::n_linear_basis_nodes_on_elem(**el);
+            
+            for (uint_t i=0; i<n_nodes; i++) {
 
                 // each density coefficient shoudl appear only once
                 // for each element. So, if the dof was found for this
@@ -194,7 +204,7 @@ public:
                 // to be the averaged value
                 MAST::Numerics::Utility::add(*v,
                                              density_dof_ids[i],
-                                             e_vol/(1. * c.elem->n_nodes()));
+                                             e_vol/(1. * n_nodes));
             }
         }
         
@@ -233,9 +243,10 @@ public:
                 dvs.size(), sens.size(),
                 "DV and sensitivity vectors must have same size");
 
-        const uint_t
+        uint_t
         sys_num        = c.rho_sys->number(),
-        n_density_dofs = c.rho_sys->n_dofs();
+        n_density_dofs = c.rho_sys->n_dofs(),
+        n_nodes        = 0;
 
         MAST::Numerics::Utility::setZero(sens);
         
@@ -269,7 +280,9 @@ public:
             const std::vector<libMesh::dof_id_type>
             &density_dof_ids = density_accessor.dof_indices();
 
-            for (uint_t i=0; i<c.elem->n_nodes(); i++) {
+            n_nodes = MAST::Mesh::libMeshWrapper::Utility::n_linear_basis_nodes_on_elem(**el);
+            
+            for (uint_t i=0; i<n_nodes; i++) {
 
                 const libMesh::Node& n = *c.elem->node_ptr(i);
 
@@ -280,7 +293,7 @@ public:
                 MAST::Numerics::Utility::add
                 (*v,
                  density_dof_ids[i],
-                 e_vol/(1. * c.elem->n_nodes()) *
+                 e_vol/(1. * n_nodes) *
                  density_filter.filter_derivative(MAST::Numerics::Utility::get
                                                   (density, n.dof_number(sys_num, 0, 0)),
                                                   1.));

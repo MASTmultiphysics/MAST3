@@ -76,36 +76,38 @@ public:
 
     InitExample(libMesh::Parallel::Communicator &mpi_comm,
                 MAST::Utility::GetPotWrapper    &inp):
-    comm      (mpi_comm),
-    input     (inp),
-    model     (new ModelType),
-    q_type    (libMesh::QGAUSS),
-    q_order   (libMesh::SECOND),
-    fe_order  (libMesh::FIRST),
-    fe_family (libMesh::LAGRANGE),
-    mesh      (new libMesh::ReplicatedMesh(comm)),
-    eq_sys    (new libMesh::EquationSystems(*mesh)),
-    sys       (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("structural")),
-    rho_sys   (&eq_sys->add_system<libMesh::ExplicitSystem>("density")),
-    filter    (nullptr),
-    p_side_id (-1),
-    penalty   (0.) {
+    comm          (mpi_comm),
+    input         (inp),
+    model         (new ModelType),
+    q_type        (libMesh::QGAUSS),
+    q_order       (libMesh::SECOND),
+    sol_fe_order  (libMesh::FIRST),
+    sol_fe_family (libMesh::LAGRANGE),
+    rho_fe_order  (libMesh::FIRST),
+    rho_fe_family (libMesh::LAGRANGE),
+    mesh          (new libMesh::ReplicatedMesh(comm)),
+    eq_sys        (new libMesh::EquationSystems(*mesh)),
+    sys           (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("structural")),
+    rho_sys       (&eq_sys->add_system<libMesh::ExplicitSystem>("density")),
+    filter        (nullptr),
+    p_side_id     (-1),
+    penalty       (0.) {
         
         std::string
         t = input("q_order", "quadrature order", "second");
         q_order = libMesh::Utility::string_to_enum<libMesh::Order>(t);
 
         t = input("fe_order", "finite element interpolation order", "first");
-        fe_order = libMesh::Utility::string_to_enum<libMesh::Order>(t);
+        sol_fe_order = libMesh::Utility::string_to_enum<libMesh::Order>(t);
         
         model->init_analysis_mesh(*this, *mesh);
 
         // displacement variables for elasticity solution
-        sys->add_variable("u_x", libMesh::FEType(fe_order, fe_family));
-        sys->add_variable("u_y", libMesh::FEType(fe_order, fe_family));
+        sys->add_variable("u_x", libMesh::FEType(sol_fe_order, sol_fe_family));
+        sys->add_variable("u_y", libMesh::FEType(sol_fe_order, sol_fe_family));
         
         // density field
-        rho_sys->add_variable("rho", libMesh::FEType(fe_order, fe_family));
+        rho_sys->add_variable("rho", libMesh::FEType(sol_fe_order, sol_fe_family));
         
         model->init_analysis_dirichlet_conditions(*this);
         
@@ -136,8 +138,10 @@ public:
     ModelType                                   *model;
     libMesh::QuadratureType                      q_type;
     libMesh::Order                               q_order;
-    libMesh::Order                               fe_order;
-    libMesh::FEFamily                            fe_family;
+    libMesh::Order                               sol_fe_order;
+    libMesh::FEFamily                            sol_fe_family;
+    libMesh::Order                               rho_fe_order;
+    libMesh::FEFamily                            rho_fe_family;
     libMesh::ReplicatedMesh                     *mesh;
     libMesh::EquationSystems                    *eq_sys;
     libMesh::NonlinearImplicitSystem            *sys;
@@ -242,35 +246,36 @@ public:
     using matrix_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     
     ElemOps(context_t  &c):
-    heaviside       (nullptr),
-    density         (nullptr),
-    E               (nullptr),
-    dt              (nullptr),
-    nu              (nullptr),
-    alpha           (nullptr),
-    press           (nullptr),
-    area            (nullptr),
-    _fe_data        (nullptr),
-    _fe_side_data   (nullptr),
-    _fe_var         (nullptr),
-    _fe_side_var    (nullptr),
-    _density_fe_var (nullptr),
-    _density_field  (nullptr),
-    _prop           (nullptr),
-    _energy         (nullptr),
-    _temp_load      (nullptr),
-    _p_load         (nullptr) {
+    heaviside            (nullptr),
+    density              (nullptr),
+    E                    (nullptr),
+    dt                   (nullptr),
+    nu                   (nullptr),
+    alpha                (nullptr),
+    press                (nullptr),
+    area                 (nullptr),
+    _fe_data             (nullptr),
+    _fe_side_data        (nullptr),
+    _fe_var              (nullptr),
+    _fe_side_var         (nullptr),
+    _density_fe_var      (nullptr),
+    _density_sens_fe_var (nullptr),
+    _density_field       (nullptr),
+    _prop                (nullptr),
+    _energy              (nullptr),
+    _temp_load           (nullptr),
+    _p_load              (nullptr) {
         
         _fe_data       = new typename TraitsType::fe_data_t;
         _fe_data->init(c.ex_init.q_order,
                        c.ex_init.q_type,
-                       c.ex_init.fe_order,
-                       c.ex_init.fe_family);
+                       c.ex_init.sol_fe_order,
+                       c.ex_init.sol_fe_family);
         _fe_side_data  = new typename TraitsType::fe_side_data_t;
         _fe_side_data->init(c.ex_init.q_order,
                             c.ex_init.q_type,
-                            c.ex_init.fe_order,
-                            c.ex_init.fe_family);
+                            c.ex_init.sol_fe_order,
+                            c.ex_init.sol_fe_family);
         _fe_var        = new typename TraitsType::fe_var_t;
         _fe_side_var   = new typename TraitsType::fe_var_t;
         
@@ -354,7 +359,8 @@ public:
 
         delete _density_field;
         delete _density_fe_var;
-        
+        delete _density_sens_fe_var;
+
         delete _fe_var;
         delete _fe_side_var;
         delete _fe_side_data;

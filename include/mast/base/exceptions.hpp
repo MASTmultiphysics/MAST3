@@ -49,6 +49,7 @@ public:
         << "Condition Violated: "
         << _cond << std::endl
         << _val_msg << std::endl
+        << _msg << std::endl
         << _file << " : " << _line << std::endl;
         
         throw 1;
