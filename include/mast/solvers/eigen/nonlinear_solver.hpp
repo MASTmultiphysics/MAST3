@@ -17,8 +17,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef __mast_petsc_nonlinear_solver_h__
-#define __mast_petsc_nonlinear_solver_h__
+#ifndef __mast_eigen_nonlinear_solver_h__
+#define __mast_eigen_nonlinear_solver_h__
 
 // C++ includes
 #include <iomanip>
@@ -26,7 +26,7 @@
 // MAST includes
 #include <mast/base/mast_data_types.h>
 #include <mast/base/exceptions.hpp>
-#include <mast/solvers/petsc/linear_solver.hpp>
+#include <mast/numerics/utility.hpp>
 
 // PETSc includes
 #include <petscmat.h>
@@ -34,22 +34,33 @@
 
 namespace MAST {
 namespace Solvers {
-namespace PETScWrapper {
+namespace EigenWrapper {
 
-template <typename FuncType>
+template <typename ScalarType,
+          typename LinearSolverType,
+          typename FuncType>
 class NonlinearSolver {
   
 public:
     
+    using scalar_t = ScalarType;
+    using vector_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
+    using matrix_t = typename FuncType::matrix_t;
+
+    static_assert(std::is_same<ScalarType, typename FuncType::scalar_t>::value,
+                  "Scalar type of function and nonlinear solver must be same");
+    static_assert(std::is_same<vector_t, typename FuncType::vector_t>::value,
+                  "Vector type of function and nonlinear solver must be same");
+
+
     real_t tol;
     real_t rtol;
     uint_t max_iter;
     
-    NonlinearSolver(const MPI_Comm comm):
+    NonlinearSolver():
     tol      (1.e-6),
     rtol     (1.e-6),
     max_iter (20),
-    _comm    (comm),
     _func    (nullptr) {
         
     }
@@ -66,21 +77,23 @@ public:
      * Solves \f$ R(x) = 0 \f$ for solution \f$ x \f$. with \par x0 as the initial guess.
      */
     inline void solve(FuncType          &func,
-                      Vec                x,
-                      const std::string *scope = nullptr) {
+                      vector_t          &x) {
      
         
-        Vec res, x0, dx;
-        Mat *jac;
+        vector_t
+        res,
+        x0,
+        dx;
         
-        VecDuplicate(x, &res);
-        VecDuplicate(x,  &x0);
-        VecDuplicate(x,  &dx);
+        matrix_t
+        jac;
         
-        VecZeroEntries(res);
-
+        func.init_vector(res);
+        func.init_vector(x0);
+        func.init_vector(dx);
+        func.init_matrix(jac);
+        
         func.residual(x, res);
-        jac = func.matrix();
 
         bool
         if_cont = true;
@@ -93,8 +106,7 @@ public:
         uint_t
         iter = 0;
         
-        VecNorm(res, NORM_2, &res_l2);
-        res0_l2 = res_l2;
+        res0_l2 = res_l2 = MAST::Numerics::Utility::real_norm(res);
         
         std::cout
         << " Iter: " << std::setw(5) << iter
@@ -103,13 +115,11 @@ public:
         
         while (if_cont) {
             
-            func.jacobian(x, *jac);
+            func.jacobian(x, jac);
 
-            MAST::Solvers::PETScWrapper::LinearSolver solver(_comm);
-            solver.init(*jac, _nm.size()?&_nm:nullptr);
-            solver.solve(dx, res);
+            dx    = LinearSolverType(jac).solve(res);
             
-            VecNorm(dx, NORM_2, &dx_l2);
+            dx_l2 = MAST::Numerics::Utility::real_norm(dx);
 
             // output
             std::cout
@@ -117,17 +127,17 @@ public:
             << std::setw(15) << dx_l2 << std::endl;
 
             // x = x + dx
-            VecAXPY(x, -1., dx);
+            x -= dx;
 
             // copy solution to another vector
-            VecCopy(x, x0);
+            x0 = x;
             iter++;
 
             // new residual
             func.residual(x, res);
             
             // check for convergence
-            VecNorm(res, NORM_2, &res_l2);
+            res_l2 = MAST::Numerics::Utility::real_norm(res);
 
             std::cout
             << " Iter: " << std::setw(5) << iter
@@ -168,13 +178,12 @@ public:
     
 private:
 
-    const MPI_Comm   _comm;
     FuncType        *_func;
     std::string      _nm;
 };
 
-} // PETScWrapper
+} // EigenWrapper
 } // Solvers
 } // MAST
 
-#endif // __mast_petsc_nonlinear_solver_h__ 
+#endif // __mast_eigen_nonlinear_solver_h__

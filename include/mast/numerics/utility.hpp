@@ -55,6 +55,34 @@ inline void
 setZero(std::vector<ScalarType>& v) { std::fill(v.begin(), v.end(), ScalarType());}
 
 
+template <typename VecType>
+inline typename
+std::enable_if<std::is_same<typename Eigen::internal::traits<VecType>::Scalar,
+                            real_t>::value, real_t>::type
+real_norm(const VecType& v) {
+    return v.norm();
+}
+
+
+template <typename VecType>
+inline typename
+std::enable_if<std::is_same<typename Eigen::internal::traits<VecType>::Scalar,
+                            complex_t>::value, real_t>::type
+real_norm(const VecType& v) {
+    return v.norm();
+}
+
+
+#if MAST_ENABLE_ADOLC == 1
+template <typename VecType>
+inline typename
+std::enable_if<std::is_same<typename Eigen::internal::traits<VecType>::Scalar,
+                            adouble_tl_t>::value, real_t>::type
+real_norm(const VecType& v) {
+    return v.norm().getValue();
+}
+#endif
+
 template <typename ScalarType>
 inline void
 add(std::vector<ScalarType>& v, uint_t i, ScalarType s) {
