@@ -116,6 +116,87 @@ private:
     const ThicknessType* _th;
 };
 
+
+template <typename ScalarType,
+          typename DensityType,
+          typename ThicknessType,
+          typename ContextType>
+class PlateInertiaSectionProperty {
+public:
+    
+    using density_scalar_t   = typename DensityType::scalar_t;
+    using thickness_scalar_t = typename ThicknessType::scalar_t;
+    using scalar_t    = typename MAST::DeducedScalarType<typename MAST::DeducedScalarType<density_scalar_t, thickness_scalar_t>::type, ScalarType>::type;
+
+    PlateInertiaSectionProperty():
+    _density      (nullptr),
+    _th           (nullptr) { }
+    
+    virtual ~PlateInertiaSectionProperty() {}
+    
+    inline void set_density_and_thickness(const DensityType& density,
+                                          const ThicknessType& th) {
+        
+        _density   = &density;
+        _th        = &th;
+    }
+    
+    
+    inline const DensityType& get_density() const {return *_density;}
+    
+    
+    inline const ThicknessType& get_thickness() const {return *_th;}
+    
+    
+    inline void translation_inertia(ContextType  &c,
+                                    scalar_t     &m) const {
+
+        Assert0(_density && _th, "Material and thickness not provided");
+
+        m = _density->value(c) * _th->value(c);
+     }
+    
+    
+    template <typename ScalarFieldType>
+    inline void translation_inertia_derivative(ContextType           &c,
+                                               const ScalarFieldType &f,
+                                               scalar_t              &m) const {
+        
+        Assert0(_density && _th, "Material and thickness not provided");
+
+        m = (_density->value(c) * _th->derivative(c, f) +
+             _density->derivative(c, f) * _th->value(c));
+    }
+
+    inline void rotation_inertia(ContextType  &c,
+                                 scalar_t     &m) const {
+
+        Assert0(_density && _th, "Material and thickness not provided");
+
+        m = _density->value(c) * pow(_th->value(c), 3)/12.;
+     }
+    
+    
+    template <typename ScalarFieldType>
+    inline void rotation_inertia_derivative(ContextType           &c,
+                                            const ScalarFieldType &f,
+                                            scalar_t              &m) const {
+        
+        Assert0(_density && _th, "Material and thickness not provided");
+
+        m = (_density->derivative(c, f) * pow(_th->value(c), 3)/12. +
+             _density->value(c) * pow(_th->value(c), 2)/4. * _th->derivative(c, f));
+    }
+
+    
+    
+private:
+    
+    const DensityType    *_density;
+    const ThicknessType  *_th;
+};
+
+
 } // namespace Elasticity
 } // namespace Physics
 } // namespace MAST

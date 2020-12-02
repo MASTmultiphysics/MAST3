@@ -2,14 +2,25 @@ target_sources(mast_catch_tests
                PRIVATE
                ${CMAKE_CURRENT_LIST_DIR}/flat_shell_face_pressure_load_complex_step_sensitivity.cpp
                ${CMAKE_CURRENT_LIST_DIR}/isotropic_stiffness.cpp
+               ${CMAKE_CURRENT_LIST_DIR}/linear_continuum_acceleration.cpp
                ${CMAKE_CURRENT_LIST_DIR}/linear_strain_energy.cpp
                ${CMAKE_CURRENT_LIST_DIR}/linear_thermoelastic_load.cpp
                ${CMAKE_CURRENT_LIST_DIR}/mindlin_plate_strain_energy_complex_step_sensitivity.cpp
                ${CMAKE_CURRENT_LIST_DIR}/plate_bending_section_property_complex_step_sensitivity.cpp
+               ${CMAKE_CURRENT_LIST_DIR}/plate_linear_acceleration.cpp
                ${CMAKE_CURRENT_LIST_DIR}/pressure_load.cpp
                ${CMAKE_CURRENT_LIST_DIR}/stress_evaluation.cpp
                ${CMAKE_CURRENT_LIST_DIR}/traction_load.cpp
                ${CMAKE_CURRENT_LIST_DIR}/von_mises_stress_complex_step_sensitivity.cpp)
+
+#Linear continuum acceleration kernel
+add_test(NAME LinearContinuumAcceleration
+         COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "linear_continuum_acceleration")
+set_tests_properties(LinearContinuumAcceleration
+        PROPERTIES
+        LABELS "SEQ"
+        FIXTURES_SETUP     LinearContinuumAcceleration)
+
 
 #Linear elasticity kernel
 add_test(NAME LinearElasticStrainEnergy
@@ -71,6 +82,15 @@ set_tests_properties(PlateBendingSectionPropertyComplexStep
         PROPERTIES
         LABELS "SEQ"
         FIXTURES_SETUP     PlateBendingSectionPropertyComplexStep)
+
+
+#plate linear acceleration
+add_test(NAME PlateLinearAccelerationKernel
+         COMMAND $<TARGET_FILE:mast_catch_tests> -w NoTests "plate_linear_acceleration")
+set_tests_properties(PlateLinearAccelerationKernel
+        PROPERTIES
+        LABELS "SEQ"
+        FIXTURES_SETUP     PlateLinearAccelerationKernel)
 
 
 #Mindlin plate strain energy
