@@ -190,7 +190,7 @@ protected:
  * Template parameter:
  *    - \p FEVarType : Class that provides the interpolation and spatial derivative of solution at quadrature points.
  *    - \p TractionFieldType : Class that provides the flux value at quadrature point
- *    - \p SectionAreaType : Class that provides the section thickness for 2D elements and section area for 1D
+ *    - \p SectionAreaType : Class that provides the section thickness for 1D elements and section area for 2D
  *    elements at quadrature points.
  *    - \p Dim : Spatial dimension of the element.
  *    - \p ContextType : Class that provides the context object where member variable \p qp
