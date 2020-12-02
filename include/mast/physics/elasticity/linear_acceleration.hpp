@@ -65,7 +65,7 @@ displacement(const FEVarType&                                    fe_var,
 
 /*!
  * This class implements the discrete evaluation of the acceleration kernel defined as
- * \f[ - \int_{\Omega_e}  \phi \rho a \frac{\partial^t u}{\partial t^2} ~d\Gamma, \f]
+ * \f[ - \int_{\Omega_e}  \phi \rho a \frac{\partial^t u}{\partial t^2} ~d\Omega, \f]
  * where, \f$ \phi\f$ is the variation, \f$ \rho \f$ is the material density, and
  * \f$ a \f$ is the section thickness for 2D elements or section area.
  *
@@ -115,7 +115,7 @@ public:
 
     /*!
      * Computes the residual of variational term
-     * \f[ - \int_{\Omega_e}  \phi \rho a \frac{\partial^t u}{\partial t^2} ~d\Gamma, \f] and returns it
+     * \f[ - \int_{\Omega_e}  \phi \rho a \frac{\partial^t u}{\partial t^2} ~d\Omega, \f] and returns it
      *  in \p res. The Jacobian is returned in \p jac if it is a non-null pointer. Note that this method does
      *  not zero these two quantities and adds the contribution from this element to the
      *  vector and matrix provided in the function arguments.
@@ -171,7 +171,7 @@ public:
     /*!
      * Computes the derivative of residual of variational term with respect to parameter \f$ \alpha \f$
      *  \f[ - \int_{\Gamma_e} \phi \left( \frac{\partial a}{\partial \alpha}  t +
-     *                          \frac{\partial t}{\partial \alpha} a \right) \cdot \hat{n} ~d\Gamma, \f]
+     *                          \frac{\partial t}{\partial \alpha} a \right) \cdot \hat{n} ~d\Omega, \f]
      *  and returns it in \p res. The Jacobian and its derivative for this term is zero.
      *  Note that this method does not zero these two quantities and adds the contribution from this
      *  element to the vector and matrix provided in the function arguments.
