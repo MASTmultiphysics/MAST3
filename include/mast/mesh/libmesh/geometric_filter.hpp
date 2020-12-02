@@ -822,7 +822,9 @@ private:
         libMesh::MeshBase& mesh = _system.get_mesh();
         
         // currently implemented for replicated mesh
-        Assert0(mesh.is_replicated(), "Function implemented only for replicated mesh");
+        Assert0(mesh.is_replicated() ||
+                mesh.comm().size(),
+                "Function implemented only for replicated mesh or serial runs");
         
 
         // iterate over all nodes to compute the
