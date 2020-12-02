@@ -56,7 +56,7 @@ displacement(const FEVarType&                                    fe_var,
     
     
     // set the strain displacement relation
-    for (uint_t i=0; i<Dim; i++) {
+    for (uint_t i=0; i<3; i++) {
         Bmat.set_shape_function(i, i, fe.phi(qp));
         u(i) = fe_var.u(qp, i);
     }
@@ -108,7 +108,7 @@ public:
 
         Assert0(_fe_var_data, "FE data not initialized.");
 
-        return Dim*_fe_var_data->get_fe_shape_data().n_basis();
+        return 3*_fe_var_data->get_fe_shape_data().n_basis();
     }
 
     /*!
@@ -128,32 +128,35 @@ public:
         const typename FEVarType::fe_shape_deriv_t
         &fe = _fe_var_data->get_fe_shape_data();
 
-        typename Eigen::Matrix<scalar_t, Dim, 1>
+        const uint_t
+        n_basis = fe.n_basis();
+
+        typename Eigen::Matrix<scalar_t, 3, 1>
         u;
+
         vector_t
-        vec     = vector_t::Zero(Dim*fe.n_basis());
+        vec     = vector_t::Zero(3*n_basis);
 
         scalar_t
         w_factor     = 0.,
         theta_factor = 0.;
 
         matrix_t
-        mat1 = matrix_t::Zero(3, 3*fe.n_basis()),
-        mat2 = matrix_t::Zero(3*fe.n_basis(), 3*fe.n_basis());
+        mat = matrix_t::Zero(3*n_basis, 3*n_basis);
 
         MAST::Numerics::FEMOperatorMatrix<scalar_t>
         Bmat;
-        Bmat.reinit(Dim, Dim, fe.n_basis());
+        Bmat.reinit(3, 3, n_basis);
 
         for (uint_t i=0; i<fe.n_q_points(); i++) {
             
             c.qp       = i;
             
             _property->translation_inertia(c, w_factor);
-            _section->rotation_inertia(c, theta_factor);
+            _property->rotation_inertia(c, theta_factor);
             
-            MAST::Physics::Elasticity::LinearContinuum::displacement
-            <scalar_t, scalar_t, FEVarType, Dim>(*_fe_var_data, i, u, Bmat);
+            MAST::Physics::Elasticity::Plate::displacement
+            <scalar_t, scalar_t, FEVarType>(*_fe_var_data, i, u, Bmat);
 
             u(0) *= w_factor;
             u(1) *= theta_factor;
@@ -164,15 +167,13 @@ public:
             
             if (jac) {
                 
-                Bmat.left_multiply(mat1, mat);
-                
-                mat1.row(0) *= w_factor;
-                mat1.row(1) *= theta_factor;
-                mat1.row(2) *= theta_factor;
+                Bmat.right_multiply_transpose(mat, Bmat);
 
-                Bmat.right_multiply_transpose(mat2, mat1);
+                mat.topLeftCorner(n_basis, n_basis)           *= w_factor;
+                mat.block(n_basis, n_basis, n_basis, n_basis) *= theta_factor;
+                mat.bottomRightCorner(n_basis, n_basis)       *= theta_factor;
 
-                (*jac) += fe.detJxW(i) * mat2;
+                (*jac) += fe.detJxW(i) * mat;
             }
         }
     }
@@ -197,34 +198,35 @@ public:
         const typename FEVarType::fe_shape_deriv_t
         &fe = _fe_var_data->get_fe_shape_data();
 
-        typename Eigen::Matrix<scalar_t, Dim, 1>
+        const uint_t
+        n_basis = fe.n_basis();
+        
+        typename Eigen::Matrix<scalar_t, 3, 1>
         u;
+        
         vector_t
-        vec     = vector_t::Zero(Dim*fe.n_basis());
+        vec     = vector_t::Zero(3*n_basis);
 
         scalar_t
         dw_factor     = 0.,
         dtheta_factor = 0.;
 
         matrix_t
-        mat1 = matrix_t::Zero(3, 3*fe.n_basis()),
-        mat2 = matrix_t::Zero(3*fe.n_basis(), 3*fe.n_basis());
+        mat = matrix_t::Zero(3*n_basis, 3*n_basis);
 
         MAST::Numerics::FEMOperatorMatrix<scalar_t>
         Bmat;
-        Bmat.reinit(Dim, Dim, fe.n_basis());
+        Bmat.reinit(3, 3, n_basis);
 
         for (uint_t i=0; i<fe.n_q_points(); i++) {
             
             c.qp       = i;
             
-            _property->translation_inertia(c, w_factor);
             _property->translation_inertia_derivative(c, f, dw_factor);
-            _section->rotation_inertia(c, theta_factor);
-            _section->rotation_inertia_derivative(c, f, dtheta_factor);
+            _property->rotation_inertia_derivative(c, f, dtheta_factor);
             
-            MAST::Physics::Elasticity::LinearContinuum::displacement
-            <scalar_t, scalar_t, FEVarType, Dim>(*_fe_var_data, i, u, Bmat);
+            MAST::Physics::Elasticity::Plate::displacement
+            <scalar_t, scalar_t, FEVarType>(*_fe_var_data, i, u, Bmat);
             
             u(0) *= dw_factor;
             u(1) *= dtheta_factor;
@@ -235,15 +237,13 @@ public:
             
             if (jac) {
                 
-                Bmat.left_multiply(mat1, mat);
-                
-                mat1.row(0) *= dw_factor;
-                mat1.row(1) *= dtheta_factor;
-                mat1.row(2) *= dtheta_factor;
+                Bmat.right_multiply_transpose(mat, Bmat);
 
-                Bmat.right_multiply_transpose(mat2, mat1);
+                mat.topLeftCorner(n_basis, n_basis)           *= dw_factor;
+                mat.block(n_basis, n_basis, n_basis, n_basis) *= dtheta_factor;
+                mat.bottomRightCorner(n_basis, n_basis)       *= dtheta_factor;
 
-                (*jac) += fe.detJxW(i) * mat2;
+                (*jac) += fe.detJxW(i) * mat;
             }
         }
     }
