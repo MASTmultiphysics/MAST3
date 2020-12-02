@@ -23,6 +23,8 @@
 // MAST includes
 #include <mast/base/mast_data_types.h>
 #include <mast/base/exceptions.hpp>
+#include <mast/numerics/fem_operator_matrix.hpp>
+
 
 namespace MAST {
 namespace Physics {
@@ -38,7 +40,7 @@ inline void
 displacement(const FEVarType&                                    fe_var,
              const uint_t                                        qp,
              typename Eigen::Matrix<VarScalarType, Dim, 1>&      u,
-             MAST::Numerics::FEMOperatorMatrix<NodalScalarType>& Bmat) {
+             MAST::Numerics::FEMOperatorMatrix<NodalScalarType> &Bmat) {
     
     u.setZero();
     
@@ -92,7 +94,7 @@ public:
 
     LinearAcceleration():
     _section       (nullptr),
-    _traction      (nullptr),
+    _density       (nullptr),
     _fe_var_data   (nullptr)
     { }
     
@@ -150,7 +152,7 @@ public:
             c.qp       = i;
             
             _density->value(c, rho);
-            _sec->value(c, sec)
+            _section->value(c, sec);
             
             MAST::Physics::Elasticity::LinearContinuum::displacement
             <scalar_t, scalar_t, FEVarType, Dim>(*_fe_var_data, i, u, Bmat);
@@ -195,7 +197,7 @@ public:
         scalar_t
         rho  = 0.,
         drho = 0.,
-        sec  = 0.;
+        sec  = 0.,
         dsec = 0.;
 
         matrix_t
@@ -210,9 +212,9 @@ public:
             c.qp       = i;
             
             _density->value(c, rho);
-            _density->derivative(c, f, rho);
-            _sec->value(c, sec)
-            _sec->derivative(c, f, sec)
+            _density->derivative(c, f, drho);
+            _section->value(c, sec);
+            _section->derivative(c, f, dsec);
 
             MAST::Physics::Elasticity::LinearContinuum::displacement
             <scalar_t, scalar_t, FEVarType, Dim>(*_fe_var_data, i, u, Bmat);
