@@ -305,6 +305,8 @@ TEST_CASE("plate_linear_acceleration",
         
         CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(res),
                    Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(res_cs)));
+        CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(jac),
+                   Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(jac_cs)));
     }
 
     // residual sensitivity wrt th
@@ -321,6 +323,8 @@ TEST_CASE("plate_linear_acceleration",
         
         CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(res),
                    Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(res_cs)));
+        CHECK_THAT(MAST::Test::eigen_matrix_to_std_vector(jac),
+                   Catch::Approx(MAST::Test::eigen_matrix_to_std_vector(jac_cs)));
     }
 
     for (uint_t i=0; i<nodes.size(); i++)
