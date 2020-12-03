@@ -39,7 +39,9 @@ class HermitianEigenSolver {
     
 public:
     
-    HermitianEigenSolver(EPSProblemType type):
+    HermitianEigenSolver(MPI_Comm          comm,
+                         EPSProblemType    type):
+    _comm         (comm),
     _initialized  (false),
     _n            (0),
     _n_converged  (0),
@@ -115,7 +117,7 @@ public:
                       EPSWhich          spectrum,
                       bool              computeEigenvectors) {
         
-        Assert0(!_initialized, "solver not initialized");
+        Assert0(!_initialized, "solver already initialized");
 
         PetscInt
         m = 0,
@@ -138,7 +140,7 @@ public:
             Assert2(m==m2 && n==n2, m2, n2, "A and B must be same size");
         }
         
-        EPSCreate(PETSC_COMM_SELF, &_eps);
+        EPSCreate(_comm, &_eps);
         
         if (!B_mat) {
 
@@ -242,6 +244,7 @@ public:
 
 protected:
     
+    MPI_Comm          _comm;
     bool              _initialized;
     int               _n, _n_converged;
     EPSProblemType    _type;
