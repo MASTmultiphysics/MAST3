@@ -121,7 +121,8 @@ TEST_CASE("slepc_hermitian_interface",
     setup_matrices(L, EA, rhoA,     &A,     &B);
     setup_matrices(L, 1.,   0., &Asens, &Bsens);
 
-    MAST::Solvers::SLEPcWrapper::HermitianEigenSolver eig_solver(EPS_GHEP);
+    MAST::Solvers::SLEPcWrapper::HermitianEigenSolver
+    eig_solver(p_global_init->comm().get(), EPS_GHEP);
     
     eig_solver.solve(A, &B, n_ev, EPS_SMALLEST_REAL, true);
     
