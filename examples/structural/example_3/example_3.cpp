@@ -56,6 +56,7 @@ class Context {
 public:
     
     Context(libMesh::Parallel::Communicator& comm):
+    L         (10.),
     q_type    (libMesh::QGAUSS),
     q_order_b (libMesh::SECOND),
     q_order_s (libMesh::FIRST),
@@ -71,8 +72,8 @@ public:
 
         libMesh::MeshTools::Generation::build_square(*mesh,
                                                      20, 20,
-                                                     0.0, 10.0,
-                                                     0.0, 10.0,
+                                                     0.0, L,
+                                                     0.0, L,
                                                      libMesh::QUAD4);
 
         sys->add_variable("w", libMesh::FEType(fe_order, fe_family));
@@ -81,7 +82,7 @@ public:
 
         sys->get_dof_map().add_dirichlet_boundary
         (libMesh::DirichletBoundary({0, 1, 2, 3},
-                                    {0, 1, 2},
+                                    {0},
                                     libMesh::ZeroFunction<real_t>()));
         
         eq_sys->init();
@@ -103,6 +104,7 @@ public:
                                               elem->type() == libMesh::QUAD8 ||
                                               elem->type() == libMesh::QUAD9);}
 
+    real_t                            L;
     libMesh::QuadratureType           q_type;
     libMesh::Order                    q_order_b;
     libMesh::Order                    q_order_s;
@@ -200,7 +202,7 @@ public:
         E           = new typename TraitsType::modulus_t(72.e9);
         nu          = new typename TraitsType::nu_t(0.33);
         rho         = new typename TraitsType::nu_t(2.7e3);
-        thickness   = new typename TraitsType::thickness_t(3.0e-2);
+        thickness   = new typename TraitsType::thickness_t(3.0e-3);
         _material   = new typename TraitsType::material_t;
         _section_b  = new typename TraitsType::section_b_t;
         _section_in = new typename TraitsType::section_in_t;
@@ -296,7 +298,7 @@ public:
                            const ScalarFieldType                 &f,
                            const AccessorType                    &v,
                            typename TraitsType::element_matrix_t &A,
-                           typename TraitsType::element_vector_t &B) {
+                           typename TraitsType::element_matrix_t &B) {
         
         _fe_data_b->reinit(c);
         _fe_var_b->init(c, v);
@@ -306,8 +308,8 @@ public:
         typename TraitsType::element_vector_t
         res = TraitsType::element_vector_t::Zero(A.rows());
 
-        _energy->derivative(c, f, res, A);
-        _acc->derivative   (c, f, res, B);
+        _energy->derivative(c, f, res, &A);
+        _acc->derivative   (c, f, res, &B);
     }
 
     
@@ -352,20 +354,35 @@ int main(int argc, const char** argv) {
     e_ops(c.q_order_b, c.q_order_s, c.q_type, c.fe_order, c.fe_family);
 
     uint_t
-    n   = c.sys->get_dof_map().n_dofs();
+    n    = c.sys->get_dof_map().n_dofs(),
+    n_ev = 5;
+    
+    real_t
+    pi   = acos(-1),
+    E    = (*e_ops.E)(),
+    nu   = (*e_ops.nu)(),
+    th   = (*e_ops.thickness)(),
+    rho  = (*e_ops.rho)();
     
     MAST::Base::Assembly::libMeshWrapper::EigenProblemAssembly<real_t, elem_ops_t>
     assembly;
     typename traits_t::assembled_matrix_t
     A   = traits_t::assembled_matrix_t::Zero(n, n),
-    B   = traits_t::assembled_matrix_t::Zero(n, n);
+    B   = traits_t::assembled_matrix_t::Zero(n, n),
+    dA  = traits_t::assembled_matrix_t::Zero(n, n),
+    dB  = traits_t::assembled_matrix_t::Zero(n, n);
 
     typename traits_t::assembled_vector_t
-    sol = traits_t::assembled_vector_t::Zero(n);
+    sol = traits_t::assembled_vector_t::Zero(n),
+    vec = traits_t::assembled_vector_t::Zero(n);
     
     assembly.set_elem_ops(e_ops);
 
+    // assembly of matrices
     assembly.assemble(c, sol, A, B);
+    
+    // sensitivity analysis with respect to thickness
+    assembly.sensitivity_assemble(c, *e_ops.thickness, sol, dA, dB);
 
     // vector of unconstrained dofs
     std::vector<uint_t>
@@ -373,10 +390,6 @@ int main(int argc, const char** argv) {
     
     MAST::Numerics::libMeshWrapper::unconstrained_dofs(c.sys->get_dof_map(),
                                                        unconstrained_dofs);
-    
-    // prepare the vector for copying the eigenvector
-    typename traits_t::assembled_vector_t
-    vec = traits_t::assembled_vector_t::Zero(n);
     
     // compute the solution
     MAST::Solvers::EigenWrapper::ConstrainedGeneralizedHermitianEigenSolver
@@ -388,15 +401,36 @@ int main(int argc, const char** argv) {
     
     solver.solve(A, B, true);
     
+    std::vector<real_t>
+    eig            (n_ev, 0.),
+    eig_analytical (n_ev, 0.),
+    deig           (n_ev, 0.),
+    deig_analytical(n_ev, 0.);
+    
     // write solution as first time-step. The first 5 modes are written
     libMesh::ExodusII_IO writer(*c.mesh);
     for (uint_t j=0; j<5; j++) {
+
+        // get the numerical eigenvalue
+        eig[j] = solver.eig(j);
         
+        // the analytical eigenvalue of a simply supported Kirchoff plate
+        // with dimensions 10 x 10
+        //eig_analytical[j] = (E*pow(th,2)/12./(1.-pow(nu,2)) *
+        //                     (m * pi));
+        
+        // get the eigenvector from the solver.
         solver.getEigenVector(j, vec);
+
+        // compute the sensitivity
+        solver.sensitivity_solve(B, dA, dB, j);
+
+        // copy to libmesh::System::solution for output
         c.sys->solution->zero();
-        
         for (uint_t i=0; i<n; i++) c.sys->solution->set(i, vec(i));
-        
+        c.sys->solution->close();
+
+        // write mode to output file.
         writer.write_timestep("modes.exo", *c.eq_sys, j+1, j);
     }
 
