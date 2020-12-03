@@ -57,9 +57,9 @@ public:
     
     Context(libMesh::Parallel::Communicator& comm):
     q_type    (libMesh::QGAUSS),
-    q_order_b (libMesh::FOURTH),
-    q_order_s (libMesh::SECOND),
-    fe_order  (libMesh::SECOND),
+    q_order_b (libMesh::SECOND),
+    q_order_s (libMesh::FIRST),
+    fe_order  (libMesh::FIRST),
     fe_family (libMesh::LAGRANGE),
     mesh      (new libMesh::ReplicatedMesh(comm)),
     eq_sys    (new libMesh::EquationSystems(*mesh)),
@@ -70,17 +70,19 @@ public:
 
 
         libMesh::MeshTools::Generation::build_square(*mesh,
-                                                     5, 5,
+                                                     20, 20,
                                                      0.0, 10.0,
                                                      0.0, 10.0,
-                                                     libMesh::QUAD9);
+                                                     libMesh::QUAD4);
 
         sys->add_variable("w", libMesh::FEType(fe_order, fe_family));
         sys->add_variable("t_x", libMesh::FEType(fe_order, fe_family));
         sys->add_variable("t_y", libMesh::FEType(fe_order, fe_family));
 
         sys->get_dof_map().add_dirichlet_boundary
-        (libMesh::DirichletBoundary({3}, {0, 1, 2}, libMesh::ZeroFunction<real_t>()));
+        (libMesh::DirichletBoundary({0, 1, 2, 3},
+                                    {0, 1, 2},
+                                    libMesh::ZeroFunction<real_t>()));
         
         eq_sys->init();
 
@@ -391,9 +393,9 @@ int main(int argc, const char** argv) {
     for (uint_t j=0; j<5; j++) {
         
         solver.getEigenVector(j, vec);
+        c.sys->solution->zero();
         
-        for (uint_t i=0; i<unconstrained_dofs.size(); i++)
-        c.sys->solution->set(unconstrained_dofs[i], vec(i));
+        for (uint_t i=0; i<n; i++) c.sys->solution->set(i, vec(i));
         
         writer.write_timestep("modes.exo", *c.eq_sys, j+1, j);
     }
