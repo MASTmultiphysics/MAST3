@@ -140,12 +140,12 @@ public:
                                       uint_t       i) {
 
         VectorType
-        v1 = VectorType::Zeros(_n);
+        v1 = VectorType::Zero(_n);
         
-        this->get_eigenvector(i, v1);
+        this->getEigenVector(i, v1);
         
         scalar_t
-        eig   = this->get_eigenvalue(i);
+        eig   = this->eig(i);
 
         eig =
         v1.dot( (A_sens * v1) - (eig * B_sens * v1) )/ // numerator
