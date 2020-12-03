@@ -56,7 +56,7 @@ public:
     
     inline void set_elem_ops(ElemOpsType& e_ops) { _e_ops = &e_ops; }
 
-    template <typename MatType, typename ContextType>
+    template <typename VecType, typename MatType, typename ContextType>
     inline void assemble(ContextType   &c,
                          const VecType &X,
                          MatType       &A,
@@ -94,7 +94,7 @@ public:
             B_e.setZero(sol_accessor.n_dofs(), sol_accessor.n_dofs());
             
             // perform the element level calculations
-            _e_ops->compute(c, sol_accessor, A, B);
+            _e_ops->compute(c, sol_accessor, A_e, B_e);
                         
             // constrain the quantities to account for hanging dofs,
             // Dirichlet constraints, etc.
