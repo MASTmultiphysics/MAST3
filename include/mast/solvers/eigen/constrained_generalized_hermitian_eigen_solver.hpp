@@ -48,13 +48,10 @@ public:
     /*!
      * \p dofs is the vector of unconstrained degrees of freedom on the local rank.
      */
-    ConstrainedGeneralizedHermitianEigenSolver(const std::vector<PetscInt> &dofs):
+    ConstrainedGeneralizedHermitianEigenSolver(const std::vector<uint_t> &dofs):
     _dofs         (dofs),
     _initialized  (false),
-    _n            (0),
-    _type         (type),
-    _A_sub        (nullptr),
-    _B_sub        (nullptr) { }
+    _n            (0) { }
     
     virtual ~ConstrainedGeneralizedHermitianEigenSolver() { }
         
@@ -92,7 +89,7 @@ public:
         x.setZero();
         
         for (uint_t j=0; j<_dofs.size(); j++) {
-            x(_dofs(j)) = solver.eigenvectors().col(i)(j);
+            x(_dofs[j]) = _solver.eigenvectors().col(i)(j);
         }
     }
     
@@ -118,7 +115,7 @@ public:
         _n = A_mat.rows();
         
         // initialize the matrices
-        _init_sub_matrices(A_mat, B_mat);
+        _init_sub_matrices(A_mat, B_mat, _A_sub, _B_sub);
         
         // create the solver context
         if (computeEigenvectors)
@@ -142,8 +139,8 @@ public:
                                       MatType      &B_sens,
                                       uint_t       i) {
 
-        VecType
-        v1 = VecType::Zeros(_n);
+        VectorType
+        v1 = VectorType::Zeros(_n);
         
         this->get_eigenvector(i, v1);
         
@@ -173,14 +170,14 @@ protected:
         
         for (uint_t i=0; i<_dofs.size(); i++) {
             for (uint_t j=0; j<_dofs.size(); j++) {
-                A_sub(i, j) = A(_dofs[i], _dof[j]);
-                B_sub(i, j) = B(_dofs[i], _dof[j]);
+                A_sub(i, j) = A(_dofs[i], _dofs[j]);
+                B_sub(i, j) = B(_dofs[i], _dofs[j]);
             }
         }
     }
     
     
-    const std::vector<PetscInt>  &_dofs;
+    const std::vector<uint_t>    &_dofs;
     bool                          _initialized;
     int                           _n;
     MatType                       _A_sub;

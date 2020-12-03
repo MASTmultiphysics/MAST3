@@ -80,12 +80,12 @@ void setup_matrices (real_t                  L,
     m_e *= rhoA*h/2.;
     
     // 11 elements with constrained ends leaves 10 free nodes.
-    for (uint_t i=0; i<n; i++) {
+    for (uint_t i=0; i<n-1; i++) {
         for (uint_t j=0; j<2; j++) {
             for (uint_t k=0; k<2; k++) {
                 
-                MatSetValue(*A, i+j-1, i+k-1, k_e(j,k), ADD_VALUES);
-                MatSetValue(*B, i+j-1, i+k-1, m_e(j,k), ADD_VALUES);
+                MatSetValue(*A, i+j, i+k, k_e(j,k), ADD_VALUES);
+                MatSetValue(*B, i+j, i+k, m_e(j,k), ADD_VALUES);
             }
         }
     }
