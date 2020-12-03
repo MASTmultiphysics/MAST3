@@ -59,7 +59,7 @@ public:
         if (_initialized) {
             
             EPSDestroy(&_eps);
-            ISDestroy(&IS);
+            ISDestroy(&_dof_indices);
             MatDestroy(&_A_sub);
             if (_B_sub)
                 MatDestroy(&_B_sub);
@@ -285,7 +285,7 @@ protected:
         MatCreateSubMatrix(A_mat, _dof_indices, _dof_indices, MAT_INITIAL_MATRIX, &_A_sub);
         
         if (B_mat)
-            MatCreateSubMatrix(B_mat, _dof_indices, _dof_indices, MAT_INITIAL_MATRIX, &_B_sub);
+            MatCreateSubMatrix(*B_mat, _dof_indices, _dof_indices, MAT_INITIAL_MATRIX, &_B_sub);
     }
     
     
