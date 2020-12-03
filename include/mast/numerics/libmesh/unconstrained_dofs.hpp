@@ -48,15 +48,15 @@ void unconstrained_dofs(const libMesh::DofMap  &dof_map,
             local_non_condensed_dofs_set.insert(i);
     }
 
-    std::set<IntType>::const_iterator
-    it   = local_non_condensed_dofs.begin(),
-    end  = local_non_condensed_dofs.end();
+    typename std::set<IntType>::const_iterator
+    it   = local_non_condensed_dofs_set.begin(),
+    end  = local_non_condensed_dofs_set.end();
     
     dofs.clear();
-    dofs.reserve(local_non_condensed_dofs().size());
+    dofs.reserve(local_non_condensed_dofs_set.size());
     
     for ( ; it != end; it++)
-        dofs.push_back(dof);
+        dofs.push_back(*it);
 }
 
 } // namespace libMeshWrapper
