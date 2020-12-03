@@ -17,8 +17,8 @@
 * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#ifndef __mast_slepc_eigen_solver_h__
-#define __mast_slepc_eigen_solver_h__
+#ifndef __mast_slepc_hermitian_eigen_solver_h__
+#define __mast_slepc_hermitian_eigen_solver_h__
 
 // C++ includes
 #include <iomanip>
@@ -40,10 +40,10 @@ class HermitianEigenSolver {
 public:
     
     HermitianEigenSolver(EPSProblemType type):
-    _initialized(false),
-    _n(0),
-    _n_converged(0),
-    _type(type) { }
+    _initialized  (false),
+    _n            (0),
+    _n_converged  (0),
+    _type(type)   { }
     
     virtual ~HermitianEigenSolver() {
         
@@ -252,5 +252,5 @@ protected:
 }  // namespace Solvers
 }  // namespace MAST
 
-#endif // __mast__slepc_eigen_solver__ 
+#endif // __mast_slepc_hermitian_eigen_solver_h__
 
