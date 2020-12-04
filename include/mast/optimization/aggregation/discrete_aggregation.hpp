@@ -61,7 +61,7 @@ aggregate_minimum(const std::vector<ScalarType> &vec,
  * computes sensitivity of aggregated minimum of values specified in vector \p vec with respect to \p i th value.
  * The aggregation constant is \p p.
  * The aggregation expression used is
- * \f[ \frac{d v_{agg}}{d v_j} =  \frac{ \exp (-p (v_j - v_{min})) }{  \sum_i \exp (-p (v_i - v_{min})) }  \right) \f],
+ * \f[ \frac{d v_{agg}}{d v_j} =  \frac{ \exp (-p (v_j - v_{min})) }{  \sum_i \exp (-p (v_i - v_{min})) }  \f],
  * where, \f$ v_{min} \f$ is the minimum value out of all values in \p vec.
  */
 template <typename ScalarType>
@@ -93,7 +93,7 @@ aggregate_minimum_sensitivity(const std::vector<ScalarType> &vec,
  * parameter \f$ \alpha \f$.  The aggregation constant is \p p. The sensitivity of values with respect to parameter is
  * provided in \p dvec.
  * The sensitivity expression used is
- * \f[ \frac{d v_{agg}}{d p} =  \frac{ \sum_j \exp (-p (v_j - v_{min})) \frac{dv_j}{d\alpha} }{  \sum_i \exp (-p (v_i - v_{min})) }  \right) \f],
+ * \f[ \frac{d v_{agg}}{d p} =  \frac{ \sum_j \exp (-p (v_j - v_{min})) \frac{dv_j}{d\alpha} }{  \sum_i \exp (-p (v_i - v_{min})) }  \f],
  * where, \f$ v_{min} \f$ is the minimum value out of all values in \p vec.
  */
 template <typename ScalarType>
@@ -154,7 +154,7 @@ aggregate_maximum(const std::vector<ScalarType> &vec,
  * computes sensitivity of aggregated maximum of values specified in vector \p vec with respect to \p i th value.
  * The aggregation constant is \p p.
  * The aggregation expression used is
- * \f[ \frac{d v_{agg}}{d v_j} =  \frac{ \exp ( p (v_j - v_{max})) }{  \sum_i \exp ( p (v_i - v_{max})) }  \right) \f],
+ * \f[ \frac{d v_{agg}}{d v_j} =  \frac{ \exp ( p (v_j - v_{max})) }{  \sum_i \exp ( p (v_i - v_{max})) } \f],
  * where, \f$ v_{max} \f$ is the maximum value out of all values in \p vec.
  */
 template <typename ScalarType>
@@ -186,7 +186,7 @@ aggregate_maximum_sensitivity(const std::vector<ScalarType> &vec,
  * parameter \f$ \alpha \f$.  The aggregation constant is \p p. The sensitivity of values with respect to parameter is
  * provided in \p dvec.
  * The sensitivity expression used is
- * \f[ \frac{d v_{agg}}{d p} =  \frac{ \sum_j \exp ( p (v_j - v_{max})) \frac{dv_j}{d\alpha} }{  \sum_i \exp ( p (v_i - v_{max})) }  \right) \f],
+ * \f[ \frac{d v_{agg}}{d p} =  \frac{ \sum_j \exp ( p (v_j - v_{max})) \frac{dv_j}{d\alpha} }{  \sum_i \exp ( p (v_i - v_{max})) } \f],
  * where, \f$ v_{max} \f$ is the maximum value out of all values in \p vec.
  */
 template <typename ScalarType>
