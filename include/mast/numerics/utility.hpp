@@ -123,7 +123,7 @@ real_minimum(const std::vector<adouble_tl_t> &vec) {
     v   = vec[0];
 
     for (uint_t i=1; i<vec.size(); i++) {
-        if (vec[i].getValue() < v.getValue())
+        if (vec[i] < v)
             v = vec[i];
     }
     
@@ -172,7 +172,7 @@ real_maximum(const std::vector<adouble_tl_t> &vec) {
     v   = vec[0];
 
     for (uint_t i=1; i<vec.size(); i++) {
-        if (v.getValue() < vec[i].getValue())
+        if (v < vec[i])
             v = vec[i];
     }
     
