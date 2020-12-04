@@ -71,6 +71,8 @@ inline void test_von_mises_stress_sensitivity()  {
     
     {
         // the number of directions for which we compute the sensitivity is = n_strain
+        adtl::setNumDir(1);
+
         stress_vec_t<adouble_tl_t, Dim>
         stress_ad;
         

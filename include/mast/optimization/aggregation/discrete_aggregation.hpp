@@ -41,8 +41,8 @@ aggregate_minimum(const std::vector<ScalarType> &vec,
                   const real_t                   p) {
     
     ScalarType
-    v      = ScalarType(),
-    v_min  = ScalarType();
+    v      = 0.,
+    v_min  = 0.;
     
     v_min = MAST::Numerics::Utility::real_minimum(vec);
     
@@ -71,8 +71,8 @@ aggregate_minimum_sensitivity(const std::vector<ScalarType> &vec,
                               const real_t                   p) {
     
     ScalarType
-    v      = ScalarType(),
-    v_min  = ScalarType();
+    v      = 0.,
+    v_min  = 0.;
     
     v_min = MAST::Numerics::Utility::real_minimum(vec);
 
@@ -103,9 +103,9 @@ aggregate_minimum_sensitivity(const std::vector<ScalarType> &vec,
                               const real_t                   p) {
     
     ScalarType
-    dv     = ScalarType(),
-    v      = ScalarType(),
-    v_min  = ScalarType();
+    dv     = 0.,
+    v      = 0.,
+    v_min  = 0.;
     
     v_min = MAST::Numerics::Utility::real_minimum(vec);
 
@@ -134,8 +134,8 @@ aggregate_maximum(const std::vector<ScalarType> &vec,
                   const real_t                   p) {
     
     ScalarType
-    v      = ScalarType(),
-    v_max  = ScalarType();
+    v      = 0.,
+    v_max  = 0.;
 
     v_max = MAST::Numerics::Utility::real_maximum(vec);
 
@@ -164,8 +164,8 @@ aggregate_maximum_sensitivity(const std::vector<ScalarType> &vec,
                               const real_t                   p) {
     
     ScalarType
-    v      = ScalarType(),
-    v_max  = ScalarType();
+    v      = 0.,
+    v_max  = 0.;
     
     v_max = MAST::Numerics::Utility::real_maximum(vec);
 
@@ -196,9 +196,9 @@ aggregate_maximum_sensitivity(const std::vector<ScalarType> &vec,
                               const real_t                   p) {
     
     ScalarType
-    dv     = ScalarType(),
-    v      = ScalarType(),
-    v_max  = ScalarType();
+    dv     = 0.,
+    v      = 0.,
+    v_max  = 0.;
     
     v_max = MAST::Numerics::Utility::real_maximum(vec);
 
