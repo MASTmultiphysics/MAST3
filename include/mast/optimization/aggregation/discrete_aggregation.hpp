@@ -25,6 +25,7 @@
 
 // MAST includes
 #include <mast/base/mast_data_types.h>
+#include <mast/numerics/utility.hpp>
 
 
 namespace MAST {
@@ -33,13 +34,14 @@ namespace Aggregation {
 
 template <typename ScalarType>
 ScalarType
-aggregate_minimum(std::vector<ScalarType>& vec, const real_t p) {
+aggregate_minimum(const std::vector<ScalarType> &vec,
+                  const real_t                   p) {
     
     ScalarType
     v      = ScalarType(),
     v_min  = ScalarType();
     
-    v_min = *std::min_element(vec.begin(), vec.end());
+    v_min = MAST::Numerics::Utility::real_minimum(vec);
     
     for (uint_t i=0; i<vec.size(); i++) {
         
@@ -54,14 +56,66 @@ aggregate_minimum(std::vector<ScalarType>& vec, const real_t p) {
 
 template <typename ScalarType>
 ScalarType
-aggregate_maximum(std::vector<ScalarType>& vec, const real_t p) {
+aggregate_minimum_sensitivity(const std::vector<ScalarType> &vec,
+                              const uint_t                   i,
+                              const ScalarType              &dv_i,
+                              const real_t                   p) {
+    
+    ScalarType
+    v      = ScalarType(),
+    v_min  = ScalarType();
+    
+    v_min = MAST::Numerics::Utility::real_minimum(vec);
+
+    for (uint_t i=0; i<vec.size(); i++) {
+        
+        v  += exp(-p * (vec[i] - v_min));
+    }
+    
+    v = exp(-p * (vec[i] - v_min)) * dv_i / v;
+    
+    return v;
+}
+
+
+
+template <typename ScalarType>
+ScalarType
+aggregate_minimum_sensitivity(const std::vector<ScalarType> &vec,
+                              const std::vector<ScalarType> &dvec,
+                              const real_t                   p) {
+    
+    ScalarType
+    dv     = ScalarType(),
+    v      = ScalarType(),
+    v_min  = ScalarType();
+    
+    v_min = MAST::Numerics::Utility::real_minimum(vec);
+
+    for (uint_t i=0; i<vec.size(); i++) {
+        
+        dv += exp(-p * (vec[i] - v_min)) * dvec[i];
+        v  += exp(-p * (vec[i] - v_min));
+    }
+    
+    v = dv / v;
+    
+    return v;
+}
+
+
+
+template <typename ScalarType>
+ScalarType
+aggregate_maximum(const std::vector<ScalarType> &vec,
+                  const real_t                   p) {
     
     ScalarType
     v      = ScalarType(),
     v_max  = ScalarType();
 
-    v_max = *std::max_element(vec.begin(), vec.end());
-    
+    v_max = MAST::Numerics::Utility::real_maximum(vec);
+
     for (uint_t i=0; i<vec.size(); i++) {
         
         v += exp(p * (vec[i] - v_max));
@@ -73,8 +127,8 @@ aggregate_maximum(std::vector<ScalarType>& vec, const real_t p) {
 }
 
 
-}
-}
-}
+} // Aggregation
+} // Optimization
+} // MAST
 
 #endif // __mast_optimization_discrete_aggregation_h__
