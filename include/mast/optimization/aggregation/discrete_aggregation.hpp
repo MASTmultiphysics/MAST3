@@ -36,10 +36,10 @@ ScalarType
 aggregate_minimum(std::vector<ScalarType>& vec, const real_t p) {
     
     ScalarType
-    v(),
-    v_min();
+    v      = ScalarType(),
+    v_min  = ScalarType();
     
-    v_min = std::min_element(vec.begin(), vec.end());
+    v_min = *std::min_element(vec.begin(), vec.end());
     
     for (uint_t i=0; i<vec.size(); i++) {
         
@@ -57,10 +57,10 @@ ScalarType
 aggregate_maximum(std::vector<ScalarType>& vec, const real_t p) {
     
     ScalarType
-    v(),
-    v_max();
-    
-    v_max = std::max_element(vec.begin(), vec.end());
+    v      = ScalarType(),
+    v_max  = ScalarType();
+
+    v_max = *std::max_element(vec.begin(), vec.end());
     
     for (uint_t i=0; i<vec.size(); i++) {
         
