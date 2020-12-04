@@ -35,11 +35,8 @@ namespace Optimization {
 namespace Aggregation {
 
 
-
-
-TEST_CASE("discrete_aggregation",
-          "[Optimization][Aggregation]") {
-
+void run_checks(const real_t p, bool check_agg_min) {
+    
     uint_t
     n  = 10;
     
@@ -52,15 +49,18 @@ TEST_CASE("discrete_aggregation",
     dvec (dvals.data(), dvals.data()+n);
 
     real_t
-    p        = 100,
     min_val  = *std::min_element(vec.begin(), vec.end()),
     min_agg  = MAST::Optimization::Aggregation::aggregate_minimum(vec, p),
     dmin_val = MAST::Optimization::Aggregation::aggregate_minimum_sensitivity(vec, dvec, p),
     max_val  = *std::max_element(vec.begin(), vec.end()),
     max_agg  = MAST::Optimization::Aggregation::aggregate_maximum(vec, p);
 
-    CHECK(min_val == Catch::Detail::Approx(min_agg).margin(1.e-2));
-    CHECK(max_val == Catch::Detail::Approx(max_agg).margin(1.e-2));
+    // check aggregated minimum if asked
+    if (check_agg_min) {
+        
+        CHECK(min_val == Catch::Detail::Approx(min_agg).margin(1.e-2));
+        CHECK(max_val == Catch::Detail::Approx(max_agg).margin(1.e-2));
+    }
 
     // complex step sensitivity of each component
     std::vector<complex_t>
@@ -95,6 +95,17 @@ TEST_CASE("discrete_aggregation",
 
     // check aggregated sensitivity
     CHECK(dval_agg_min == Catch::Detail::Approx(dmin_val));
+}
+
+
+TEST_CASE("discrete_aggregation",
+          "[Optimization][Aggregation]") {
+
+    // check only sensitivity for low value of aggregation constant
+    run_checks(10, false);
+    
+    // check both aggregated value and sensitivity for high value of aggregation constant
+    run_checks(100, true);
 }
 
 } // namespace Aggregation
