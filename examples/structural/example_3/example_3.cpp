@@ -333,6 +333,46 @@ private:
     typename TraitsType::acc_t             *_acc;
 };
 
+inline void analytical_eigenvalues(real_t               Lx,
+                                   real_t               Ly,
+                                   real_t               E,
+                                   real_t               nu,
+                                   real_t               rho,
+                                   real_t               h,
+                                   uint_t               n_eig,
+                                   std::vector<real_t> &eig,
+                                   std::vector<real_t> *eig_sens) {
+    
+    real_t
+    pi   = acos(-1.);
+    
+    std::vector<real_t>
+    factor;
+
+    eig.reserve(n_eig*n_eig);
+    factor.reserve(n_eig*n_eig);
+    
+    for (uint_t m=1; m<=n_eig; m++)
+    for (uint_t n=1; n<=n_eig; n++) {
+        factor.push_back(pow(m*pi/Lx, 4) +
+                         pow(n*pi/Ly, 4) +
+                         2. * pow(m*pi/Lx, 2) * pow(n*pi/Ly, 2));
+    }
+    
+    std::sort(factor.begin(), factor.end());
+        
+    for (uint_t i=0; i<factor.size(); i++)
+    eig.push_back(factor[i] * E*h*h/rho/12./(1.-nu*nu));
+
+    // sensitivity with respect to thickness
+    if (eig_sens) {
+        eig_sens->reserve(n_eig*n_eig);
+        
+        for (uint_t i=0; i<factor.size(); i++)
+        eig_sens->push_back(factor[i]  * E*h/rho/6./(1.-nu*nu));
+    }
+}
+
 } // namespace Example3
 } // namespace Structural
 } // namespace Examples
@@ -359,10 +399,19 @@ int main(int argc, const char** argv) {
     
     real_t
     pi   = acos(-1),
+    L    = c.L,
     E    = (*e_ops.E)(),
     nu   = (*e_ops.nu)(),
     th   = (*e_ops.thickness)(),
-    rho  = (*e_ops.rho)();
+    rho  = (*e_ops.rho)(),
+    eig  = 0.,
+    deig = 0.;
+    
+    std::vector<real_t>
+    eig_vals,
+    eig_sens;
+    MAST::Examples::Structural::Example3::analytical_eigenvalues
+    (L, L, E, nu, rho, th, n_ev, eig_vals, &eig_sens);
     
     MAST::Base::Assembly::libMeshWrapper::EigenProblemAssembly<real_t, elem_ops_t>
     assembly;
@@ -401,31 +450,39 @@ int main(int argc, const char** argv) {
     
     solver.solve(A, B, true);
     
-    std::vector<real_t>
-    eig            (n_ev, 0.),
-    eig_analytical (n_ev, 0.),
-    deig           (n_ev, 0.),
-    deig_analytical(n_ev, 0.);
+    std::cout
+    << std::setw(5) << " "
+    << std::setw(30) << "          Eigenvalue          "
+    << std::setw(30) << "          Sensitivity         "
+    << std::endl
+    << std::setw(5) << "Id"
+    << std::setw(15) << "Analytical"
+    << std::setw(15) << "Numerical"
+    << std::setw(15) << "Analytical"
+    << std::setw(15) << "Numerical"
+    << std::endl;
     
     // write solution as first time-step. The first 5 modes are written
     libMesh::ExodusII_IO writer(*c.mesh);
-    for (uint_t j=0; j<5; j++) {
+    for (uint_t j=0; j<n_ev; j++) {
 
         // get the numerical eigenvalue
-        eig[j] = solver.eig(j);
-        
-        // the analytical eigenvalue of a simply supported Kirchoff plate
-        // with dimensions 10 x 10
-        //eig_analytical[j] = (E*pow(th,2)/12./(1.-pow(nu,2)) *
-        //                     (m * pi));
-        
-        // get the eigenvector from the solver.
-        solver.getEigenVector(j, vec);
+        eig  = solver.eig(j);
 
         // compute the sensitivity
-        solver.sensitivity_solve(B, dA, dB, j);
+        deig = solver.sensitivity_solve(B, dA, dB, j);
 
+        std::cout
+        << std::setw(5) << j
+        << std::setw(15) << eig_vals[j]
+        << std::setw(15) << eig
+        << std::setw(15) << eig_sens[j]
+        << std::setw(15) << deig
+        << std::endl;
+        
         // copy to libmesh::System::solution for output
+        // get the eigenvector from the solver.
+        solver.getEigenVector(j, vec);
         c.sys->solution->zero();
         for (uint_t i=0; i<n; i++) c.sys->solution->set(i, vec(i));
         c.sys->solution->close();
