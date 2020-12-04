@@ -83,6 +83,105 @@ real_norm(const VecType& v) {
 }
 #endif
 
+
+/*!
+ * computes minimum of vector
+ */
+inline real_t
+real_minimum(const std::vector<real_t> &vec) {
+    
+    return *std::min_element(vec.begin(), vec.end());
+}
+
+
+/*!
+ * computes minimum based on real-part of complex numbers
+ */
+inline complex_t
+real_minimum(const std::vector<complex_t> &vec) {
+    
+    complex_t
+    v   = vec[0];
+
+    for (uint_t i=1; i<vec.size(); i++) {
+        if (vec[i].real() < v.real())
+            v = vec[i];
+    }
+    
+    return v;
+}
+
+
+#if MAST_ENABLE_ADOLC == 1
+/*!
+ * computes minimum based on value of variables
+ */
+inline adouble_tl_t
+real_minimum(const std::vector<adouble_tl_t> &vec) {
+    
+    adouble_tl_t
+    v   = vec[0];
+
+    for (uint_t i=1; i<vec.size(); i++) {
+        if (vec[i].getValue() < v.getValue())
+            v = vec[i];
+    }
+    
+    return v;
+}
+#endif
+
+
+
+/*!
+ * computes maximum of vector
+ */
+inline real_t
+real_maximum(const std::vector<real_t> &vec) {
+    
+    return *std::max_element(vec.begin(), vec.end());
+}
+
+
+/*!
+ * computes maximum based on real-part of complex numbers
+ */
+inline complex_t
+real_maximum(const std::vector<complex_t> &vec) {
+    
+    complex_t
+    v   = vec[0];
+
+    for (uint_t i=1; i<vec.size(); i++) {
+        if (v.real() < vec[i].real())
+            v = vec[i];
+    }
+    
+    return v;
+}
+
+
+#if MAST_ENABLE_ADOLC == 1
+/*!
+ * computes maximum based on value of variables
+ */
+inline adouble_tl_t
+real_maximum(const std::vector<adouble_tl_t> &vec) {
+    
+    adouble_tl_t
+    v   = vec[0];
+
+    for (uint_t i=1; i<vec.size(); i++) {
+        if (v.getValue() < vec[i].getValue())
+            v = vec[i];
+    }
+    
+    return v;
+}
+#endif
+
+
+
 template <typename ScalarType>
 inline void
 add(std::vector<ScalarType>& v, uint_t i, ScalarType s) {
