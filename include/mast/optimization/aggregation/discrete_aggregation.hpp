@@ -127,6 +127,55 @@ aggregate_maximum(const std::vector<ScalarType> &vec,
 }
 
 
+template <typename ScalarType>
+ScalarType
+aggregate_maximum_sensitivity(const std::vector<ScalarType> &vec,
+                              const uint_t                   i,
+                              const ScalarType              &dv_i,
+                              const real_t                   p) {
+    
+    ScalarType
+    v      = ScalarType(),
+    v_max  = ScalarType();
+    
+    v_max = MAST::Numerics::Utility::real_maximum(vec);
+
+    for (uint_t i=0; i<vec.size(); i++) {
+        
+        v += exp(p * (vec[i] - v_max));
+    }
+    
+    v = exp(p * (vec[i] - v_max)) * dv_i / v;
+    
+    return v;
+}
+
+
+
+template <typename ScalarType>
+ScalarType
+aggregate_maximum_sensitivity(const std::vector<ScalarType> &vec,
+                              const std::vector<ScalarType> &dvec,
+                              const real_t                   p) {
+    
+    ScalarType
+    dv     = ScalarType(),
+    v      = ScalarType(),
+    v_max  = ScalarType();
+    
+    v_max = MAST::Numerics::Utility::real_maximum(vec);
+
+    for (uint_t i=0; i<vec.size(); i++) {
+        
+        dv += exp(p * (vec[i] - v_max)) * dvec[i];
+        v  += exp(p * (vec[i] - v_max));
+    }
+    
+    v = dv / v;
+    
+    return v;
+}
+
 } // Aggregation
 } // Optimization
 } // MAST
