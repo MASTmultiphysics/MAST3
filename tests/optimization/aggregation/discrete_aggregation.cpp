@@ -71,6 +71,7 @@ void run_checks(const real_t p, bool check_agg_min) {
     val;
 
     real_t
+    v            = 0.,
     dval         = 0.,
     dval_cs      = 0.,
     dval_agg_min = 0.,
@@ -114,6 +115,45 @@ void run_checks(const real_t p, bool check_agg_min) {
     // check aggregated sensitivity
     CHECK(dval_agg_min == Catch::Detail::Approx(dmin_val));
     CHECK(dval_agg_max == Catch::Detail::Approx(dmax_val));
+    
+#if MAST_ENABLE_ADOLC == 1
+    adtl::setNumDir(1);
+    
+    std::vector<adouble_tl_t>
+    vec_ad(n, 0.);
+    
+    for (uint_t i=0; i<n; i++) {
+        
+        for (uint_t j=0; j<n; j++) {
+            vec_ad[j] = vec[j];
+            vec_ad[j].setADValue(&dvec[j]);
+        }
+    }
+
+    //////////////////////////////////////////////////////////
+    // sensitivity of minimum aggregate
+    //////////////////////////////////////////////////////////
+    // analytical sensitivity wrt ith var
+    {
+        adouble_tl_t
+        val_ad = MAST::Optimization::Aggregation::aggregate_minimum(vec_ad, p);
+        
+        CHECK(val_ad.getValue() == Catch::Detail::Approx(min_agg));
+        CHECK(*val_ad.getADValue() == Catch::Detail::Approx(dmin_val));
+    }
+
+    //////////////////////////////////////////////////////////
+    // sensitivity of maximum aggregate
+    //////////////////////////////////////////////////////////
+    // analytical sensitivity wrt ith var
+    {
+        adouble_tl_t
+        val_ad = MAST::Optimization::Aggregation::aggregate_maximum(vec_ad, p);
+        
+        CHECK(val_ad.getValue() == Catch::Detail::Approx(max_agg));
+        CHECK(*val_ad.getADValue() == Catch::Detail::Approx(dmax_val));
+    }
+#endif
 }
 
 
