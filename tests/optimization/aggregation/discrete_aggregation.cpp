@@ -86,7 +86,7 @@ void run_checks(const real_t p, bool check_agg_min) {
         // sensitivity of minimum aggregate
         //////////////////////////////////////////////////////////
         // analytical sensitivity wrt ith var
-        dval = MAST::Optimization::Aggregation::aggregate_minimum_sensitivity(vec, i, 1., p);
+        dval = MAST::Optimization::Aggregation::aggregate_minimum_sensitivity(vec, i, p);
         
         // complex-step sensitivity wrt ith var
         val     = MAST::Optimization::Aggregation::aggregate_minimum(vec_cs, p);
@@ -100,7 +100,7 @@ void run_checks(const real_t p, bool check_agg_min) {
         // sensitivity of maximum aggregate
         //////////////////////////////////////////////////////////
         // analytical sensitivity wrt ith var
-        dval = MAST::Optimization::Aggregation::aggregate_maximum_sensitivity(vec, i, 1., p);
+        dval = MAST::Optimization::Aggregation::aggregate_maximum_sensitivity(vec, i, p);
         
         // complex-step sensitivity wrt ith var
         val     = MAST::Optimization::Aggregation::aggregate_maximum(vec_cs, p);
