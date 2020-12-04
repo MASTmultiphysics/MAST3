@@ -149,6 +149,8 @@ TEST_CASE("eigen_hermitian_eigen_solver",
     ////////////////////////////////////////////////////////////
 #if MAST_ENABLE_ADOLC == 1
     {
+        adtl::setNumDir(1);
+
         adouble_tl_t
         EA_ad          = EA,
         rhoA_ad        = rhoA,

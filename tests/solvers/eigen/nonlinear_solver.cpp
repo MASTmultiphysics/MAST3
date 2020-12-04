@@ -247,6 +247,8 @@ TEST_CASE("eigen_nonlinear_solver",
     ////////////////////////////////////////////////////////////
 #if MAST_ENABLE_ADOLC == 1
     {
+        adtl::setNumDir(1);
+
         Eigen::Matrix<adouble_tl_t, Eigen::Dynamic, 1>
         x_ad,
         x_ref_ad;

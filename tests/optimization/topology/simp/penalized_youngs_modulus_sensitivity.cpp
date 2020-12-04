@@ -102,6 +102,8 @@ inline void test_penalized_youngs_modulus_sensitivity()  {
 #if MAST_ENABLE_ADOLC == 1
     // automatic differentiation
     {
+        adtl::setNumDir(1);
+
         using density_ad_t = MAST::Optimization::Topology::SIMP::PenalizedDensity<adouble_tl_t, DensityField<adouble_tl_t>>;
         using youngs_mod_ad_t = MAST::Optimization::Topology::SIMP::PenalizedScalar<adouble_tl_t, density_ad_t>;
 

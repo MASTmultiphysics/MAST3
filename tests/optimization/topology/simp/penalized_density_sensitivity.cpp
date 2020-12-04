@@ -94,6 +94,8 @@ inline void test_penalized_density_sensitivity()  {
 #if MAST_ENABLE_ADOLC == 1
     // automatic differentiation
     {
+        adtl::setNumDir(1);
+
         DensityField<adouble_tl_t> field_ad;
         field_ad.v.setADValue(&field_ad.dv);
         
