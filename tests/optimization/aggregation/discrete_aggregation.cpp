@@ -53,7 +53,8 @@ void run_checks(const real_t p, bool check_agg_min) {
     min_agg  = MAST::Optimization::Aggregation::aggregate_minimum(vec, p),
     dmin_val = MAST::Optimization::Aggregation::aggregate_minimum_sensitivity(vec, dvec, p),
     max_val  = *std::max_element(vec.begin(), vec.end()),
-    max_agg  = MAST::Optimization::Aggregation::aggregate_maximum(vec, p);
+    max_agg  = MAST::Optimization::Aggregation::aggregate_maximum(vec, p),
+    dmax_val = MAST::Optimization::Aggregation::aggregate_maximum_sensitivity(vec, dvec, p);
 
     // check aggregated minimum if asked
     if (check_agg_min) {
@@ -81,7 +82,9 @@ void run_checks(const real_t p, bool check_agg_min) {
         for (uint_t j=0; j<n; j++) vec_cs[j] = vec[j];
         vec_cs[i] += complex_t(0., 1.e-12);
 
+        //////////////////////////////////////////////////////////
         // sensitivity of minimum aggregate
+        //////////////////////////////////////////////////////////
         // analytical sensitivity wrt ith var
         dval = MAST::Optimization::Aggregation::aggregate_minimum_sensitivity(vec, i, 1., p);
         
@@ -90,11 +93,27 @@ void run_checks(const real_t p, bool check_agg_min) {
         dval_cs = val.imag()/1.e-12;
         
         dval_agg_min += dval_cs * dvec[i];
+        
+        CHECK(dval_cs == Catch::Detail::Approx(dval));
+
+        //////////////////////////////////////////////////////////
+        // sensitivity of maximum aggregate
+        //////////////////////////////////////////////////////////
+        // analytical sensitivity wrt ith var
+        dval = MAST::Optimization::Aggregation::aggregate_maximum_sensitivity(vec, i, 1., p);
+        
+        // complex-step sensitivity wrt ith var
+        val     = MAST::Optimization::Aggregation::aggregate_maximum(vec_cs, p);
+        dval_cs = val.imag()/1.e-12;
+
+        dval_agg_max += dval_cs * dvec[i];
+        
         CHECK(dval_cs == Catch::Detail::Approx(dval));
     }
 
     // check aggregated sensitivity
     CHECK(dval_agg_min == Catch::Detail::Approx(dmin_val));
+    CHECK(dval_agg_max == Catch::Detail::Approx(dmax_val));
 }
 
 
