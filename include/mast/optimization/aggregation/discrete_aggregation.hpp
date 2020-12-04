@@ -20,9 +20,6 @@
 #ifndef __mast_optimization_discrete_aggregation_h__
 #define __mast_optimization_discrete_aggregation_h__
 
-// C++ includes
-#include <algorithm>
-
 // MAST includes
 #include <mast/base/mast_data_types.h>
 #include <mast/numerics/utility.hpp>
