@@ -21,7 +21,7 @@
 #include "catch.hpp"
 
 // MAST includes
-#include <mast/solvers/slepc/hermitian_eigen_solver.hpp>
+#include <mast/solvers/slepc/constrained_hermitian_eigen_solver.hpp>
 
 // Test includes
 #include <test_helpers.h>
@@ -37,13 +37,26 @@ namespace Test {
 namespace Solvers {
 namespace SLEPc {
 
-void setup_matrices (real_t L, real_t EA, real_t rhoA, Mat *A, Mat *B) {
+void setup_matrices (real_t                  L,
+                     real_t                  EA,
+                     real_t                  rhoA,
+                     Mat                    *A,
+                     Mat                    *B,
+                     std::vector<PetscInt>  *unconstrained_dofs) {
 
     // setup matrix for FEA of bar modal analysis
     
-    uint_t n = 100; // number of free nodes
-    real_t h = L/n;
+    uint_t n = 100; // number of nodes
+    real_t h = L/(n-1);
     
+    if (unconstrained_dofs) {
+
+        unconstrained_dofs->clear();
+        unconstrained_dofs->reserve(n-2);
+        for (PetscInt i=1; i<n-1; i++) {
+            unconstrained_dofs->push_back(i);
+        }
+    }
 
     MatCreate(p_global_init->comm().get(), A);
     MatCreate(p_global_init->comm().get(), B);
@@ -67,29 +80,12 @@ void setup_matrices (real_t L, real_t EA, real_t rhoA, Mat *A, Mat *B) {
     m_e *= rhoA*h/2.;
     
     // 11 elements with constrained ends leaves 10 free nodes.
-    for (uint_t i=0; i<=n; i++) {
+    for (uint_t i=0; i<n-1; i++) {
         for (uint_t j=0; j<2; j++) {
             for (uint_t k=0; k<2; k++) {
                 
-                // first node of first element is not included
-                if (i == 0) {
-                    if (j>0  && k>0) {
-                        MatSetValue(*A, i+j-1, i+k-1, k_e(j,k), ADD_VALUES);
-                        MatSetValue(*B, i+j-1, i+k-1, m_e(j,k), ADD_VALUES);
-                    }
-                }
-                // last node of last element is not included
-                else if (i == n) {
-                    if (j==0 && k==0) {
-                        MatSetValue(*A, i+j-1, i+k-1, k_e(j,k), ADD_VALUES);
-                        MatSetValue(*B, i+j-1, i+k-1, m_e(j,k), ADD_VALUES);
-                    }
-                }
-                else {
-                    
-                    MatSetValue(*A, i+j-1, i+k-1, k_e(j,k), ADD_VALUES);
-                    MatSetValue(*B, i+j-1, i+k-1, m_e(j,k), ADD_VALUES);
-                }
+                MatSetValue(*A, i+j, i+k, k_e(j,k), ADD_VALUES);
+                MatSetValue(*B, i+j, i+k, m_e(j,k), ADD_VALUES);
             }
         }
     }
@@ -102,7 +98,7 @@ void setup_matrices (real_t L, real_t EA, real_t rhoA, Mat *A, Mat *B) {
 
 
 
-TEST_CASE("slepc_hermitian_interface",
+TEST_CASE("slepc_constrained_hermitian_interface",
           "[Algebra][Solvers][SLEPc]") {
     
     uint_t
@@ -118,11 +114,16 @@ TEST_CASE("slepc_hermitian_interface",
     
     Mat A, B, Asens, Bsens;
     
-    setup_matrices(L, EA, rhoA,     &A,     &B);
-    setup_matrices(L, 1.,   0., &Asens, &Bsens);
+    std::vector<PetscInt>
+    unconstrained_dofs;
+    
+    setup_matrices(L, EA, rhoA,     &A,     &B,  &unconstrained_dofs);
+    setup_matrices(L, 1.,   0., &Asens, &Bsens,              nullptr);
 
-    MAST::Solvers::SLEPcWrapper::HermitianEigenSolver
-    eig_solver(p_global_init->comm().get(), EPS_GHEP);
+    MAST::Solvers::SLEPcWrapper::ConstrainedHermitianEigenSolver
+    eig_solver(p_global_init->comm().get(),
+               unconstrained_dofs,
+               EPS_GHEP);
     
     eig_solver.solve(A, &B, n_ev, EPS_SMALLEST_REAL, true);
     

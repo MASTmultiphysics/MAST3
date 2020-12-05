@@ -54,10 +54,22 @@ public:
         return _v;
     }
 
+    template <typename ContextType>
+    inline void value(ContextType& c, ScalarType& v) const {
+        v = _v;
+    }
+
     template <typename ContextType, typename ScalarFieldType>
     inline ScalarType derivative(ContextType& c,
                                  const ScalarFieldType& f) const {
         return &f==this?1.:0.;
+    }
+
+    template <typename ContextType, typename ScalarFieldType>
+    inline void derivative(ContextType           &c,
+                           const ScalarFieldType &f,
+                           ScalarType            &v) const {
+        v = &f==this?1.:0.;
     }
 
 private:

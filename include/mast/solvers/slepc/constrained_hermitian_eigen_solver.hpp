@@ -17,8 +17,8 @@
 * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#ifndef __mast_slepc_hermitian_eigen_solver_h__
-#define __mast_slepc_hermitian_eigen_solver_h__
+#ifndef __mast_slepc_constrained_hermitian_eigen_solver_h__
+#define __mast_slepc_constrained_hermitian_eigen_solver_h__
 
 // C++ includes
 #include <iomanip>
@@ -35,22 +35,35 @@ namespace MAST {
 namespace Solvers {
 namespace SLEPcWrapper {
 
-class HermitianEigenSolver {
+class ConstrainedHermitianEigenSolver {
     
 public:
     
-    HermitianEigenSolver(MPI_Comm          comm,
-                         EPSProblemType    type):
+    /*!
+     * \p dofs is the vector of unconstrained degrees of freedom on the local rank.
+     */
+    ConstrainedHermitianEigenSolver(MPI_Comm                     comm,
+                                    const std::vector<PetscInt> &dofs,
+                                    EPSProblemType               type):
     _comm         (comm),
+    _dofs         (dofs),
     _initialized  (false),
     _n            (0),
     _n_converged  (0),
-    _type(type)   { }
+    _type         (type),
+    _A_sub        (nullptr),
+    _B_sub        (nullptr) { }
     
-    virtual ~HermitianEigenSolver() {
+    virtual ~ConstrainedHermitianEigenSolver() {
         
-        if (_initialized)
+        if (_initialized) {
+            
             EPSDestroy(&_eps);
+            ISDestroy(&_dof_indices);
+            MatDestroy(&_A_sub);
+            if (_B_sub)
+                MatDestroy(&_B_sub);
+        }
     }
     
     /// @returns the number of converged eigen pairs
@@ -80,7 +93,12 @@ public:
     }
     
     
-    /// this method returns the eigen pair
+    /*!
+     * this method returns the eigen pair. The \p i th eigenvalue is returned in \p eig and the
+     * corresponding eigenvector of the origin problem size (including both constrained and
+     * unconstrained dofs) is returned in \p x.
+     * The index \p i must be less than the total number of converged eigenvalues.
+     */
     inline void getEigenPair(uint_t   i,
                              real_t  &eig,
                              Vec      x) {
@@ -93,18 +111,26 @@ public:
         
         VecZeroEntries(x);
 
-        Vec vi;
-        VecDuplicate(x, &vi);
-        
+        Vec vr, vi;
+        MatCreateVecs(_A_sub, &vr, PETSC_NULL);
+        MatCreateVecs(_A_sub, &vi, PETSC_NULL);
+
         eig = 0.;
         
         real_t
         im = 0.;
         
-        EPSGetEigenpair(_eps, i, &eig, &im, x, vi);
+        EPSGetEigenpair(_eps, i, &eig, &im, vr, vi);
+
+        // now copy the vector to the global vector x
+        PetscScalar *vals = nullptr;
+        VecGetArray(vr, &vals);
+        VecSetValues(x, _dofs.size(), _dofs.data(), vals, INSERT_VALUES);
+        VecRestoreArray(vr, &vals);
 
         // assuming that the imaginary componet of vector will be zero for
         // generalized Hermitian problem
+        VecDestroy(&vr);
         VecDestroy(&vi);
     }
     
@@ -118,7 +144,7 @@ public:
                       bool              computeEigenvectors) {
         
         Assert0(!_initialized, "solver already initialized");
-
+        
         PetscInt
         m = 0,
         n = 0;
@@ -139,19 +165,23 @@ public:
                     "Eigensolver type must be Generalized Hermitian");
             Assert2(m==m2 && n==n2, m2, n2, "A and B must be same size");
         }
+
+        // initialize the matrices
+        _init_sub_matrices(A_mat, B_mat);
         
+        // create the solver context
         EPSCreate(_comm, &_eps);
         
         if (!B_mat) {
 
-            EPSSetOperators(_eps, A_mat, PETSC_NULL);
+            EPSSetOperators(_eps, _A_sub, PETSC_NULL);
             EPSSetProblemType(_eps, _type);
 
             Assert0(_type == EPS_HEP || _type == EPS_NHEP, "Invalid EPS type");
         }
         else {
 
-            EPSSetOperators(_eps, A_mat, *B_mat);
+            EPSSetOperators(_eps, _A_sub, _B_sub);
             EPSSetProblemType(_eps, _type);
 
             Assert0(_type == EPS_GHEP || _type == EPS_GNHEP, "Invalid EPS type");
@@ -185,6 +215,8 @@ public:
      *  compute the sensitivity of \p i th eigenvalue
      *  \f[  \frac{d \lambda_i}{d p} = \frac{ x^T \left(\frac{\partial A}{\partial p} -
      *   \lambda_i \frac{\partial B}{\partial p}\right) x}{x_i^T B x_i } \f]
+     *   Dimension of the matrices \p B, \p A_sens and \p B_sens is equal to
+     *   the original problem including both the constrained and unconstrained degrees-of-freedom.
      */
     inline real_t sensitivity_solve(Mat          B,
                                     Mat          A_sens,
@@ -243,17 +275,42 @@ public:
     }
 
 protected:
+
+    inline void _init_sub_matrices(Mat               A_mat,
+                                   Mat              *B_mat) {
+        
+        Assert0(!_initialized, "solver already initialized");
+
+        ISCreateGeneral(_comm, _dofs.size(), _dofs.data(), PETSC_USE_POINTER, &_dof_indices);
+        MatCreateSubMatrix(A_mat, _dof_indices, _dof_indices,
+#if (PETSC_VERSION_MAJOR == 3) && (PETSC_VERSION_MINOR > 7)
+                           MAT_INITIAL_MATRIX,
+#endif
+                           &_A_sub);
+        
+        if (B_mat)
+            MatCreateSubMatrix(*B_mat, _dof_indices, _dof_indices,
+#if (PETSC_VERSION_MAJOR == 3) && (PETSC_VERSION_MINOR > 7)
+                               MAT_INITIAL_MATRIX,
+#endif
+                               &_B_sub);
+    }
     
-    MPI_Comm          _comm;
-    bool              _initialized;
-    int               _n, _n_converged;
-    EPSProblemType    _type;
-    EPS               _eps;
+    
+    MPI_Comm                      _comm;
+    const std::vector<PetscInt>  &_dofs;
+    bool                          _initialized;
+    int                           _n, _n_converged;
+    EPSProblemType                _type;
+    IS                            _dof_indices;
+    Mat                           _A_sub;
+    Mat                           _B_sub;
+    EPS                           _eps;
 };
 
 }  // namespace SLEPcWrapper
 }  // namespace Solvers
 }  // namespace MAST
 
-#endif // __mast_slepc_hermitian_eigen_solver_h__
+#endif // __mast_slepc_constrained_hermitian_eigen_solver_h__
 
