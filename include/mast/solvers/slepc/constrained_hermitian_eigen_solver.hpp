@@ -283,14 +283,14 @@ protected:
 
         ISCreateGeneral(_comm, _dofs.size(), _dofs.data(), PETSC_USE_POINTER, &_dof_indices);
         MatCreateSubMatrix(A_mat, _dof_indices, _dof_indices,
-#if !PETSC_VERSION_LESS_THAN(3,8,0)
+#if (PETSC_VERSION_MAJOR == 3) && (PETSC_VERSION_MINOR > 7)
                            MAT_INITIAL_MATRIX,
 #endif
                            &_A_sub);
         
         if (B_mat)
             MatCreateSubMatrix(*B_mat, _dof_indices, _dof_indices,
-#if !PETSC_VERSION_LESS_THAN(3,8,0)
+#if (PETSC_VERSION_MAJOR == 3) && (PETSC_VERSION_MINOR > 7)
                                MAT_INITIAL_MATRIX,
 #endif
                                &_B_sub);
