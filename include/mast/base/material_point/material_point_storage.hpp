@@ -27,9 +27,11 @@
 
 namespace MAST {
 namespace Base {
+namespace MaterialPoint {
+
 
 template <typename ScalarType, uint_t NComponents>
-class MaterialPointStorage {
+class Storage {
     
 public:
   
@@ -37,14 +39,14 @@ public:
     using view_t   = Eigen::Map<const typename Eigen::Matrix<scalar_t, NComponents, 1>>;
 
     
-    MaterialPointStorage(MPI_Comm comm):
+    Storage(MPI_Comm comm):
     _initialized  (false),
     _n_points     (0)
     _data         (nullptr),
     _comm         (comm)
     { }
     
-    virtual ~MaterialPointStorage() {
+    virtual ~Storage() {
 
         if (_data) delete _data;
     }
@@ -104,6 +106,7 @@ private:
     MPI_Comm     _comm;
 };
 
+}  // namespace MaterialPoint
 }  // namespace Base
 }  // namespace MAST
 
