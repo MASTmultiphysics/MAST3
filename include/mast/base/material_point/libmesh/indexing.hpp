@@ -42,15 +42,33 @@ class Indexing {
     
 public:
       
-    Indexing(const libMesh::Mesh &mesh, uint_t n_point_per_elem):
-    _mesh           (mesh),
-    _n_points       (n_point_per_elem),
+    Indexing():
+    _initialized    (false),
+    _mesh           (nullptr),
+    _n_points       (0),
     _begin_local_id (0),
     _end_local_id   (0) {
         
+    }
+    
+    virtual ~Indexing() { }
+
+    inline uint_t n_local_points() const {
+        
+        Assert0(_initialized, "Object must be initialized");
+        return _end_local_id - _begin_local_id;
+    }
+    
+    inline void init(const libMesh::MeshBase &mesh, uint_t n_points_per_elem) {
+        
+        Assert0(!_initialized, "Object already initialized");
+        
+        _mesh     = &mesh;
+        _n_points = n_points_per_elem;
+        
         libMesh::MeshBase::const_element_iterator
-        it   = _mesh.active_local_elements_begin(),
-        end  = _mesh.active_local_elements_end();
+        it   = mesh.active_local_elements_begin(),
+        end  = mesh.active_local_elements_end();
         
         for ( ; it != end; it++) {
             
@@ -59,28 +77,34 @@ public:
             _end_local_id  += n_points_per_elem;
         }
         
+        uint_t
+        comm_rank = mesh.comm().rank(),
+        comm_size = mesh.comm().size();
+        
+        
         std::vector<uint_t>
-        n_ids_on_rank(_comm.size());
+        n_ids_on_rank(comm_size);
         
         // number of points on this rank
-        n_ids_on_rank[_comm.rank()] = n_points_per_elem;
+        n_ids_on_rank[comm_rank] = _end_local_id;
         
-        _comm.sum(n_ids_on_rank);
+        mesh.comm().sum(n_ids_on_rank);
         
-        for (uint_t i=1; i<_comm.size(); i++)
+        for (uint_t i=1; i<comm_size; i++)
             n_ids_on_rank[i] += n_ids_on_rank[i-1];
         
-        if (_comm.rank() > 0)
-            _begin_local_id = n_ids_on_rank[i-1];
-        _end_local_id = n_ids_on_rank[i];
+        if (comm_rank > 0)
+            _begin_local_id = n_ids_on_rank[comm_rank-1];
+        _end_local_id = n_ids_on_rank[comm_rank];
+        
+        _initialized = true;
     }
-    
-    virtual ~Indexing() { }
 
     inline uint_t
     local_id_for_point_on_elem(const libMesh::Elem *e,
                                uint_t               i) const {
         
+        Assert0(_initialized, "Object must be initialized");
         Assert2(i < _n_points, i, _n_points,
                 "Index must be less than points per element");
         
@@ -102,9 +126,9 @@ public:
 
 private:
     
-    const libMesh::MeshBase                &_mesh;
+    bool                                    _initialized;
+    const libMesh::MeshBase                *_mesh;
     uint_t                                  _n_points;
-    MPI_Comm                                _comm;
     uint_t                                  _begin_local_id;
     uint_t                                  _end_local_id;
     std::map<const libMesh::Elem*, uint_t>  _elem_id_map;

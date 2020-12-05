@@ -19,17 +19,21 @@
 
 // MAST includes
 #include <mast/base/exceptions.hpp>
+#include <mast/base/scalar_constant.hpp>
+#include <mast/base/material_point/material_point_storage.hpp>
+#include <mast/base/material_point/libmesh/indexing.hpp>
 #include <mast/util/perf_log.hpp>
 #include <mast/fe/eval/fe_basis_derivatives.hpp>
 #include <mast/fe/libmesh/fe_data.hpp>
 #include <mast/fe/libmesh/fe_side_data.hpp>
 #include <mast/fe/fe_var_data.hpp>
 #include <mast/physics/elasticity/isotropic_stiffness.hpp>
-#include <mast/base/scalar_constant.hpp>
 #include <mast/physics/elasticity/linear_strain_energy.hpp>
 #include <mast/physics/elasticity/pressure_load.hpp>
+#include <mast/physics/elasticity/continuum_stress.hpp>
 #include <mast/base/assembly/libmesh/residual_and_jacobian.hpp>
 #include <mast/base/assembly/libmesh/residual_sensitivity.hpp>
+#include <mast/base/assembly/libmesh/stress_assembly.hpp>
 #include <mast/numerics/libmesh/sparse_matrix_initialization.hpp>
 
 // libMesh includes
@@ -56,6 +60,8 @@ class Context {
     
 public:
     
+    using mp_indexing_t = MAST::Base::MaterialPoint::libMeshWrapper::Indexing;
+
     Context(libMesh::Parallel::Communicator& comm):
     q_type    (libMesh::QGAUSS),
     q_order   (libMesh::FOURTH),
@@ -66,7 +72,8 @@ public:
     sys       (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("structural")),
     elem      (nullptr),
     qp        (-1),
-    p_side_id (1) {
+    p_side_id (1),
+    index     (nullptr) {
 
 
 
@@ -86,12 +93,15 @@ public:
 
         mesh->print_info(std::cout);
         eq_sys->print_info(std::cout);
+        
+        index = new mp_indexing_t;
     }
 
     virtual ~Context() {
         
         delete eq_sys;
         delete mesh;
+        delete index;
     }
     
     uint_t elem_dim() const {return elem->dim();}
@@ -100,8 +110,16 @@ public:
     inline bool elem_is_quad() const {return (elem->type() == libMesh::QUAD4 ||
                                               elem->type() == libMesh::QUAD8 ||
                                               elem->type() == libMesh::QUAD9);}
+    // since we use a mesh two-dimensional quad9 elements, the number of quadrature
+    // points per element can be a-priori determined.
+    inline uint_t n_qpoints_per_elem() const {
+        if (q_order == libMesh::SECOND) return 4;
+        else if (q_order == libMesh::FOURTH) return 9;
+        else Error(false, "Quadrature order not implemented");
+    }
     inline bool if_compute_pressure_load_on_side(const uint_t s)
     { return mesh->boundary_info->has_boundary_id(elem, s, p_side_id);}
+    inline void init_index() { index->init(*mesh, this->n_qpoints_per_elem());}
 
     libMesh::QuadratureType           q_type;
     libMesh::Order                    q_order;
@@ -113,6 +131,7 @@ public:
     const libMesh::Elem              *elem;
     uint_t                            qp;
     uint_t                            p_side_id;
+    mp_indexing_t                    *index;
 };
 
 
@@ -135,11 +154,14 @@ struct Traits {
     using area_t            = typename MAST::Base::ScalarConstant<SolScalarType>;
     using prop_t            = typename MAST::Physics::Elasticity::IsotropicMaterialStiffness<SolScalarType, Dim, modulus_t, nu_t, Context>;
     using energy_t          = typename MAST::Physics::Elasticity::LinearContinuum::StrainEnergy<fe_var_t, prop_t, Dim, Context>;
+    using stress_t          = typename MAST::Physics::Elasticity::LinearContinuum::Stress<fe_var_t, prop_t, Dim, Context>;
     using press_load_t      = typename MAST::Physics::Elasticity::SurfacePressureLoad<fe_var_t, press_t, area_t, Dim, Context>;
     using element_vector_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using element_matrix_t  = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>;
     using assembled_vector_t = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>;
     using assembled_matrix_t = Eigen::SparseMatrix<scalar_t>;
+    using mp_indexing_t      = MAST::Base::MaterialPoint::libMeshWrapper::Indexing;
+    using mp_storage_t       = MAST::Base::MaterialPoint::Storage<scalar_t, stress_t::n_strain>;
 };
 
 
@@ -168,7 +190,8 @@ public:
     _fe_side_var  (nullptr),
     _prop         (nullptr),
     _energy       (nullptr),
-    _p_load       (nullptr) {
+    _p_load       (nullptr),
+    _stress       (nullptr) {
         
         _fe_data       = new typename TraitsType::fe_data_t;
         _fe_data->init(q_order, q_type, fe_order, fe_family);
@@ -206,15 +229,19 @@ public:
         _p_load   = new typename TraitsType::press_load_t;
         _p_load->set_section_area(*area);
         _p_load->set_pressure(*press);
-        
+        _stress   = new typename TraitsType::stress_t;
+        _stress->set_section_property(*_prop);
+
         // tell physics kernels about the FE discretization information
         _energy->set_fe_var_data(*_fe_var);
         _p_load->set_fe_var_data(*_fe_side_var);
+        _stress->set_fe_var_data(*_fe_var);
     }
     
     virtual ~ElemOps() {
         
         delete _p_load;
+        delete _stress;
         delete area;
         delete press;
         delete _energy;
@@ -227,7 +254,7 @@ public:
         delete _fe_data;
     }
     
-
+    // this method computes the residual and Jacobian for an element
     template <typename ContextType, typename AccessorType>
     inline void compute(ContextType                       &c,
                         const AccessorType                &v,
@@ -248,6 +275,39 @@ public:
     }
 
     
+    // this method computes the stress at the material (quadrature) points in an element.
+    // The storage object \p storage stores the stress vector in Voigt representation.
+    // and \p index provides the mapping from element and quadrature point to the
+    // local/global index of the material point.
+    template <typename ContextType,
+              typename AccessorType,
+              typename IndexingType,
+              typename StorageType>
+    inline void compute(ContextType             &c,
+                        const AccessorType      &v,
+                        const IndexingType      &index,
+                        StorageType             &storage) {
+        
+        _fe_data->reinit(c);
+        _fe_var->init(c, v);
+        
+        uint_t
+        id = 0;
+        
+        for (uint_t i=0; i<_fe_var->n_q_points(); i++) {
+            
+            id = index.local_id_for_point_on_elem(c.elem, i);
+            typename StorageType::view_t
+            stress_qp = storage.data(id);
+            
+            _stress->compute(c, stress_qp);
+        }
+    }
+
+    
+    // this method computes the derivative of residual and Jacobian for an element
+    // with respect to the parameter \p f. This uses the hand-coded derivatives
+    // in the compute kernels that through the \p derivative() methods.
     template <typename ContextType, typename AccessorType, typename ScalarFieldType>
     inline void derivative(ContextType                       &c,
                            const ScalarFieldType             &f,
@@ -284,6 +344,7 @@ private:
     typename TraitsType::prop_t            *_prop;
     typename TraitsType::energy_t          *_energy;
     typename TraitsType::press_load_t      *_p_load;
+    typename TraitsType::stress_t          *_stress;
 };
 
 
@@ -332,6 +393,27 @@ compute_residual_sensitivity(Context                                        &c,
     dres = TraitsType::assembled_vector_t::Zero(c.sys->n_dofs());
     
     assembly.assemble(c, f, sol, &dres, jac);
+}
+
+
+template <typename TraitsType, typename IndexingType>
+inline void
+compute_stress(Context                                        &c,
+               ElemOps<TraitsType>                            &e_ops,
+               const typename TraitsType::assembled_vector_t  &sol,
+               const IndexingType                             &index,
+               typename TraitsType::mp_storage_t              &stress) {
+    
+    using scalar_t   = typename TraitsType::scalar_t;
+
+    MAST::Base::Assembly::libMeshWrapper::StressAssembly<scalar_t, ElemOps<TraitsType>>
+    assembly;
+    
+    assembly.set_elem_ops(e_ops);
+
+    stress.zero();
+    
+    assembly.assemble(c, sol, index, stress);
 }
 
 
@@ -430,11 +512,19 @@ int main(int argc, const char** argv) {
     sol,
     dsol;
 
+    typename traits_t::mp_storage_t
+    stress(c.mesh->comm().get());
+    
+    c.init_index();
+    stress.init(c.index->n_local_points());
+    
     typename traits_complex_t::assembled_vector_t
     sol_c;
 
     // compute the solution
     MAST::Examples::Structural::Example1::compute_sol<traits_t>(c, e_ops, sol);
+    MAST::Examples::Structural::Example1::compute_stress<traits_t>
+    (c, e_ops, sol, *c.index, stress);
     
     // write solution as first time-step
     libMesh::ExodusII_IO writer(*c.mesh);

@@ -24,6 +24,9 @@
 #include <mast/base/mast_data_types.h>
 #include <mast/base/exceptions.hpp>
 
+// MPI includes
+#include <mpi.h>
+
 
 namespace MAST {
 namespace Base {
@@ -36,12 +39,12 @@ class Storage {
 public:
   
     using scalar_t = ScalarType;
-    using view_t   = Eigen::Map<const typename Eigen::Matrix<scalar_t, NComponents, 1>>;
+    using view_t   = Eigen::Map<typename Eigen::Matrix<scalar_t, NComponents, 1>>;
 
     
     Storage(MPI_Comm comm):
     _initialized  (false),
-    _n_points     (0)
+    _n_points     (0),
     _data         (nullptr),
     _comm         (comm)
     { }
@@ -60,7 +63,7 @@ public:
         
         _n_points = n_points;
         
-        _data     = scalar_t[n_comp*NComponents];
+        _data     = new scalar_t[n_points*NComponents];
         
         _initialized = true;
         
@@ -92,6 +95,16 @@ public:
      * @returns a \p view_t object for the data on point \p pt
      */
     inline view_t data(uint_t pt) {
+        
+        Assert0(_initialized, "Object must be initialized");
+        return view_t(_data + NComponents*pt, NComponents, 1);
+    }
+
+    
+    /*!
+     * @returns a \p view_t object for the data on point \p pt
+     */
+    inline const view_t data(uint_t pt) const {
         
         Assert0(_initialized, "Object must be initialized");
         return view_t(_data + NComponents*pt, NComponents, 1);
