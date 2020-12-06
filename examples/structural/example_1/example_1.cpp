@@ -879,6 +879,8 @@ int main(int argc, const char** argv) {
         Eigen::Map<Eigen::Matrix<complex_t, Eigen::Dynamic, 1>>
         vm_stress_vec_cs(vm_stress_cs.data(), vm_stress_cs.size(), 1);
         
+        vm_stress_vec -= vm_stress_vec_cs.imag()/ComplexStepDelta;
+
         // print out the norm of the difference. The difference should be zero to machine
         // precision. This proceduce is followed for all the other parameters.
         std::cout
@@ -949,7 +951,9 @@ int main(int argc, const char** argv) {
         
         Eigen::Map<Eigen::Matrix<complex_t, Eigen::Dynamic, 1>>
         vm_stress_vec_cs(vm_stress_cs.data(), vm_stress_cs.size(), 1);
-        
+
+        vm_stress_vec -= vm_stress_vec_cs.imag()/ComplexStepDelta;
+
         // print out the norm of the difference. The difference should be zero to machine
         // precision. This proceduce is followed for all the other parameters.
         std::cout
@@ -1021,6 +1025,9 @@ int main(int argc, const char** argv) {
         Eigen::Map<Eigen::Matrix<complex_t, Eigen::Dynamic, 1>>
         vm_stress_vec_cs(vm_stress_cs.data(), vm_stress_cs.size(), 1);
         
+
+        vm_stress_vec -= vm_stress_vec_cs.imag()/ComplexStepDelta;
+
         // print out the norm of the difference. The difference should be zero to machine
         // precision. This proceduce is followed for all the other parameters.
         std::cout
@@ -1093,7 +1100,9 @@ int main(int argc, const char** argv) {
         
         Eigen::Map<Eigen::Matrix<complex_t, Eigen::Dynamic, 1>>
         vm_stress_vec_cs(vm_stress_cs.data(), vm_stress_cs.size(), 1);
-        
+
+        vm_stress_vec -= vm_stress_vec_cs.imag()/ComplexStepDelta;
+
         // print out the norm of the difference. The difference should be zero to machine
         // precision. This proceduce is followed for all the other parameters.
         std::cout
