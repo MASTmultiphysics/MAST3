@@ -45,7 +45,8 @@ public:
 
     Stress():
     _property      (nullptr),
-    _fe_var_data   (nullptr)
+    _fe_var_data   (nullptr),
+    _sens_fe_var_data   (nullptr)
     { }
 
 
@@ -58,11 +59,24 @@ public:
     }
 
     
+    /*!
+     * \p sens_fe_data provides the solution
+     */
     inline void set_fe_var_data(const FEVarType &fe_data) {
 
         Assert0(!_fe_var_data, "FE data already initialized.");
         _fe_var_data = &fe_data;
     }
+
+    /*!
+     * \p sens_fe_data provides the sensitivity of solution
+     */
+    inline void set_fe_var_sensitivity_data(const FEVarType &sens_fe_data) {
+
+        Assert0(!_sens_fe_var_data, "FE data already initialized.");
+        _sens_fe_var_data = &sens_fe_data;
+    }
+
     
     inline uint_t n_dofs() const {
 
@@ -118,6 +132,7 @@ public:
                            AccessorType           &dstress) const {
         
         Assert0(_fe_var_data, "FE data not initialized.");
+        Assert0(_sens_fe_var_data, "FE data not initialized.");
         Assert0(_property, "Section property not initialized");
 
         Assert2(dstress.size() == n_strain,
@@ -132,23 +147,30 @@ public:
                 "Invalid quadrature point index");
 
         typename Eigen::Matrix<scalar_t, n_strain, 1>
-        epsilon;
+        epsilon,
+        depsilon;
 
         typename MaterialPropertyType::value_t
+        m,
         dm;
 
         MAST::Numerics::FEMOperatorMatrix<nodal_scalar_t>
         Bmat;
         Bmat.reinit(n_strain, Dim, _fe_var_data->get_fe_shape_data().n_basis());
 
+        _property->value(c, m);
         _property->derivative(c, f, dm);
         
         MAST::Physics::Elasticity::LinearContinuum::strain
         <nodal_scalar_t, var_scalar_t, FEVarType, Dim>
         (*_fe_var_data, c.qp, epsilon, Bmat);
-        
+
+        MAST::Physics::Elasticity::LinearContinuum::strain
+        <nodal_scalar_t, var_scalar_t, FEVarType, Dim>
+        (*_sens_fe_var_data, c.qp, depsilon, Bmat);
+
         // set value for ith quadrature point
-        dstress = dm * epsilon;
+        dstress = dm * epsilon + m * depsilon;
     }
 
     
@@ -199,7 +221,8 @@ private:
     
     const MaterialPropertyType                           *_property;
     const FEVarType                                      *_fe_var_data;
-    
+    const FEVarType                                      *_sens_fe_var_data;
+
 };
 }  // namespace LinearContinuum
 }  // namespace Elasticity
