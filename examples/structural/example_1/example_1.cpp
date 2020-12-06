@@ -733,6 +733,151 @@ copy_stress_to_system(libMesh::System                  &sys,
     }
 }
 
+
+template <typename TraitsType,
+          typename ContextType,
+          typename ElemOpsType,
+          typename VecType,
+          typename IndexType,
+          typename StressStorageType,
+          typename vonMisesStressStorageType>
+inline void analysis(ContextType               &c,
+                     ElemOpsType               &e_ops,
+                     VecType                   &sol,
+                     IndexType                 &index,
+                     StressStorageType         &stress,
+                     vonMisesStressStorageType &vm_stress) {
+
+    // compute the solution
+    MAST::Examples::Structural::Example1::compute_sol<TraitsType>
+    (c, e_ops, sol);
+    
+    // compute the stresses from the solution
+    MAST::Examples::Structural::Example1::compute_stress<TraitsType>
+    (c, e_ops, sol, *c.index, stress);
+    
+    // compute the vonMises stress from the stresses
+    MAST::Examples::Structural::Example1::compute_vonMises_stress
+    (*c.stress_sys,
+     *c.index,
+     stress,
+     TraitsType::stress_t::n_strain,
+     c.n_qpoints_per_elem(),
+     vm_stress);
+}
+
+
+template <typename TraitsType,
+          typename ContextType,
+          typename ScalarFieldType,
+          typename ElemOpsType,
+          typename VecType,
+          typename IndexType,
+          typename StressStorageType,
+          typename vonMisesStressStorageType>
+inline void sensitivity(ContextType               &c,
+                        ScalarFieldType           &f,
+                        ElemOpsType               &e_ops,
+                        VecType                   &sol,
+                        VecType                   &dsol,
+                        IndexType                 &index,
+                        StressStorageType         &stress,
+                        StressStorageType         &dstress,
+                        vonMisesStressStorageType &dvm_stress) {
+
+    MAST::Examples::Structural::Example1::compute_sol_sensitivity<TraitsType>
+    (c, e_ops, f, sol, dsol);
+    
+    MAST::Examples::Structural::Example1::compute_stress_sensitivity<TraitsType>
+    (c, e_ops, f, sol, dsol, *c.index, dstress);
+    
+    // compute the vonMises stress from the stresses
+    MAST::Examples::Structural::Example1::compute_vonMises_stress_sensitivity
+    (*c.stress_sys,
+     *c.index,
+     stress,
+     dstress,
+     TraitsType::stress_t::n_strain,
+     c.n_qpoints_per_elem(),
+     dvm_stress);
+}
+
+
+template <typename TraitsType,
+          typename ContextType,
+          typename VecType,
+          typename IndexType,
+          typename StressStorageType,
+          typename vonMisesStressStorageType>
+inline void write_solution(ContextType               &c,
+                           VecType                   &sol,
+                           IndexType                 &index,
+                           StressStorageType         &stress,
+                           vonMisesStressStorageType &vm_stress,
+                           uint_t                     time) {
+ 
+    // copy the solution to system for plotting
+    MAST::Examples::Structural::Example1::copy_stress_to_system
+    (*c.stress_sys, *c.index, stress, vm_stress, TraitsType::stress_t::n_strain, c.n_qpoints_per_elem());
+    
+    // write solution as first time-step
+    libMesh::ExodusII_IO writer(*c.mesh);
+    {
+        for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, sol(i));
+        writer.write_timestep("solution.exo", *c.eq_sys, time, 1.*time);
+    }
+}
+
+
+
+template <typename VecType,
+          typename VecTypeCS,
+          typename StressStorageType,
+          typename StressStorageTypeCS,
+          typename vonMisesStressStorageType,
+          typename vonMisesStressStorageTypeCS>
+inline void print_difference(VecType                     &dsol,
+                             VecTypeCS                   &sol_cs,
+                             StressStorageType           &dstress,
+                             StressStorageTypeCS         &stress_cs,
+                             vonMisesStressStorageType   &dvm_stress,
+                             vonMisesStressStorageTypeCS &vm_stress_cs) {
+ 
+    // the complex-step sensitivity is obtained from the imaginary part of the solution.
+    // We compute the difference between the analytical sensitivity in \p dsol and
+    // the complex-step sensitivity.
+    dsol -= sol_cs.imag()/ComplexStepDelta;
+    
+    // compute difference in sensitivity of stress
+    Eigen::Map<Eigen::Matrix<real_t, Eigen::Dynamic, 1>>
+    dstress_vec(dstress.data(), dstress.size(), 1);
+    
+    Eigen::Map<Eigen::Matrix<complex_t, Eigen::Dynamic, 1>>
+    stress_vec_cs(stress_cs.data(), stress_cs.size(), 1);
+    
+    dstress_vec -= stress_vec_cs.imag()/ComplexStepDelta;
+    
+    // similarly, compute the difference between the analytical and complex-step
+    // sensitivity of vonMises stress
+    Eigen::Map<Eigen::Matrix<real_t, Eigen::Dynamic, 1>>
+    dvm_stress_vec(dvm_stress.data(), dvm_stress.size(), 1);
+    
+    Eigen::Map<Eigen::Matrix<complex_t, Eigen::Dynamic, 1>>
+    vm_stress_vec_cs(vm_stress_cs.data(), vm_stress_cs.size(), 1);
+    
+    dvm_stress_vec -= vm_stress_vec_cs.imag()/ComplexStepDelta;
+
+    // print out the norm of the difference. The difference should be zero to machine
+    // precision. This proceduce is followed for all the other parameters.
+    std::cout
+    << std::setw(20) << dsol.norm()
+    << std::setw(20) << dstress_vec.norm()
+    << std::setw(20) << dvm_stress_vec.norm()
+    << std::endl;
+}
+
+
+
 } // namespace Example1
 } // namespace Structural
 } // namespace Examples
@@ -783,27 +928,11 @@ int main(int argc, const char** argv) {
     typename traits_complex_t::assembled_vector_t
     sol_c;
 
-    // compute the solution
-    MAST::Examples::Structural::Example1::compute_sol<traits_t>(c, e_ops, sol);
+    MAST::Examples::Structural::Example1::analysis<traits_t>
+    (c, e_ops, sol, *c.index, stress, vm_stress);
     
-    // compute the stresses from the solution
-    MAST::Examples::Structural::Example1::compute_stress<traits_t>
-    (c, e_ops, sol, *c.index, stress);
-    
-    // compute the vonMises stress from the stresses
-    MAST::Examples::Structural::Example1::compute_vonMises_stress
-    (*c.stress_sys, *c.index, stress, traits_t::stress_t::n_strain, c.n_qpoints_per_elem(), vm_stress);
-
-    // copy the solution to system for plotting
-    MAST::Examples::Structural::Example1::copy_stress_to_system
-    (*c.stress_sys, *c.index, stress, vm_stress, traits_t::stress_t::n_strain, c.n_qpoints_per_elem());
-    
-    // write solution as first time-step
-    libMesh::ExodusII_IO writer(*c.mesh);
-    {
-        for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, sol(i));
-        writer.write_timestep("solution.exo", *c.eq_sys, 1, 1.);
-    }
+    MAST::Examples::Structural::Example1::write_solution<traits_t>
+    (c, sol, *c.index, stress, vm_stress, 1);
 
     // print the header for the table
     std::cout
@@ -820,74 +949,24 @@ int main(int argc, const char** argv) {
     {
         // add a complex perturbation to the modulus-of-elasticity
         (*e_ops_c.E)() += complex_t(0., ComplexStepDelta);
-        
-        // compute the solution with the complex-perturbation
-        MAST::Examples::Structural::Example1::compute_sol<traits_complex_t>(c, e_ops_c, sol_c);
-        
-        // compute the stresses from the solution
-        MAST::Examples::Structural::Example1::compute_stress<traits_complex_t>
-        (c, e_ops_c, sol_c, *c.index, stress_cs);
-        
-        // compute the vonMises stress from the stresses
-        MAST::Examples::Structural::Example1::compute_vonMises_stress
-        (*c.stress_sys, *c.index, stress_cs, traits_complex_t::stress_t::n_strain,
-         c.n_qpoints_per_elem(), vm_stress_cs);
+
+        MAST::Examples::Structural::Example1::analysis<traits_complex_t>
+        (c, e_ops_c, sol_c, *c.index, stress_cs, vm_stress_cs);
         
         // remove the complex perturbation
         (*e_ops_c.E)() -= complex_t(0., ComplexStepDelta);
         
-        MAST::Examples::Structural::Example1::compute_sol_sensitivity<traits_t>
-        (c, e_ops, *e_ops.E, sol, dsol);
+        // sensitivity of solution and stress
+        MAST::Examples::Structural::Example1::sensitivity<traits_t>
+        (c, *e_ops.E, e_ops, sol, dsol, *c.index, stress, dstress, dvm_stress);
         
-        // compute the sensitivity stresses from the solution
-        MAST::Examples::Structural::Example1::compute_stress_sensitivity<traits_t>
-        (c, e_ops, *e_ops.E, sol, dsol, *c.index, dstress);
-        
-        // compute the vonMises stress from the stresses
-        MAST::Examples::Structural::Example1::compute_vonMises_stress_sensitivity
-        (*c.stress_sys, *c.index, stress, dstress, traits_t::stress_t::n_strain, c.n_qpoints_per_elem(), dvm_stress);
-        
-        // copy the sensitivity of stress to system for plotting
-        MAST::Examples::Structural::Example1::copy_stress_to_system
-        (*c.stress_sys, *c.index, dstress, dvm_stress, traits_t::stress_t::n_strain, c.n_qpoints_per_elem());
-        
-        // write solution as first time-step
-        {
-            for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
-            writer.write_timestep("solution.exo", *c.eq_sys, 2, 2.);
-        }
-        
-        // the complex-step sensitivity is obtained from the imaginary part of the solution.
-        // We compute the difference between the analytical sensitivity in \p dsol and
-        // the complex-step sensitivity.
-        dsol -= sol_c.imag()/ComplexStepDelta;
-        
-        // compute difference in sensitivity of stress
-        Eigen::Map<Eigen::Matrix<real_t, Eigen::Dynamic, 1>>
-        stress_vec(stress.data(), stress.size(), 1);
-        
-        Eigen::Map<Eigen::Matrix<complex_t, Eigen::Dynamic, 1>>
-        stress_vec_cs(stress_cs.data(), stress_cs.size(), 1);
-        
-        stress_vec -= stress_vec_cs.imag()/ComplexStepDelta;
-        
-        // similarly, compute the difference between the analytical and complex-step
-        // sensitivity of vonMises stress
-        Eigen::Map<Eigen::Matrix<real_t, Eigen::Dynamic, 1>>
-        vm_stress_vec(vm_stress.data(), vm_stress.size(), 1);
-        
-        Eigen::Map<Eigen::Matrix<complex_t, Eigen::Dynamic, 1>>
-        vm_stress_vec_cs(vm_stress_cs.data(), vm_stress_cs.size(), 1);
-        
-        vm_stress_vec -= vm_stress_vec_cs.imag()/ComplexStepDelta;
+        MAST::Examples::Structural::Example1::write_solution<traits_t>
+        (c, dsol, *c.index, dstress, dvm_stress, 2);
 
-        // print out the norm of the difference. The difference should be zero to machine
-        // precision. This proceduce is followed for all the other parameters.
-        std::cout
-        << std::setw(20) << dsol.norm()
-        << std::setw(20) << stress_vec.norm()
-        << std::setw(20) << vm_stress_vec.norm()
-        << std::endl;
+        MAST::Examples::Structural::Example1::print_difference
+        (dsol, sol_c,
+         dstress, stress_cs,
+         dvm_stress, vm_stress_cs);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////
@@ -896,71 +975,23 @@ int main(int argc, const char** argv) {
     {
         (*e_ops_c.nu)() += complex_t(0., ComplexStepDelta);
         
-        // compute the solution with the complex-perturbation
-        MAST::Examples::Structural::Example1::compute_sol<traits_complex_t>(c, e_ops_c, sol_c);
-        
-        // compute the stresses from the solution
-        MAST::Examples::Structural::Example1::compute_stress<traits_complex_t>
-        (c, e_ops_c, sol_c, *c.index, stress_cs);
-        
-        // compute the vonMises stress from the stresses
-        MAST::Examples::Structural::Example1::compute_vonMises_stress
-        (*c.stress_sys, *c.index, stress_cs, traits_complex_t::stress_t::n_strain,
-         c.n_qpoints_per_elem(), vm_stress_cs);
-        
+        MAST::Examples::Structural::Example1::analysis<traits_complex_t>
+        (c, e_ops_c, sol_c, *c.index, stress_cs, vm_stress_cs);
+
         // remove the complex perturbation
         (*e_ops_c.nu)() -= complex_t(0., ComplexStepDelta);
         
-        MAST::Examples::Structural::Example1::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.nu, sol, dsol);
+        // sensitivity of solution and stress
+        MAST::Examples::Structural::Example1::sensitivity<traits_t>
+        (c, *e_ops.nu, e_ops, sol, dsol, *c.index, stress, dstress, dvm_stress);
         
-        MAST::Examples::Structural::Example1::compute_stress_sensitivity<traits_t>
-        (c, e_ops, *e_ops.nu, sol, dsol, *c.index, stress);
-        
-        // compute the vonMises stress from the stresses
-        MAST::Examples::Structural::Example1::compute_vonMises_stress_sensitivity
-        (*c.stress_sys, *c.index, stress, dstress, traits_t::stress_t::n_strain, c.n_qpoints_per_elem(), dvm_stress);
-        
-        // copy the sensitivity of stress to system for plotting
-        MAST::Examples::Structural::Example1::copy_stress_to_system
-        (*c.stress_sys, *c.index, dstress, dvm_stress, traits_t::stress_t::n_strain, c.n_qpoints_per_elem());
-        
-        // write solution as first time-step
-        {
-            for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
-            writer.write_timestep("solution.exo", *c.eq_sys, 3, 3.);
-        }
-        
-        // the complex-step sensitivity is obtained from the imaginary part of the solution.
-        // We compute the difference between the analytical sensitivity in \p dsol and
-        // the complex-step sensitivity.
-        dsol -= sol_c.imag()/ComplexStepDelta;
-        
-        // compute difference in sensitivity of stress
-        Eigen::Map<Eigen::Matrix<real_t, Eigen::Dynamic, 1>>
-        stress_vec(stress.data(), stress.size(), 1);
-        
-        Eigen::Map<Eigen::Matrix<complex_t, Eigen::Dynamic, 1>>
-        stress_vec_cs(stress_cs.data(), stress_cs.size(), 1);
-        
-        stress_vec -= stress_vec_cs.imag()/ComplexStepDelta;
-        
-        // similarly, compute the difference between the analytical and complex-step
-        // sensitivity of vonMises stress
-        Eigen::Map<Eigen::Matrix<real_t, Eigen::Dynamic, 1>>
-        vm_stress_vec(vm_stress.data(), vm_stress.size(), 1);
-        
-        Eigen::Map<Eigen::Matrix<complex_t, Eigen::Dynamic, 1>>
-        vm_stress_vec_cs(vm_stress_cs.data(), vm_stress_cs.size(), 1);
+        MAST::Examples::Structural::Example1::write_solution<traits_t>
+        (c, dsol, *c.index, dstress, dvm_stress, 3);
 
-        vm_stress_vec -= vm_stress_vec_cs.imag()/ComplexStepDelta;
-
-        // print out the norm of the difference. The difference should be zero to machine
-        // precision. This proceduce is followed for all the other parameters.
-        std::cout
-        << std::setw(20) << dsol.norm()
-        << std::setw(20) << stress_vec.norm()
-        << std::setw(20) << vm_stress_vec.norm()
-        << std::endl;
+        MAST::Examples::Structural::Example1::print_difference
+        (dsol, sol_c,
+         dstress, stress_cs,
+         dvm_stress, vm_stress_cs);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////
@@ -969,72 +1000,23 @@ int main(int argc, const char** argv) {
     {
         (*e_ops_c.press)() += complex_t(0., ComplexStepDelta);
         
-        // compute the solution with the complex-perturbation
-        MAST::Examples::Structural::Example1::compute_sol<traits_complex_t>(c, e_ops_c, sol_c);
-        
-        // compute the stresses from the solution
-        MAST::Examples::Structural::Example1::compute_stress<traits_complex_t>
-        (c, e_ops_c, sol_c, *c.index, stress_cs);
-        
-        // compute the vonMises stress from the stresses
-        MAST::Examples::Structural::Example1::compute_vonMises_stress
-        (*c.stress_sys, *c.index, stress_cs, traits_complex_t::stress_t::n_strain,
-         c.n_qpoints_per_elem(), vm_stress_cs);
-        
+        MAST::Examples::Structural::Example1::analysis<traits_complex_t>
+        (c, e_ops_c, sol_c, *c.index, stress_cs, vm_stress_cs);
+
         // remove the complex perturbation
         (*e_ops_c.press)() -= complex_t(0., ComplexStepDelta);
         
-        MAST::Examples::Structural::Example1::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.press, sol, dsol);
+        // sensitivity of solution and stress
+        MAST::Examples::Structural::Example1::sensitivity<traits_t>
+        (c, *e_ops.press, e_ops, sol, dsol, *c.index, stress, dstress, dvm_stress);
         
-        MAST::Examples::Structural::Example1::compute_stress_sensitivity<traits_t>
-        (c, e_ops, *e_ops.press, sol, dsol, *c.index, stress);
-        
-        // compute the vonMises stress from the stresses
-        MAST::Examples::Structural::Example1::compute_vonMises_stress_sensitivity
-        (*c.stress_sys, *c.index, stress, dstress, traits_t::stress_t::n_strain, c.n_qpoints_per_elem(), dvm_stress);
-        
-        // copy the sensitivity of stress to system for plotting
-        MAST::Examples::Structural::Example1::copy_stress_to_system
-        (*c.stress_sys, *c.index, dstress, dvm_stress, traits_t::stress_t::n_strain, c.n_qpoints_per_elem());
-        
-        // write solution as first time-step
-        {
-            for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
-            writer.write_timestep("solution.exo", *c.eq_sys, 4, 4.);
-        }
-        
-        // the complex-step sensitivity is obtained from the imaginary part of the solution.
-        // We compute the difference between the analytical sensitivity in \p dsol and
-        // the complex-step sensitivity.
-        dsol -= sol_c.imag()/ComplexStepDelta;
-        
-        // compute difference in sensitivity of stress
-        Eigen::Map<Eigen::Matrix<real_t, Eigen::Dynamic, 1>>
-        stress_vec(stress.data(), stress.size(), 1);
-        
-        Eigen::Map<Eigen::Matrix<complex_t, Eigen::Dynamic, 1>>
-        stress_vec_cs(stress_cs.data(), stress_cs.size(), 1);
-        
-        stress_vec -= stress_vec_cs.imag()/ComplexStepDelta;
-        
-        // similarly, compute the difference between the analytical and complex-step
-        // sensitivity of vonMises stress
-        Eigen::Map<Eigen::Matrix<real_t, Eigen::Dynamic, 1>>
-        vm_stress_vec(vm_stress.data(), vm_stress.size(), 1);
-        
-        Eigen::Map<Eigen::Matrix<complex_t, Eigen::Dynamic, 1>>
-        vm_stress_vec_cs(vm_stress_cs.data(), vm_stress_cs.size(), 1);
-        
+        MAST::Examples::Structural::Example1::write_solution<traits_t>
+        (c, dsol, *c.index, dstress, dvm_stress, 4);
 
-        vm_stress_vec -= vm_stress_vec_cs.imag()/ComplexStepDelta;
-
-        // print out the norm of the difference. The difference should be zero to machine
-        // precision. This proceduce is followed for all the other parameters.
-        std::cout
-        << std::setw(20) << dsol.norm()
-        << std::setw(20) << stress_vec.norm()
-        << std::setw(20) << vm_stress_vec.norm()
-        << std::endl;
+        MAST::Examples::Structural::Example1::print_difference
+        (dsol, sol_c,
+         dstress, stress_cs,
+         dvm_stress, vm_stress_cs);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////
@@ -1044,72 +1026,23 @@ int main(int argc, const char** argv) {
         
         (*e_ops_c.area)() += complex_t(0., ComplexStepDelta);
         
-        // compute the solution with the complex-perturbation
-        MAST::Examples::Structural::Example1::compute_sol<traits_complex_t>(c, e_ops_c, sol_c);
-        
-        // compute the stresses from the solution
-        MAST::Examples::Structural::Example1::compute_stress<traits_complex_t>
-        (c, e_ops_c, sol_c, *c.index, stress_cs);
-        
-        // compute the vonMises stress from the stresses
-        MAST::Examples::Structural::Example1::compute_vonMises_stress
-        (*c.stress_sys, *c.index, stress_cs, traits_complex_t::stress_t::n_strain,
-         c.n_qpoints_per_elem(), vm_stress_cs);
+        MAST::Examples::Structural::Example1::analysis<traits_complex_t>
+        (c, e_ops_c, sol_c, *c.index, stress_cs, vm_stress_cs);
         
         // remove the complex perturbation
         (*e_ops_c.area)() -= complex_t(0., ComplexStepDelta);
         
-        MAST::Examples::Structural::Example1::compute_sol_sensitivity<traits_t>(c, e_ops, *e_ops.area, sol, dsol);
+        // sensitivity of solution and stress
+        MAST::Examples::Structural::Example1::sensitivity<traits_t>
+        (c, *e_ops.area, e_ops, sol, dsol, *c.index, stress, dstress, dvm_stress);
         
-        MAST::Examples::Structural::Example1::compute_stress_sensitivity<traits_t>
-        (c, e_ops, *e_ops.area, sol, dsol, *c.index, stress);
-        
-        // compute the vonMises stress from the stresses
-        MAST::Examples::Structural::Example1::compute_vonMises_stress_sensitivity
-        (*c.stress_sys, *c.index, stress, dstress, traits_t::stress_t::n_strain, c.n_qpoints_per_elem(), dvm_stress);
-        
-        // copy the sensitivity of stress to system for plotting
-        MAST::Examples::Structural::Example1::copy_stress_to_system
-        (*c.stress_sys, *c.index, dstress, dvm_stress, traits_t::stress_t::n_strain, c.n_qpoints_per_elem());
-        
-        
-        // write solution as first time-step
-        {
-            for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, dsol(i));
-            writer.write_timestep("solution.exo", *c.eq_sys, 5, 5.);
-        }
-        
-        // the complex-step sensitivity is obtained from the imaginary part of the solution.
-        // We compute the difference between the analytical sensitivity in \p dsol and
-        // the complex-step sensitivity.
-        dsol -= sol_c.imag()/ComplexStepDelta;
-        
-        // compute difference in sensitivity of stress
-        Eigen::Map<Eigen::Matrix<real_t, Eigen::Dynamic, 1>>
-        stress_vec(stress.data(), stress.size(), 1);
-        
-        Eigen::Map<Eigen::Matrix<complex_t, Eigen::Dynamic, 1>>
-        stress_vec_cs(stress_cs.data(), stress_cs.size(), 1);
-        
-        stress_vec -= stress_vec_cs.imag()/ComplexStepDelta;
-        
-        // similarly, compute the difference between the analytical and complex-step
-        // sensitivity of vonMises stress
-        Eigen::Map<Eigen::Matrix<real_t, Eigen::Dynamic, 1>>
-        vm_stress_vec(vm_stress.data(), vm_stress.size(), 1);
-        
-        Eigen::Map<Eigen::Matrix<complex_t, Eigen::Dynamic, 1>>
-        vm_stress_vec_cs(vm_stress_cs.data(), vm_stress_cs.size(), 1);
+        MAST::Examples::Structural::Example1::write_solution<traits_t>
+        (c, dsol, *c.index, dstress, dvm_stress, 5);
 
-        vm_stress_vec -= vm_stress_vec_cs.imag()/ComplexStepDelta;
-
-        // print out the norm of the difference. The difference should be zero to machine
-        // precision. This proceduce is followed for all the other parameters.
-        std::cout
-        << std::setw(20) << dsol.norm()
-        << std::setw(20) << stress_vec.norm()
-        << std::setw(20) << vm_stress_vec.norm()
-        << std::endl;
+        MAST::Examples::Structural::Example1::print_difference
+        (dsol, sol_c,
+         dstress, stress_cs,
+         dvm_stress, vm_stress_cs);
     }
     
     // END_TRANSLATE
