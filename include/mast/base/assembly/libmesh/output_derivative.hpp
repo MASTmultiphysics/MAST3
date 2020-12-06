@@ -37,6 +37,10 @@ namespace Base {
 namespace Assembly {
 namespace libMeshWrapper {
 
+/*!
+ * provides a method for global assembly of derivative of output functional with respect to the solution
+ * vector. This is typically used for solution of adjoint problems.
+ */
 template <typename ScalarType,
           typename ElemOpsType>
 class OutputDerivative {
@@ -55,16 +59,11 @@ public:
     inline void set_elem_ops(ElemOpsType& e_ops) { _e_ops = &e_ops; }
 
     template <typename VecType, typename MatType, typename ContextType, typename ScalarFieldType>
-    inline void assemble(ContextType   &c,
-                         const ScalarFieldType& f,
-                         const VecType &X,
-                         VecType       *R,
-                         MatType       *J) {
-        
-        Assert0( R || J, "Atleast one assembled quantity should be specified.");
-        
-        if (R) MAST::Numerics::Utility::setZero(*R);
-        if (J) MAST::Numerics::Utility::setZero(*J);
+    inline void assemble(ContextType            &c,
+                         const VecType          &X,
+                         VecType                &dqdX) {
+                
+        MAST::Numerics::Utility::setZero(dqdX);
         
         // iterate over each element, initialize it and get the relevant
         // analysis quantities
@@ -72,11 +71,8 @@ public:
         sol_accessor(*c.sys, X);
 
         using elem_vector_t = typename ElemOpsType::vector_t;
-        using elem_matrix_t = typename ElemOpsType::matrix_t;
         
-        elem_vector_t res_e;
-        elem_matrix_t jac_e;
-
+        elem_vector_t dqdX_e;
         
         libMesh::MeshBase::const_element_iterator
         el     = c.mesh->active_local_elements_begin(),
@@ -89,31 +85,20 @@ public:
             
             sol_accessor.init(*c.elem);
             
-            res_e.setZero(sol_accessor.n_dofs());
-            if (J) jac_e.setZero(sol_accessor.n_dofs(), sol_accessor.n_dofs());
+            dqdX_e.setZero(sol_accessor.n_dofs());
             
             // perform the element level calculations
-            _e_ops->derivative(c, f, sol_accessor, res_e, J?&jac_e:nullptr);
+            _e_ops->derivativeX(c, sol_accessor, dqdX_e);
             
             // constrain the quantities to account for hanging dofs,
             // Dirichlet constraints, etc.
-            if (R && J)
-                MAST::Base::Assembly::libMeshWrapper::constrain_and_add_matrix_and_vector
-                <ScalarType, VecType, MatType, elem_vector_t, elem_matrix_t>
-                (*R, *J, c.sys->get_dof_map(), sol_accessor.dof_indices(), res_e, jac_e);
-            else if (R)
-                MAST::Base::Assembly::libMeshWrapper::constrain_and_add_vector
-                <ScalarType, VecType, elem_vector_t>
-                (*R, c.sys->get_dof_map(), sol_accessor.dof_indices(), res_e);
-            else
-                MAST::Base::Assembly::libMeshWrapper::constrain_and_add_matrix
-                <ScalarType, MatType, elem_matrix_t>
-                (*J, c.sys->get_dof_map(), sol_accessor.dof_indices(), jac_e);
+            MAST::Base::Assembly::libMeshWrapper::constrain_and_add_vector
+            <ScalarType, VecType, elem_vector_t>
+            (dqdX, c.sys->get_dof_map(), sol_accessor.dof_indices(), dqdX_e);
         }
 
         // parallel matrix/vector require finalization of communication
-        if (R) MAST::Numerics::Utility::finalize(*R);
-        if (J && _finalize_jac) MAST::Numerics::Utility::finalize(*J);
+        MAST::Numerics::Utility::finalize(dqdX);
     }
     
 private:
