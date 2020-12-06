@@ -51,14 +51,14 @@ aggregate_minimum(libMesh::Parallel::Communicator *comm,
     
     v_min = MAST::Numerics::Utility::real_minimum(vec);
     
-    if (comm) comm->min(v_min);
+    if (comm) MAST::Numerics::Utility::comm_min(comm, v_min);
     
     for (uint_t i=0; i<vec.size(); i++) {
         
         v += exp(-p * (vec[i] - v_min));
     }
     
-    if (comm) comm->sum(v);
+    if (comm) MAST::Numerics::Utility::comm_sum(comm, v);
 
     v = v_min - log(v) / p;
     
@@ -88,14 +88,14 @@ aggregate_minimum_sensitivity(libMesh::Parallel::Communicator *comm,
     
     v_min = MAST::Numerics::Utility::real_minimum(vec);
 
-    if (comm) comm->min(v_min);
+    if (comm) MAST::Numerics::Utility::comm_min(comm, v_min);
 
     for (uint_t i=0; i<vec.size(); i++) {
         
         v  += exp(-p * (vec[i] - v_min));
     }
     
-    if (comm) comm->sum(v);
+    if (comm) MAST::Numerics::Utility::comm_sum(comm, v);
 
     v = exp(-p * (vec[i] - v_min)) / v;
     
@@ -128,7 +128,7 @@ aggregate_minimum_sensitivity(libMesh::Parallel::Communicator *comm,
     
     v_min = MAST::Numerics::Utility::real_minimum(vec);
 
-    if (comm) comm->min(v_min);
+    if (comm) MAST::Numerics::Utility::comm_min(comm, v_min);
 
     for (uint_t i=0; i<vec.size(); i++) {
         
@@ -136,8 +136,8 @@ aggregate_minimum_sensitivity(libMesh::Parallel::Communicator *comm,
         v  += exp(-p * (vec[i] - v_min));
     }
     
-    if (comm) comm->sum(dv);
-    if (comm) comm->sum(v);
+    if (comm) MAST::Numerics::Utility::comm_sum(comm, dv);
+    if (comm) MAST::Numerics::Utility::comm_sum(comm, v);
 
     v = dv / v;
     
@@ -166,14 +166,14 @@ aggregate_minimum_denominator(libMesh::Parallel::Communicator *comm,
     
     v_min = MAST::Numerics::Utility::real_minimum(vec);
 
-    if (comm) comm->min(v_min);
+    if (comm) MAST::Numerics::Utility::comm_min(comm, v_min);
 
     for (uint_t i=0; i<vec.size(); i++) {
         
         denom  += exp(-p * (vec[i] - v_min));
     }
     
-    if (comm) comm->sum(denom);
+    if (comm) MAST::Numerics::Utility::comm_sum(comm, denom);
 }
 
 
@@ -229,7 +229,7 @@ aggregate_minimum_sensitivity(libMesh::Parallel::Communicator *comm,
         dv += exp(-p * (vec[i] - v_min)) * dvec[i];
     }
     
-    if (comm) comm->sum(dv);
+    if (comm) MAST::Numerics::Utility::comm_sum(comm, dv);
 
    return dv / denom;
 }
@@ -255,14 +255,14 @@ aggregate_maximum(libMesh::Parallel::Communicator *comm,
 
     v_max = MAST::Numerics::Utility::real_maximum(vec);
 
-    if (comm) comm->max(v_max);
+    if (comm) MAST::Numerics::Utility::comm_max(comm, v_max);
 
     for (uint_t i=0; i<vec.size(); i++) {
         
         v += exp(p * (vec[i] - v_max));
     }
     
-    if (comm) comm->sum(v);
+    if (comm) MAST::Numerics::Utility::comm_sum(comm, v);
 
     v = v_max + log(v) / p;
     
@@ -292,14 +292,14 @@ aggregate_maximum_sensitivity(libMesh::Parallel::Communicator *comm,
     
     v_max = MAST::Numerics::Utility::real_maximum(vec);
 
-    if (comm) comm->max(v_max);
+    if (comm) MAST::Numerics::Utility::comm_max(comm, v_max);
     
     for (uint_t i=0; i<vec.size(); i++) {
         
         v += exp(p * (vec[i] - v_max));
     }
     
-    if (comm) comm->sum(v);
+    if (comm) MAST::Numerics::Utility::comm_sum(comm, v);
 
     v = exp(p * (vec[i] - v_max)) / v;
     
@@ -332,7 +332,7 @@ aggregate_maximum_sensitivity(libMesh::Parallel::Communicator *comm,
     
     v_max = MAST::Numerics::Utility::real_maximum(vec);
 
-    if (comm) comm->max(v_max);
+    if (comm) MAST::Numerics::Utility::comm_max(comm, v_max);
 
     for (uint_t i=0; i<vec.size(); i++) {
         
@@ -340,8 +340,8 @@ aggregate_maximum_sensitivity(libMesh::Parallel::Communicator *comm,
         v  += exp(p * (vec[i] - v_max));
     }
     
-    if (comm) comm->sum(dv);
-    if (comm) comm->sum(v);
+    if (comm) MAST::Numerics::Utility::comm_sum(comm, dv);
+    if (comm) MAST::Numerics::Utility::comm_sum(comm, v);
 
     v = dv / v;
     
@@ -369,14 +369,14 @@ aggregate_maximum_denominator(libMesh::Parallel::Communicator *comm,
     
     v_max = MAST::Numerics::Utility::real_maximum(vec);
 
-    if (comm) comm->max(v_max);
+    if (comm) MAST::Numerics::Utility::comm_max(comm, v_max);
     
     for (uint_t i=0; i<vec.size(); i++) {
         
         denom  += exp(p * (vec[i] - v_max));
     }
 
-    if (comm) comm->sum(denom);
+    if (comm) MAST::Numerics::Utility::comm_sum(comm, denom);
 }
 
 
@@ -432,7 +432,7 @@ aggregate_maximum_sensitivity(libMesh::Parallel::Communicator *comm,
         dv += exp(p * (vec[i] - v_max)) * dvec[i];
     }
 
-    if (comm) comm->sum(dv);
+    if (comm) MAST::Numerics::Utility::comm_sum(comm, dv);
 
     return dv / denom;
 }
