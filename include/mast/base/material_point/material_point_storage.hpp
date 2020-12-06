@@ -71,6 +71,15 @@ public:
     }
 
     
+    /*!
+     * @returns the total number of values in this storage
+     */
+    inline uint_t size() const {
+        
+        return _n_points * NComponents;
+    }
+    
+    
     inline scalar_t* data() {
         
         Assert0(_initialized, "Object must be initialized");
