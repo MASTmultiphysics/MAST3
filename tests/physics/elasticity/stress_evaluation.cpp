@@ -85,6 +85,7 @@ struct ElemOps {
     fe       (new typename Traits::fe_basis_t(libMesh::FEType(libMesh::FIRST, libMesh::LAGRANGE))),
     fe_deriv (new typename Traits::fe_shape_t),
     fe_var   (new typename Traits::fe_var_t),
+    dfe_var  (new typename Traits::fe_var_t),
     E        (new typename Traits::modulus_t(72.e9)),
     nu       (new typename Traits::nu_t(0.33)),
     prop     (new typename Traits::prop_t),
@@ -103,11 +104,14 @@ struct ElemOps {
         // initialize the variable data
         fe_var->set_compute_du_dx(true);
         fe_var->set_fe_shape_data(*fe_deriv);
-        
+        dfe_var->set_compute_du_dx(true);
+        dfe_var->set_fe_shape_data(*fe_deriv);
+
         prop->set_modulus_and_nu(*E, *nu);
         
         stress_e->set_section_property(*prop);
         stress_e->set_fe_var_data(*fe_var);
+        stress_e->set_fe_var_sensitivity_data(*dfe_var);
     }
     
     virtual ~ElemOps() {}
@@ -168,10 +172,15 @@ struct ElemOps {
 
     template <typename ScalarFieldType>
     inline void derivative(const ScalarFieldType& f,
+                           const typename Traits::vector_t& sol,
+                           const typename Traits::vector_t& dsol,
                            typename Traits::stress_storage_t& dstress_storage) {
 
         typename Traits::stress_vec_t
         dstress;
+        
+        fe_var->init(c, sol);
+        dfe_var->init(c, dsol);
         
         for (uint_t i=0; i<q->n_points(); i++) {
             
@@ -186,6 +195,7 @@ struct ElemOps {
     std::unique_ptr<typename Traits::fe_basis_t>     fe;
     std::unique_ptr<typename Traits::fe_shape_t>     fe_deriv;
     std::unique_ptr<typename Traits::fe_var_t>       fe_var;
+    std::unique_ptr<typename Traits::fe_var_t>       dfe_var;
     std::unique_ptr<typename Traits::modulus_t>      E;
     std::unique_ptr<typename Traits::nu_t>           nu;
     std::unique_ptr<typename Traits::prop_t>         prop;
@@ -259,7 +269,8 @@ TEST_CASE("stress_evaluation",
     using traits_t         = Traits<real_t, real_t, real_t, 2>;
     
     typename traits_t::vector_t
-    sol;
+    sol,
+    dsol;
     
     // stress at all quadrature points
     typename traits_t::stress_storage_t
@@ -275,6 +286,7 @@ TEST_CASE("stress_evaluation",
     e_ops.init(e.get());
     
     sol           = 0.1 * traits_t::vector_t::Random(e_ops.n_dofs());
+    dsol          = 0.1 * traits_t::vector_t::Zero(e_ops.n_dofs());
     stress        = traits_t::stress_storage_t::Zero(n_strain, e_ops.q->n_points());
     stress_cs     = traits_t::stress_storage_t::Zero(n_strain, e_ops.q->n_points());
     dstress_dX    = traits_t::stress_adj_storage_t::Zero(n_strain*e_ops.n_dofs(),
@@ -326,7 +338,7 @@ TEST_CASE("stress_evaluation",
     // residual sensitivity wrt E
     {
         stress.setZero();
-        e_ops.derivative(*e_ops.E, stress);
+        e_ops.derivative(*e_ops.E, sol, dsol, stress);
         
         ElemOps<traits_complex_t> e_ops_c;
         
@@ -341,7 +353,7 @@ TEST_CASE("stress_evaluation",
     // residual sensitivity wrt nu
     {
         stress.setZero();
-        e_ops.derivative(*e_ops.nu, stress);
+        e_ops.derivative(*e_ops.nu, sol, dsol, stress);
         
         ElemOps<traits_complex_t> e_ops_c;
         
