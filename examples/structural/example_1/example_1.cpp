@@ -36,6 +36,7 @@
 #include <mast/base/assembly/libmesh/residual_sensitivity.hpp>
 #include <mast/base/assembly/libmesh/stress_assembly.hpp>
 #include <mast/numerics/libmesh/sparse_matrix_initialization.hpp>
+#include <mast/optimization/aggregation/discrete_aggregation.hpp>
 
 // libMesh includes
 #include <libmesh/replicated_mesh.h>
@@ -741,13 +742,16 @@ template <typename TraitsType,
           typename IndexType,
           typename StressStorageType,
           typename vonMisesStressStorageType>
-inline void analysis(ContextType               &c,
-                     ElemOpsType               &e_ops,
-                     VecType                   &sol,
-                     IndexType                 &index,
-                     StressStorageType         &stress,
-                     vonMisesStressStorageType &vm_stress) {
+inline void analysis(ContextType                      &c,
+                     ElemOpsType                      &e_ops,
+                     VecType                          &sol,
+                     IndexType                        &index,
+                     StressStorageType                &stress,
+                     vonMisesStressStorageType        &vm_stress,
+                     typename TraitsType::scalar_t    &vm_max_agg) {
 
+    using scalar_t = typename TraitsType::scalar_t;
+    
     // compute the solution
     MAST::Examples::Structural::Example1::compute_sol<TraitsType>
     (c, e_ops, sol);
@@ -764,6 +768,11 @@ inline void analysis(ContextType               &c,
      TraitsType::stress_t::n_strain,
      c.n_qpoints_per_elem(),
      vm_stress);
+    
+    std::vector<scalar_t>
+    vals(vm_stress.data(), vm_stress.data()+vm_stress.size());
+    
+    vm_max_agg = MAST::Optimization::Aggregation::aggregate_maximum(vals, 50);
 }
 
 
@@ -775,15 +784,19 @@ template <typename TraitsType,
           typename IndexType,
           typename StressStorageType,
           typename vonMisesStressStorageType>
-inline void sensitivity(ContextType               &c,
-                        ScalarFieldType           &f,
-                        ElemOpsType               &e_ops,
-                        VecType                   &sol,
-                        VecType                   &dsol,
-                        IndexType                 &index,
-                        StressStorageType         &stress,
-                        StressStorageType         &dstress,
-                        vonMisesStressStorageType &dvm_stress) {
+inline void sensitivity(ContextType                      &c,
+                        ScalarFieldType                  &f,
+                        ElemOpsType                      &e_ops,
+                        VecType                          &sol,
+                        VecType                          &dsol,
+                        IndexType                        &index,
+                        StressStorageType                &stress,
+                        StressStorageType                &dstress,
+                        vonMisesStressStorageType        &vm_stress,
+                        vonMisesStressStorageType        &dvm_stress,
+                        typename TraitsType::scalar_t    &dvm_max_agg) {
+
+    using scalar_t = typename TraitsType::scalar_t;
 
     MAST::Examples::Structural::Example1::compute_sol_sensitivity<TraitsType>
     (c, e_ops, f, sol, dsol);
@@ -800,6 +813,13 @@ inline void sensitivity(ContextType               &c,
      TraitsType::stress_t::n_strain,
      c.n_qpoints_per_elem(),
      dvm_stress);
+    
+    std::vector<scalar_t>
+    vals (vm_stress.data(), vm_stress.data()+vm_stress.size()),
+    dvals(dvm_stress.data(), dvm_stress.data()+dvm_stress.size());
+    
+    dvm_max_agg = MAST::Optimization::Aggregation::aggregate_maximum_sensitivity
+    (vals, dvals,  50);
 }
 
 
@@ -842,6 +862,8 @@ inline void print_difference(VecType                     &dsol,
                              StressStorageTypeCS         &stress_cs,
                              vonMisesStressStorageType   &dvm_stress,
                              vonMisesStressStorageTypeCS &vm_stress_cs,
+                             real_t                      &dvm_agg,
+                             complex_t                   &vm_agg_cs,
                              std::string                  nm) {
  
     // the complex-step sensitivity is obtained from the imaginary part of the solution.
@@ -868,6 +890,9 @@ inline void print_difference(VecType                     &dsol,
     
     dvm_stress_vec -= vm_stress_vec_cs.imag()/ComplexStepDelta;
 
+    // difference between the aggregated value sensivitity
+    dvm_agg -= vm_agg_cs.imag()/ComplexStepDelta;
+    
     // print out the norm of the difference. The difference should be zero to machine
     // precision. This proceduce is followed for all the other parameters.
     std::cout
@@ -875,6 +900,7 @@ inline void print_difference(VecType                     &dsol,
     << std::setw(20) << dsol.norm()
     << std::setw(20) << dstress_vec.norm()
     << std::setw(20) << dvm_stress_vec.norm()
+    << std::setw(20) << dvm_agg
     << std::endl;
 }
 
@@ -930,20 +956,28 @@ int main(int argc, const char** argv) {
     typename traits_complex_t::assembled_vector_t
     sol_c;
 
+    real_t
+    vm_agg  = 0.,
+    dvm_agg = 0;
+    
+    complex_t
+    vm_agg_cs = 0.;
+    
     MAST::Examples::Structural::Example1::analysis<traits_t>
-    (c, e_ops, sol, *c.index, stress, vm_stress);
+    (c, e_ops, sol, *c.index, stress, vm_stress, vm_agg);
     
     MAST::Examples::Structural::Example1::write_solution<traits_t>
     (c, sol, *c.index, stress, vm_stress, 1);
 
     // print the header for the table
     std::cout
-    << std::setw(65) << " **********  Norm of Difference in Sensitivity ********  "
+    << std::setw(85) << " **********  Norm of Difference in Sensitivity ********  "
     << std::endl
     << std::setw(5) << "Param"
     << std::setw(20) << "Solution"
     << std::setw(20) << "Stress"
     << std::setw(20) << "vonMises Stress"
+    << std::setw(20) << "vonMises Agg"
     << std::endl;
 
     ///////////////////////////////////////////////////////////////////////////////////////
@@ -954,14 +988,16 @@ int main(int argc, const char** argv) {
         (*e_ops_c.E)() += complex_t(0., ComplexStepDelta);
 
         MAST::Examples::Structural::Example1::analysis<traits_complex_t>
-        (c, e_ops_c, sol_c, *c.index, stress_cs, vm_stress_cs);
+        (c, e_ops_c, sol_c, *c.index, stress_cs, vm_stress_cs, vm_agg_cs);
         
         // remove the complex perturbation
         (*e_ops_c.E)() -= complex_t(0., ComplexStepDelta);
         
         // sensitivity of solution and stress
         MAST::Examples::Structural::Example1::sensitivity<traits_t>
-        (c, *e_ops.E, e_ops, sol, dsol, *c.index, stress, dstress, dvm_stress);
+        (c, *e_ops.E, e_ops, sol, dsol, *c.index,
+         stress, dstress,
+         vm_stress, dvm_stress, dvm_agg);
         
         MAST::Examples::Structural::Example1::write_solution<traits_t>
         (c, dsol, *c.index, dstress, dvm_stress, 2);
@@ -970,6 +1006,7 @@ int main(int argc, const char** argv) {
         (dsol, sol_c,
          dstress, stress_cs,
          dvm_stress, vm_stress_cs,
+         dvm_agg, vm_agg_cs,
          "E");
     }
 
@@ -980,14 +1017,16 @@ int main(int argc, const char** argv) {
         (*e_ops_c.nu)() += complex_t(0., ComplexStepDelta);
         
         MAST::Examples::Structural::Example1::analysis<traits_complex_t>
-        (c, e_ops_c, sol_c, *c.index, stress_cs, vm_stress_cs);
+        (c, e_ops_c, sol_c, *c.index, stress_cs, vm_stress_cs, vm_agg_cs);
 
         // remove the complex perturbation
         (*e_ops_c.nu)() -= complex_t(0., ComplexStepDelta);
         
         // sensitivity of solution and stress
         MAST::Examples::Structural::Example1::sensitivity<traits_t>
-        (c, *e_ops.nu, e_ops, sol, dsol, *c.index, stress, dstress, dvm_stress);
+        (c, *e_ops.nu, e_ops, sol, dsol, *c.index,
+         stress, dstress,
+         vm_stress, dvm_stress, dvm_agg);
         
         MAST::Examples::Structural::Example1::write_solution<traits_t>
         (c, dsol, *c.index, dstress, dvm_stress, 3);
@@ -996,6 +1035,7 @@ int main(int argc, const char** argv) {
         (dsol, sol_c,
          dstress, stress_cs,
          dvm_stress, vm_stress_cs,
+         dvm_agg, vm_agg_cs,
          "nu");
     }
 
@@ -1006,14 +1046,16 @@ int main(int argc, const char** argv) {
         (*e_ops_c.press)() += complex_t(0., ComplexStepDelta);
         
         MAST::Examples::Structural::Example1::analysis<traits_complex_t>
-        (c, e_ops_c, sol_c, *c.index, stress_cs, vm_stress_cs);
+        (c, e_ops_c, sol_c, *c.index, stress_cs, vm_stress_cs, vm_agg_cs);
 
         // remove the complex perturbation
         (*e_ops_c.press)() -= complex_t(0., ComplexStepDelta);
         
         // sensitivity of solution and stress
         MAST::Examples::Structural::Example1::sensitivity<traits_t>
-        (c, *e_ops.press, e_ops, sol, dsol, *c.index, stress, dstress, dvm_stress);
+        (c, *e_ops.press, e_ops, sol, dsol, *c.index,
+         stress, dstress,
+         vm_stress, dvm_stress, dvm_agg);
         
         MAST::Examples::Structural::Example1::write_solution<traits_t>
         (c, dsol, *c.index, dstress, dvm_stress, 4);
@@ -1022,6 +1064,7 @@ int main(int argc, const char** argv) {
         (dsol, sol_c,
          dstress, stress_cs,
          dvm_stress, vm_stress_cs,
+         dvm_agg, vm_agg_cs,
          "pres");
     }
 
@@ -1033,14 +1076,16 @@ int main(int argc, const char** argv) {
         (*e_ops_c.area)() += complex_t(0., ComplexStepDelta);
         
         MAST::Examples::Structural::Example1::analysis<traits_complex_t>
-        (c, e_ops_c, sol_c, *c.index, stress_cs, vm_stress_cs);
+        (c, e_ops_c, sol_c, *c.index, stress_cs, vm_stress_cs, vm_agg_cs);
         
         // remove the complex perturbation
         (*e_ops_c.area)() -= complex_t(0., ComplexStepDelta);
         
         // sensitivity of solution and stress
         MAST::Examples::Structural::Example1::sensitivity<traits_t>
-        (c, *e_ops.area, e_ops, sol, dsol, *c.index, stress, dstress, dvm_stress);
+        (c, *e_ops.area, e_ops, sol, dsol, *c.index,
+         stress, dstress,
+         vm_stress, dvm_stress, dvm_agg);
         
         MAST::Examples::Structural::Example1::write_solution<traits_t>
         (c, dsol, *c.index, dstress, dvm_stress, 5);
@@ -1049,6 +1094,7 @@ int main(int argc, const char** argv) {
         (dsol, sol_c,
          dstress, stress_cs,
          dvm_stress, vm_stress_cs,
+         dvm_agg, vm_agg_cs,
          "area");
     }
     
