@@ -129,9 +129,7 @@ public:
             
             
             val +=
-            _output_e_ops->derivative(c, // partial derivative of output
-                                      f,
-                                      sol_accessor)
+            _output_e_ops->derivative(c, f, sol_accessor) // partial derivative of output
             + adj_accessor.dot(dres_e)); // the adjoint vector combined w/ res sens
         }
         
