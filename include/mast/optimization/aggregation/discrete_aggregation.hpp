@@ -24,6 +24,8 @@
 #include <mast/base/mast_data_types.h>
 #include <mast/numerics/utility.hpp>
 
+// libMesh includes
+#include <libmesh/parallel.h>
 
 namespace MAST {
 namespace Optimization {
@@ -34,11 +36,14 @@ namespace Aggregation {
  * The aggregation expression used is
  * \f[ v_{agg} = v_{min} - \frac{1}{p} \log \left( \sum_i \exp (-p (v_i - v_{min}))  \right) \f],
  * where, \f$ v_{min} \f$ is the minimum value out of all values in \p vec.
+ * If \p comm is a non-null pointer then the computation is synchronized across all ranks with the \f$ v_min\f$ and
+ * the summation obtained from a collective.
  */
 template <typename ScalarType>
 ScalarType
-aggregate_minimum(const std::vector<ScalarType> &vec,
-                  const real_t                   p) {
+aggregate_minimum(libMesh::Parallel::Communicator *comm,
+                  const std::vector<ScalarType>   &vec,
+                  const real_t                     p) {
     
     ScalarType
     v      = 0.,
@@ -46,11 +51,15 @@ aggregate_minimum(const std::vector<ScalarType> &vec,
     
     v_min = MAST::Numerics::Utility::real_minimum(vec);
     
+    if (comm) comm->min(v_min);
+    
     for (uint_t i=0; i<vec.size(); i++) {
         
         v += exp(-p * (vec[i] - v_min));
     }
     
+    if (comm) comm->sum(v);
+
     v = v_min - log(v) / p;
     
     return v;
@@ -63,12 +72,15 @@ aggregate_minimum(const std::vector<ScalarType> &vec,
  * The aggregation expression used is
  * \f[ \frac{d v_{agg}}{d v_j} =  \frac{ \exp (-p (v_j - v_{min})) }{  \sum_i \exp (-p (v_i - v_{min})) }  \f],
  * where, \f$ v_{min} \f$ is the minimum value out of all values in \p vec.
+ * If \p comm is a non-null pointer then the computation is synchronized across all ranks with the \f$ v_min\f$ and
+ * the summation obtained from a collective.
  */
 template <typename ScalarType>
 ScalarType
-aggregate_minimum_sensitivity(const std::vector<ScalarType> &vec,
-                              const uint_t                   i,
-                              const real_t                   p) {
+aggregate_minimum_sensitivity(libMesh::Parallel::Communicator *comm,
+                              const std::vector<ScalarType>   &vec,
+                              const uint_t                     i,
+                              const real_t                     p) {
     
     ScalarType
     v      = 0.,
@@ -76,11 +88,15 @@ aggregate_minimum_sensitivity(const std::vector<ScalarType> &vec,
     
     v_min = MAST::Numerics::Utility::real_minimum(vec);
 
+    if (comm) comm->min(v_min);
+
     for (uint_t i=0; i<vec.size(); i++) {
         
         v  += exp(-p * (vec[i] - v_min));
     }
     
+    if (comm) comm->sum(v);
+
     v = exp(-p * (vec[i] - v_min)) / v;
     
     return v;
@@ -95,12 +111,15 @@ aggregate_minimum_sensitivity(const std::vector<ScalarType> &vec,
  * The sensitivity expression used is
  * \f[ \frac{d v_{agg}}{d p} =  \frac{ \sum_j \exp (-p (v_j - v_{min})) \frac{dv_j}{d\alpha} }{  \sum_i \exp (-p (v_i - v_{min})) }  \f],
  * where, \f$ v_{min} \f$ is the minimum value out of all values in \p vec.
+ * If \p comm is a non-null pointer then the computation is synchronized across all ranks with the \f$ v_min\f$ and
+ * the summation obtained from a collective.
  */
 template <typename ScalarType>
 ScalarType
-aggregate_minimum_sensitivity(const std::vector<ScalarType> &vec,
-                              const std::vector<ScalarType> &dvec,
-                              const real_t                   p) {
+aggregate_minimum_sensitivity(libMesh::Parallel::Communicator *comm,
+                              const std::vector<ScalarType>   &vec,
+                              const std::vector<ScalarType>   &dvec,
+                              const real_t                     p) {
     
     ScalarType
     dv     = 0.,
@@ -109,12 +128,17 @@ aggregate_minimum_sensitivity(const std::vector<ScalarType> &vec,
     
     v_min = MAST::Numerics::Utility::real_minimum(vec);
 
+    if (comm) comm->min(v_min);
+
     for (uint_t i=0; i<vec.size(); i++) {
         
         dv += exp(-p * (vec[i] - v_min)) * dvec[i];
         v  += exp(-p * (vec[i] - v_min));
     }
     
+    if (comm) comm->sum(dv);
+    if (comm) comm->sum(v);
+
     v = dv / v;
     
     return v;
@@ -127,22 +151,29 @@ aggregate_minimum_sensitivity(const std::vector<ScalarType> &vec,
  * The value is  \f$  \sum_i \exp (-p (v_i - v_{min}))   \f$,
  * where, \f$ v_{min} \f$ is the minimum value out of all values in \p vec. The denomimator is returned in
  * \p denom and the minimum value is returned in \p vmin.
+ * If \p comm is a non-null pointer then the computation is synchronized across all ranks with the \f$ v_min\f$ and
+ * the summation obtained from a collective.
  */
 template <typename ScalarType>
 void
-aggregate_minimum_denominator(const std::vector<ScalarType> &vec,
-                              const real_t                   p,
-                              ScalarType                    &denom,
-                              ScalarType                    &v_min) {
+aggregate_minimum_denominator(libMesh::Parallel::Communicator *comm,
+                              const std::vector<ScalarType>   &vec,
+                              const real_t                     p,
+                              ScalarType                      &denom,
+                              ScalarType                      &v_min) {
     
     denom  = 0.;
     
     v_min = MAST::Numerics::Utility::real_minimum(vec);
 
+    if (comm) comm->min(v_min);
+
     for (uint_t i=0; i<vec.size(); i++) {
         
         denom  += exp(-p * (vec[i] - v_min));
     }
+    
+    if (comm) comm->sum(denom);
 }
 
 
@@ -158,11 +189,11 @@ aggregate_minimum_denominator(const std::vector<ScalarType> &vec,
  */
 template <typename ScalarType>
 ScalarType
-aggregate_minimum_sensitivity(const std::vector<ScalarType> &vec,
-                              const uint_t                   i,
-                              const real_t                   p,
-                              const ScalarType              &denom,
-                              const ScalarType              &v_min) {
+aggregate_minimum_sensitivity(const std::vector<ScalarType>   &vec,
+                              const uint_t                     i,
+                              const real_t                     p,
+                              const ScalarType                &denom,
+                              const ScalarType                &v_min) {
     
     return exp(-p * (vec[i] - v_min)) / denom;
 }
@@ -178,14 +209,17 @@ aggregate_minimum_sensitivity(const std::vector<ScalarType> &vec,
  * This method differs from the other
  * in that the user provides the cached denominator of the sensitivity  and the minimum value in \p denom and
  * \p v_min.
+ * If \p comm is a non-null pointer then the computation is synchronized across all ranks with the
+ * summation obtained from a collective.
  */
 template <typename ScalarType>
 ScalarType
-aggregate_minimum_sensitivity(const std::vector<ScalarType> &vec,
-                              const std::vector<ScalarType> &dvec,
-                              const real_t                   p,
-                              const ScalarType              &denom,
-                              const ScalarType              &v_min) {
+aggregate_minimum_sensitivity(libMesh::Parallel::Communicator *comm,
+                              const std::vector<ScalarType>   &vec,
+                              const std::vector<ScalarType>   &dvec,
+                              const real_t                     p,
+                              const ScalarType                &denom,
+                              const ScalarType                &v_min) {
     
     ScalarType
     dv     = 0.;
@@ -195,7 +229,9 @@ aggregate_minimum_sensitivity(const std::vector<ScalarType> &vec,
         dv += exp(-p * (vec[i] - v_min)) * dvec[i];
     }
     
-    return dv / denom;
+    if (comm) comm->sum(dv);
+
+   return dv / denom;
 }
 
 
@@ -204,11 +240,14 @@ aggregate_minimum_sensitivity(const std::vector<ScalarType> &vec,
  * The aggregation expression used is
  * \f[ v_{agg} = v_{max} + \frac{1}{p} \log \left( \sum_i \exp (p (v_i - v_{max}))  \right) \f],
  * where, \f$ v_{max} \f$ is the maximum value out of all values in \p vec.
+ * If \p comm is a non-null pointer then the computation is synchronized across all ranks with the \f$ v_max\f$ and
+ * the summation obtained from a collective.
  */
 template <typename ScalarType>
 ScalarType
-aggregate_maximum(const std::vector<ScalarType> &vec,
-                  const real_t                   p) {
+aggregate_maximum(libMesh::Parallel::Communicator *comm,
+                  const std::vector<ScalarType>   &vec,
+                  const real_t                     p) {
     
     ScalarType
     v      = 0.,
@@ -216,11 +255,15 @@ aggregate_maximum(const std::vector<ScalarType> &vec,
 
     v_max = MAST::Numerics::Utility::real_maximum(vec);
 
+    if (comm) comm->max(v_max);
+
     for (uint_t i=0; i<vec.size(); i++) {
         
         v += exp(p * (vec[i] - v_max));
     }
     
+    if (comm) comm->sum(v);
+
     v = v_max + log(v) / p;
     
     return v;
@@ -233,12 +276,15 @@ aggregate_maximum(const std::vector<ScalarType> &vec,
  * The aggregation expression used is
  * \f[ \frac{d v_{agg}}{d v_j} =  \frac{ \exp ( p (v_j - v_{max})) }{  \sum_i \exp ( p (v_i - v_{max})) } \f],
  * where, \f$ v_{max} \f$ is the maximum value out of all values in \p vec.
+ * If \p comm is a non-null pointer then the computation is synchronized across all ranks with the \f$ v_min\f$ and
+ * the summation obtained from a collective.
  */
 template <typename ScalarType>
 ScalarType
-aggregate_maximum_sensitivity(const std::vector<ScalarType> &vec,
-                              const uint_t                   i,
-                              const real_t                   p) {
+aggregate_maximum_sensitivity(libMesh::Parallel::Communicator *comm,
+                              const std::vector<ScalarType>   &vec,
+                              const uint_t                     i,
+                              const real_t                     p) {
     
     ScalarType
     v      = 0.,
@@ -246,11 +292,15 @@ aggregate_maximum_sensitivity(const std::vector<ScalarType> &vec,
     
     v_max = MAST::Numerics::Utility::real_maximum(vec);
 
+    if (comm) comm->max(v_max);
+    
     for (uint_t i=0; i<vec.size(); i++) {
         
         v += exp(p * (vec[i] - v_max));
     }
     
+    if (comm) comm->sum(v);
+
     v = exp(p * (vec[i] - v_max)) / v;
     
     return v;
@@ -265,12 +315,15 @@ aggregate_maximum_sensitivity(const std::vector<ScalarType> &vec,
  * The sensitivity expression used is
  * \f[ \frac{d v_{agg}}{d p} =  \frac{ \sum_j \exp ( p (v_j - v_{max})) \frac{dv_j}{d\alpha} }{  \sum_i \exp ( p (v_i - v_{max})) } \f],
  * where, \f$ v_{max} \f$ is the maximum value out of all values in \p vec.
+ * If \p comm is a non-null pointer then the computation is synchronized across all ranks with the \f$ v_min\f$ and
+ * the summation obtained from a collective.
  */
 template <typename ScalarType>
 ScalarType
-aggregate_maximum_sensitivity(const std::vector<ScalarType> &vec,
-                              const std::vector<ScalarType> &dvec,
-                              const real_t                   p) {
+aggregate_maximum_sensitivity(libMesh::Parallel::Communicator *comm,
+                              const std::vector<ScalarType>   &vec,
+                              const std::vector<ScalarType>   &dvec,
+                              const real_t                     p) {
     
     ScalarType
     dv     = 0.,
@@ -279,12 +332,17 @@ aggregate_maximum_sensitivity(const std::vector<ScalarType> &vec,
     
     v_max = MAST::Numerics::Utility::real_maximum(vec);
 
+    if (comm) comm->max(v_max);
+
     for (uint_t i=0; i<vec.size(); i++) {
         
         dv += exp(p * (vec[i] - v_max)) * dvec[i];
         v  += exp(p * (vec[i] - v_max));
     }
     
+    if (comm) comm->sum(dv);
+    if (comm) comm->sum(v);
+
     v = dv / v;
     
     return v;
@@ -296,22 +354,29 @@ aggregate_maximum_sensitivity(const std::vector<ScalarType> &vec,
  * The value is  \f$  \sum_i \exp (p (v_i - v_{max}))   \f$,
  * where, \f$ v_{max} \f$ is the maximum value out of all values in \p vec. The denominator is returned in
  * \p denom and the minimum value is returned in \p v_max.
+ * If \p comm is a non-null pointer then the computation is synchronized across all ranks with the \f$ v_min\f$ and
+ * the summation obtained from a collective.
  */
 template <typename ScalarType>
 void
-aggregate_maximum_denominator(const std::vector<ScalarType> &vec,
-                              const real_t                   p,
-                              ScalarType                    &denom,
-                              ScalarType                    &v_max) {
+aggregate_maximum_denominator(libMesh::Parallel::Communicator *comm,
+                              const std::vector<ScalarType>   &vec,
+                              const real_t                     p,
+                              ScalarType                      &denom,
+                              ScalarType                      &v_max) {
     
     denom  = 0.;
     
     v_max = MAST::Numerics::Utility::real_maximum(vec);
 
+    if (comm) comm->max(v_max);
+    
     for (uint_t i=0; i<vec.size(); i++) {
         
         denom  += exp(p * (vec[i] - v_max));
     }
+
+    if (comm) comm->sum(denom);
 }
 
 
@@ -327,11 +392,11 @@ aggregate_maximum_denominator(const std::vector<ScalarType> &vec,
  */
 template <typename ScalarType>
 ScalarType
-aggregate_maximum_sensitivity(const std::vector<ScalarType> &vec,
-                              const uint_t                   i,
-                              const real_t                   p,
-                              const ScalarType              &denom,
-                              const ScalarType              &v_max) {
+aggregate_maximum_sensitivity(const std::vector<ScalarType>   &vec,
+                              const uint_t                     i,
+                              const real_t                     p,
+                              const ScalarType                &denom,
+                              const ScalarType                &v_max) {
     
     return exp(p * (vec[i] - v_max)) / denom;
 }
@@ -347,14 +412,17 @@ aggregate_maximum_sensitivity(const std::vector<ScalarType> &vec,
  * This method differs from the other
  * in that the user provides the cached denominator of the sensitivity  and the maximum value in \p denom and
  * \p v_max.
+ * If \p comm is a non-null pointer then the computation is synchronized across all ranks with the \f$ v_min\f$ and
+ * the summation obtained from a collective.
  */
 template <typename ScalarType>
 ScalarType
-aggregate_maximum_sensitivity(const std::vector<ScalarType> &vec,
-                              const std::vector<ScalarType> &dvec,
-                              const real_t                   p,
-                              const ScalarType              &denom,
-                              const ScalarType              &v_max) {
+aggregate_maximum_sensitivity(libMesh::Parallel::Communicator *comm,
+                              const std::vector<ScalarType>   &vec,
+                              const std::vector<ScalarType>   &dvec,
+                              const real_t                     p,
+                              const ScalarType                &denom,
+                              const ScalarType                &v_max) {
     
     ScalarType
     dv     = 0.;
@@ -363,7 +431,9 @@ aggregate_maximum_sensitivity(const std::vector<ScalarType> &vec,
         
         dv += exp(p * (vec[i] - v_max)) * dvec[i];
     }
-    
+
+    if (comm) comm->sum(dv);
+
     return dv / denom;
 }
 
