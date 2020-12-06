@@ -17,8 +17,8 @@
 * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-#ifndef __mast_optimization_topology_simp_libmesh_output_sensitivity_h__
-#define __mast_optimization_topology_simp_libmesh_output_sensitivity_h__
+#ifndef __mast_libmesh_output_sensitivity_h__
+#define __mast_libmesh_output_sensitivity_h__
 
 // MAST includes
 #include <mast/base/mast_data_types.h>
@@ -30,20 +30,18 @@
 #include <mast/mesh/libmesh/utility.hpp>
 
 // libMesh includes
-#include <libmesh/nonlinear_implicit_system.h>
-#include <libmesh/dof_map.h>
+#include <libmesh/parallel.h>
 
 
 namespace MAST {
-namespace Optimization {
-namespace Topology {
-namespace SIMP {
+namespace Base {
+namespace Assembly {
 namespace libMeshWrapper {
 
 template <typename ScalarType,
           typename ResidualElemOpsType,
           typename OutputElemOpsType>
-class AssembleOutputSensitivity {
+class OutputSensitivity {
     
 public:
 
@@ -55,12 +53,13 @@ public:
                   "Scalar type of assembly and element operations must be same");
 
     
-    AssembleOutputSensitivity():
+    OutputSensitivity(libMesh::Communicator &comm):
+    _comm         (comm),
     _e_ops        (nullptr),
     _output_e_ops (nullptr)
     { }
     
-    virtual ~AssembleOutputSensitivity() {}
+    virtual ~OutputSensitivity() {}
     
     inline void set_elem_ops(ResidualElemOpsType &e_ops,
                              OutputElemOpsType   &output_ops) {
@@ -76,48 +75,29 @@ public:
     template <typename Vec1Type,
               typename Vec2Type,
               typename ContextType,
-              typename FilterType>
-    inline void assemble(ContextType               &c,
-                         const Vec1Type            &X,
-                         const Vec2Type            &density,
-                         const Vec1Type            &X_adj,
-                         const FilterType          &filter,
-                         const MAST::Optimization::DesignParameterVector<ScalarType> &dvs,
-                         std::vector<ScalarType>   &sens) {
+              typename ScalarFieldType>
+    inline ScalarType
+    assemble(ContextType               &c,
+             ScalarFieldType           &f,
+             const Vec1Type            &X,
+             const Vec1Type            &X_adj) {
                 
         Assert0(_e_ops && _output_e_ops, "Elem Operation objects not initialized");
-        Assert2(density.size() == c.rho_sys->n_dofs(),
-                density.size(), c.rho_sys->n_dofs(),
-                "Density coefficients must be provided for whole mesh");
-        Assert2(dvs.size() == sens.size(),
-                dvs.size(), sens.size(),
-                "DV and sensitivity vectors must have same size");
-           
-        uint_t
-        n_density_dofs = c.rho_sys->n_dofs(),
-        n_nodes        = 0;
 
-        MAST::Numerics::Utility::setZero(sens);
-
-        std::unique_ptr<Vec2Type>
-        v (MAST::Numerics::Utility::build<Vec2Type>(*c.rho_sys).release()),
-        v_filtered (MAST::Numerics::Utility::build<Vec2Type>(*c.rho_sys).release());
-
+        ScalarType
+        val = 0.;
+        
         // iterate over each element, initialize it and get the relevant
         // analysis quantities
         typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, Vec1Type>
         sol_accessor     (*c.sys, X),
         adj_accessor     (*c.sys, X_adj);
         
-        typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, Vec2Type>
-        density_accessor (*c.rho_sys, density);
-
         using elem_vector_t = typename ResidualElemOpsType::vector_t;
         using elem_matrix_t = typename ResidualElemOpsType::matrix_t;
         
         elem_vector_t
-        dres_e,
-        drho;
+        dres_e;
 
         uint_t
         idx = 0;
@@ -135,85 +115,42 @@ public:
             c.elem = *el;
             
             sol_accessor.init(*c.elem);
-            density_accessor.init(*c.elem);
             adj_accessor.init(*c.elem);
             
-            const std::vector<libMesh::dof_id_type>
-            &density_dof_ids = density_accessor.dof_indices();
-
-            n_nodes = MAST::Mesh::libMeshWrapper::Utility::n_linear_basis_nodes_on_elem(**el);
+            dres_e.setZero(sol_accessor.n_dofs());
             
-            for (uint_t i=0; i<n_nodes; i++) {
-                
-                if (!dvs.is_design_parameter_dof_id(density_dof_ids[i]))
-                    continue;
-
-                // this assumes that if the DV (which is associated with a node)
-                // is connected to this element, then the dof_indices for this
-                // element will contain this index. If not, then the contribution
-                // of this element to the sensitivity is zero.
-                
-                idx    = dvs.get_dv_id_for_topology_dof(density_dof_ids[i]);
-                const MAST::Optimization::DesignParameter<ScalarType>
-                &dv    = dvs[idx];
-                
-                // set a unit value of density sensitivity
-                // for this dof
-                drho.setZero(density_dof_ids.size());
-                drho(i) = 1.;
-                
-                dres_e.setZero(sol_accessor.n_dofs());
-                
-                // first we compute the partial derivative of the
-                // residual wrt the parameter.
-                _e_ops->derivative(c,
-                                   dv,
-                                   sol_accessor,
-                                   density_accessor,
-                                   drho,
-                                   dres_e,
-                                   nullptr);
-                
-                // next, we compute the partial derivative derivative of
-                // the output functional and add it to the sensitivity result
-                MAST::Numerics::Utility::add
-                (*v,
-                 density_dof_ids[i],
-                 _output_e_ops->derivative(c, // partial derivative of output
-                                           dv,
-                                           sol_accessor,
-                                           density_accessor,
-                                           drho)
-                 + adj_accessor.dot(dres_e)); // the adjoint vector combined w/ res sens
-            }
+            // first we compute the partial derivative of the
+            // residual wrt the parameter.
+            _e_ops->derivative(c,
+                               f,
+                               sol_accessor,
+                               dres_e,
+                               nullptr);
+            
+            
+            val +=
+            _output_e_ops->derivative(c, // partial derivative of output
+                                      f,
+                                      sol_accessor)
+            + adj_accessor.dot(dres_e)); // the adjoint vector combined w/ res sens
         }
         
-        MAST::Numerics::Utility::finalize(*v);
-
-        // Now, combine the sensitivty with the filtering data
-        filter.compute_reverse_filtered_values(*v, *v_filtered);
-
-        // copy the results back to sens
-        for (uint_t i=dvs.local_begin(); i<dvs.local_end(); i++) {
-
-            idx = dvs.get_data_for_parameter(dvs[i]).template get<int>("dof_id");
-            sens[i] = MAST::Numerics::Utility::get(*v_filtered, idx);
-        }
+        MAST::Numerics::Utility::comm_sum(_comm, val);
         
-        MAST::Numerics::Utility::comm_sum(c.rho_sys->comm(), sens);
+        return val;
     }
 
 private:
   
+    libMesh::Comm        &_comm;
     ResidualElemOpsType  *_e_ops;
     OutputElemOpsType    *_output_e_ops;
 };
 
 } // namespace libMeshWrapper
-} // namespace SIMP
-} // namespace Topology
-} // namespace Optimization
+} // namespace Assembly
+} // namespace Base
 } // namespace MAST
 
 
-#endif // __mast_optimization_topology_simp_libmesh_output_sensitivity_h__
+#endif // __mast_libmesh_output_sensitivity_h__
