@@ -58,7 +58,7 @@ public:
         
     inline void set_elem_ops(ElemOpsType& e_ops) { _e_ops = &e_ops; }
 
-    template <typename VecType, typename MatType, typename ContextType, typename ScalarFieldType>
+    template <typename VecType, typename ContextType>
     inline void assemble(ContextType            &c,
                          const VecType          &X,
                          VecType                &dqdX) {
