@@ -113,7 +113,7 @@ public:
         
         Assert0( it != _elem_id_map.end(), "Element not in map");
         
-        return it->second;
+        return it->second + i;
     }
 
 
