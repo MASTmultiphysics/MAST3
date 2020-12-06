@@ -66,8 +66,6 @@ public:
         // analysis quantities
         typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, VecType>
         sol_accessor(*c.sys, X);
-
-        using stress_view_t = typename StorageType::view_t;
         
         libMesh::MeshBase::const_element_iterator
         el     = c.mesh->active_local_elements_begin(),
@@ -82,6 +80,42 @@ public:
                         
             // perform the element level calculations
             _e_ops->compute(c, sol_accessor, index, stress);
+        }
+    }
+
+    
+    template <typename VecType,
+              typename IndexingType,
+              typename StorageType,
+              typename ContextType,
+              typename ScalarFieldType>
+    inline void sensitivity_assemble(ContextType            &c,
+                                     const ScalarFieldType  &f,
+                                     const VecType          &X,
+                                     const VecType          &dX,
+                                     const IndexingType     &index,
+                                     StorageType            &dstress) {
+        
+        // iterate over each element, initialize it and get the relevant
+        // analysis quantities
+        typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, VecType>
+        sol_accessor(*c.sys, X),
+        dsol_accessor(*c.sys, dX);
+        
+        libMesh::MeshBase::const_element_iterator
+        el     = c.mesh->active_local_elements_begin(),
+        end_el = c.mesh->active_local_elements_end();
+        
+        for ( ; el != end_el; ++el) {
+            
+            // set element in the context, which will be used for the initialization routines
+            c.elem = *el;
+            
+            sol_accessor.init(*c.elem);
+            dsol_accessor.init(*c.elem);
+
+            // perform the element level calculations
+            _e_ops->derivative(c, f, sol_accessor, dsol_accessor, index, dstress);
         }
     }
 
