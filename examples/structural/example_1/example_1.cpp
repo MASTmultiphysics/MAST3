@@ -841,7 +841,8 @@ inline void print_difference(VecType                     &dsol,
                              StressStorageType           &dstress,
                              StressStorageTypeCS         &stress_cs,
                              vonMisesStressStorageType   &dvm_stress,
-                             vonMisesStressStorageTypeCS &vm_stress_cs) {
+                             vonMisesStressStorageTypeCS &vm_stress_cs,
+                             std::string                  nm) {
  
     // the complex-step sensitivity is obtained from the imaginary part of the solution.
     // We compute the difference between the analytical sensitivity in \p dsol and
@@ -870,6 +871,7 @@ inline void print_difference(VecType                     &dsol,
     // print out the norm of the difference. The difference should be zero to machine
     // precision. This proceduce is followed for all the other parameters.
     std::cout
+    << std::setw(5)  << nm
     << std::setw(20) << dsol.norm()
     << std::setw(20) << dstress_vec.norm()
     << std::setw(20) << dvm_stress_vec.norm()
@@ -936,8 +938,9 @@ int main(int argc, const char** argv) {
 
     // print the header for the table
     std::cout
-    << std::setw(60) << " **********  Norm of Difference in Sensitivity ********  "
+    << std::setw(65) << " **********  Norm of Difference in Sensitivity ********  "
     << std::endl
+    << std::setw(5) << "Param"
     << std::setw(20) << "Solution"
     << std::setw(20) << "Stress"
     << std::setw(20) << "vonMises Stress"
@@ -966,7 +969,8 @@ int main(int argc, const char** argv) {
         MAST::Examples::Structural::Example1::print_difference
         (dsol, sol_c,
          dstress, stress_cs,
-         dvm_stress, vm_stress_cs);
+         dvm_stress, vm_stress_cs,
+         "E");
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////
@@ -991,7 +995,8 @@ int main(int argc, const char** argv) {
         MAST::Examples::Structural::Example1::print_difference
         (dsol, sol_c,
          dstress, stress_cs,
-         dvm_stress, vm_stress_cs);
+         dvm_stress, vm_stress_cs,
+         "nu");
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////
@@ -1016,7 +1021,8 @@ int main(int argc, const char** argv) {
         MAST::Examples::Structural::Example1::print_difference
         (dsol, sol_c,
          dstress, stress_cs,
-         dvm_stress, vm_stress_cs);
+         dvm_stress, vm_stress_cs,
+         "pres");
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////
@@ -1042,7 +1048,8 @@ int main(int argc, const char** argv) {
         MAST::Examples::Structural::Example1::print_difference
         (dsol, sol_c,
          dstress, stress_cs,
-         dvm_stress, vm_stress_cs);
+         dvm_stress, vm_stress_cs,
+         "area");
     }
     
     // END_TRANSLATE
