@@ -31,6 +31,7 @@
 #include <mast/physics/elasticity/linear_strain_energy.hpp>
 #include <mast/physics/elasticity/pressure_load.hpp>
 #include <mast/physics/elasticity/continuum_stress.hpp>
+#include <mast/physics/elasticity/von_mises_stress.hpp>
 #include <mast/base/assembly/libmesh/residual_and_jacobian.hpp>
 #include <mast/base/assembly/libmesh/residual_sensitivity.hpp>
 #include <mast/base/assembly/libmesh/stress_assembly.hpp>
@@ -70,25 +71,41 @@ public:
     mesh      (new libMesh::ReplicatedMesh(comm)),
     eq_sys    (new libMesh::EquationSystems(*mesh)),
     sys       (&eq_sys->add_system<libMesh::NonlinearImplicitSystem>("structural")),
+    stress_sys(&eq_sys->add_system<libMesh::ExplicitSystem>("stress")),
     elem      (nullptr),
     qp        (-1),
     p_side_id (1),
     index     (nullptr) {
 
 
-
+        // initialize the mesh on a two-dimensional domanin of size
+        // \f$ [0,10]\times[0,10]\f$ with a \f$ 10\times 10\f$ mesh of nine-noded
+        // quadrilateral elements.
         libMesh::MeshTools::Generation::build_square(*mesh,
-                                                     2, 2,
+                                                     10, 10,
                                                      0.0, 10.0,
                                                      0.0, 10.0,
                                                      libMesh::QUAD9);
 
+        // We add two variables to the system, one for each component of the displacement.
+        // The variables are discretized using C0 continuous Lagrange shape functions
+        // of second order, as defined in the constructor above.
         sys->add_variable("u_x", libMesh::FEType(fe_order, fe_family));
         sys->add_variable("u_y", libMesh::FEType(fe_order, fe_family));
 
+        // we add constant variables for plotting stress. One variable for each component
+        // of stress \f$ \{ \sigma_xx, \sigma_yy, \sigma_xy \} \f$ and one for von Mises
+        // stress.
+        stress_sys->add_variable("s_xx", libMesh::FEType(libMesh::CONSTANT, libMesh::MONOMIAL));
+        stress_sys->add_variable("s_yy", libMesh::FEType(libMesh::CONSTANT, libMesh::MONOMIAL));
+        stress_sys->add_variable("s_xy", libMesh::FEType(libMesh::CONSTANT, libMesh::MONOMIAL));
+        stress_sys->add_variable("s_vm", libMesh::FEType(libMesh::CONSTANT, libMesh::MONOMIAL));
+
+        // this constrains both displacement variables on boundary 3 (left edge) to zero.
         sys->get_dof_map().add_dirichlet_boundary
         (libMesh::DirichletBoundary({3}, {0, 1}, libMesh::ZeroFunction<real_t>()));
         
+        // initializing the equation system sets up the discretization in libMesh.
         eq_sys->init();
 
         mesh->print_info(std::cout);
@@ -128,6 +145,7 @@ public:
     libMesh::ReplicatedMesh          *mesh;
     libMesh::EquationSystems         *eq_sys;
     libMesh::NonlinearImplicitSystem *sys;
+    libMesh::ExplicitSystem          *stress_sys;
     const libMesh::Elem              *elem;
     uint_t                            qp;
     uint_t                            p_side_id;
@@ -296,6 +314,8 @@ public:
         
         for (uint_t i=0; i<_fe_var->n_q_points(); i++) {
             
+            c.qp = i;
+            
             id = index.local_id_for_point_on_elem(c.elem, i);
             typename StorageType::view_t
             stress_qp = storage.data(id);
@@ -417,6 +437,66 @@ compute_stress(Context                                        &c,
 }
 
 
+// this identifies maximum value of each stress component on the element
+// and copies it to the system for plotting
+template <typename IndexingType, typename StressStorageType>
+inline void
+copy_stress_to_system(libMesh::System          &sys,
+                      const IndexingType       &index,
+                      const StressStorageType  &stress,
+                      const uint_t              n_stress_comp,
+                      const uint_t              n_qp) {
+    
+    libMesh::MeshBase::const_element_iterator
+    it  = sys.get_mesh().active_local_elements_begin(),
+    end = sys.get_mesh().active_local_elements_end();
+    
+    for ( ; it != end; it++) {
+        
+        const libMesh::Elem *e = *it;
+
+        // this stores the components of stress for each quadrature point
+        // in the matrix column
+        Eigen::Matrix<real_t, Eigen::Dynamic, Eigen::Dynamic>
+        s_vals = Eigen::Matrix<real_t, Eigen::Dynamic, Eigen::Dynamic>::Zero(n_stress_comp+1, n_qp);
+        
+        uint_t
+        id = 0;
+        
+        for (uint_t i=0; i<n_qp; i++) {
+         
+            id = index.local_id_for_point_on_elem(e, i);
+            
+            typename StressStorageType::view_t
+            stress_e = stress.data(id);
+            
+            // copy the stress components
+            s_vals.col(i).topRows(n_stress_comp) = stress_e;
+            
+            // compute the von Mises stress and put that in the last row
+            s_vals(n_stress_comp, i) =
+            MAST::Physics::Elasticity::LinearContinuum::vonMises_stress
+            <real_t, 2, typename StressStorageType::view_t>(stress_e);
+        }
+        
+        // identify the maximum absolute value of stress
+        for (uint_t i=0; i<n_stress_comp+1; i++) {
+            real_t
+            v = s_vals(i,0);
+            
+            for (uint_t j=1; j<n_qp; j++) {
+                if (fabs(v) < fabs(s_vals(i,j))) v = s_vals(i,j);
+            }
+            
+            // set the value in the system solution vector
+            sys.solution->set(e->dof_number(sys.number(), i, 0), v);
+        }
+        
+        // copy the maximum value for each stress component to the system
+        sys.solution->close();
+    }
+}
+
 
 template <typename TraitsType>
 inline void
@@ -523,8 +603,14 @@ int main(int argc, const char** argv) {
 
     // compute the solution
     MAST::Examples::Structural::Example1::compute_sol<traits_t>(c, e_ops, sol);
+    
+    // compute the stresses from the solution
     MAST::Examples::Structural::Example1::compute_stress<traits_t>
     (c, e_ops, sol, *c.index, stress);
+
+    // copy the solution to system for plotting
+    MAST::Examples::Structural::Example1::copy_stress_to_system
+    (*c.stress_sys, *c.index, stress, traits_t::stress_t::n_strain, c.n_qpoints_per_elem());
     
     // write solution as first time-step
     libMesh::ExodusII_IO writer(*c.mesh);
