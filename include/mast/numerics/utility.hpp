@@ -390,9 +390,27 @@ comm_min(const libMesh::Parallel::Communicator& comm,
 }
 
 
+inline real_t
+comm_min(const libMesh::Parallel::Communicator &comm,
+         real_t                                 v) {
+    
+    comm.min(v);
+    
+    return v;
+}
+
+
 inline complex_t
 comm_min(const libMesh::Parallel::Communicator& comm,
          const std::vector<complex_t>& v) {
+    Error(false, "Not currently implemented for complex_t");
+}
+
+
+inline complex_t
+comm_min(const libMesh::Parallel::Communicator &comm,
+         complex_t                                 v) {
+    
     Error(false, "Not currently implemented for complex_t");
 }
 
@@ -409,9 +427,26 @@ comm_max(const libMesh::Parallel::Communicator& comm,
     return v_max;
 }
 
+
+inline real_t
+comm_max(const libMesh::Parallel::Communicator &comm,
+         real_t                                 v) {
+    
+    comm.max(v);
+    
+    return v;
+}
+
 inline complex_t
 comm_max(const libMesh::Parallel::Communicator& comm,
          const std::vector<complex_t>& v) {
+    Error(false, "Not currently implemented for complex_t");
+}
+
+
+inline complex_t
+comm_max(const libMesh::Parallel::Communicator &comm,
+         complex_t                              v) {
     Error(false, "Not currently implemented for complex_t");
 }
 
@@ -426,7 +461,8 @@ comm_sum(const libMesh::Parallel::Communicator& comm,
 inline void
 comm_sum(const libMesh::Parallel::Communicator& comm,
          std::vector<adouble_tl_t>& v) {
-    comm.sum(v);
+    
+    Error(false, "Not currently implemented for adouble_tl_t");
 }
 
 inline adouble_tl_t
@@ -437,8 +473,23 @@ comm_min(const libMesh::Parallel::Communicator& comm,
 }
 
 inline adouble_tl_t
+comm_min(const libMesh::Parallel::Communicator  &comm,
+         adouble_tl_t                            v) {
+    
+    Error(false, "Not currently implemented for adouble_tl_t");
+}
+
+
+inline adouble_tl_t
 comm_max(const libMesh::Parallel::Communicator& comm,
          const std::vector<adouble_tl_t>& v) {
+    
+    Error(false, "Not currently implemented for adouble_tl_t");
+}
+
+inline adouble_tl_t
+comm_max(const libMesh::Parallel::Communicator &comm,
+         std::vector<adouble_tl_t>              v) {
     
     Error(false, "Not currently implemented for adouble_tl_t");
 }
