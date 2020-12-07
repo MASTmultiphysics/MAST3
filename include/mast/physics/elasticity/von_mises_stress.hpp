@@ -41,10 +41,10 @@ using stress_adjoint_mat_t = Eigen::Matrix<ScalarType,
 
 
 
-template <typename ScalarType, uint_t Dim>
+template <typename ScalarType, uint_t Dim, typename VecType>
 inline
 typename std::enable_if<Dim==2, ScalarType>::type
-vonMises_stress(stress_vec_t<ScalarType, Dim>& stress) {
+vonMises_stress(const VecType& stress) {
    
     Assert1(stress.size() == MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<Dim>::value,
             stress.size(),
@@ -59,10 +59,10 @@ vonMises_stress(stress_vec_t<ScalarType, Dim>& stress) {
 
 
 
-template <typename ScalarType, uint_t Dim>
+template <typename ScalarType, uint_t Dim, typename VecType>
 inline
 typename std::enable_if<Dim==3, ScalarType>::type
-vonMises_stress(stress_vec_t<ScalarType, Dim>& stress) {
+vonMises_stress(const VecType& stress) {
    
     Assert1(stress.size() == MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<Dim>::value,
             stress.size(),
@@ -79,11 +79,11 @@ vonMises_stress(stress_vec_t<ScalarType, Dim>& stress) {
 
 
 
-template <typename ScalarType, uint_t Dim>
+template <typename ScalarType, uint_t Dim, typename Vec1Type, typename Vec2Type>
 inline
 typename std::enable_if<Dim==2, ScalarType>::type
-vonMises_stress_derivative(stress_vec_t<ScalarType, Dim>& stress,
-                           stress_vec_t<ScalarType, Dim>& dstress_dp) {
+vonMises_stress_derivative(const Vec1Type& stress,
+                           const Vec2Type& dstress_dp) {
     
     Assert1(stress.size() == MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<Dim>::value,
             stress.size(),
@@ -115,11 +115,11 @@ vonMises_stress_derivative(stress_vec_t<ScalarType, Dim>& stress,
 
 
 
-template <typename ScalarType, uint_t Dim>
+template <typename ScalarType, uint_t Dim, typename Vec1Type, typename Vec2Type>
 inline
 typename std::enable_if<Dim==3, ScalarType>::type
-vonMises_stress_derivative(stress_vec_t<ScalarType, Dim>& stress,
-                           stress_vec_t<ScalarType, Dim>& dstress_dp) {
+vonMises_stress_derivative(const Vec1Type& stress,
+                           const Vec2Type& dstress_dp) {
     
     Assert1(stress.size() == MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<Dim>::value,
             stress.size(),
@@ -154,11 +154,14 @@ vonMises_stress_derivative(stress_vec_t<ScalarType, Dim>& stress,
 
 
 
-template <typename ScalarType, uint_t Dim>
+template <typename ScalarType,
+          uint_t Dim,
+          typename VecType,
+          typename AdjMatType>
 inline
 typename std::enable_if<Dim==2, void>::type
-vonMises_stress_dX(stress_vec_t<ScalarType, Dim>                &stress,
-                   stress_adjoint_mat_t<ScalarType, Dim>        &dstress_dX,
+vonMises_stress_dX(const VecType                   &stress,
+                   const AdjMatType                &dstress_dX,
                    Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> &vm_adjoint) {
     
     Assert1(stress.size() == MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<Dim>::value,
@@ -191,11 +194,14 @@ vonMises_stress_dX(stress_vec_t<ScalarType, Dim>                &stress,
 
 
 
-template <typename ScalarType, uint_t Dim>
+template <typename ScalarType,
+          uint_t Dim,
+          typename VecType,
+          typename AdjMatType>
 inline
 typename std::enable_if<Dim==3, void>::type
-vonMises_stress_dX(stress_vec_t<ScalarType, Dim>                &stress,
-                   stress_adjoint_mat_t<ScalarType, Dim>        &dstress_dX,
+vonMises_stress_dX(const VecType                &stress,
+                   const AdjMatType             &dstress_dX,
                    Eigen::Matrix<ScalarType, Eigen::Dynamic, 1> &vm_adjoint) {
     
     Assert1(stress.size() == MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<Dim>::value,

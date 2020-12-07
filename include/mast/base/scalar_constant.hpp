@@ -76,7 +76,8 @@ private:
     
     ScalarType _v;
 };
-}
-}
+
+} // namespace Base
+} // namespace MAST
 
 #endif // __mast_scalar_constant_h__
