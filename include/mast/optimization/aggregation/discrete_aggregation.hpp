@@ -41,9 +41,9 @@ namespace Aggregation {
  */
 template <typename ScalarType>
 ScalarType
-aggregate_minimum(libMesh::Parallel::Communicator *comm,
-                  const std::vector<ScalarType>   &vec,
-                  const real_t                     p) {
+aggregate_minimum(const libMesh::Parallel::Communicator *comm,
+                  const std::vector<ScalarType>         &vec,
+                  const real_t                           p) {
     
     ScalarType
     v      = 0.,
@@ -51,14 +51,14 @@ aggregate_minimum(libMesh::Parallel::Communicator *comm,
     
     v_min = MAST::Numerics::Utility::real_minimum(vec);
     
-    if (comm) MAST::Numerics::Utility::comm_min(comm, v_min);
+    if (comm) MAST::Numerics::Utility::comm_min(*comm, v_min);
     
     for (uint_t i=0; i<vec.size(); i++) {
         
         v += exp(-p * (vec[i] - v_min));
     }
     
-    if (comm) MAST::Numerics::Utility::comm_sum(comm, v);
+    if (comm) MAST::Numerics::Utility::comm_sum(*comm, v);
 
     v = v_min - log(v) / p;
     
@@ -77,10 +77,10 @@ aggregate_minimum(libMesh::Parallel::Communicator *comm,
  */
 template <typename ScalarType>
 ScalarType
-aggregate_minimum_sensitivity(libMesh::Parallel::Communicator *comm,
-                              const std::vector<ScalarType>   &vec,
-                              const uint_t                     i,
-                              const real_t                     p) {
+aggregate_minimum_sensitivity(const libMesh::Parallel::Communicator *comm,
+                              const std::vector<ScalarType>         &vec,
+                              const uint_t                           i,
+                              const real_t                           p) {
     
     ScalarType
     v      = 0.,
@@ -88,14 +88,14 @@ aggregate_minimum_sensitivity(libMesh::Parallel::Communicator *comm,
     
     v_min = MAST::Numerics::Utility::real_minimum(vec);
 
-    if (comm) MAST::Numerics::Utility::comm_min(comm, v_min);
+    if (comm) MAST::Numerics::Utility::comm_min(*comm, v_min);
 
     for (uint_t i=0; i<vec.size(); i++) {
         
         v  += exp(-p * (vec[i] - v_min));
     }
     
-    if (comm) MAST::Numerics::Utility::comm_sum(comm, v);
+    if (comm) MAST::Numerics::Utility::comm_sum(*comm, v);
 
     v = exp(-p * (vec[i] - v_min)) / v;
     
@@ -116,10 +116,10 @@ aggregate_minimum_sensitivity(libMesh::Parallel::Communicator *comm,
  */
 template <typename ScalarType>
 ScalarType
-aggregate_minimum_sensitivity(libMesh::Parallel::Communicator *comm,
-                              const std::vector<ScalarType>   &vec,
-                              const std::vector<ScalarType>   &dvec,
-                              const real_t                     p) {
+aggregate_minimum_sensitivity(const libMesh::Parallel::Communicator *comm,
+                              const std::vector<ScalarType>         &vec,
+                              const std::vector<ScalarType>         &dvec,
+                              const real_t                           p) {
     
     ScalarType
     dv     = 0.,
@@ -128,7 +128,7 @@ aggregate_minimum_sensitivity(libMesh::Parallel::Communicator *comm,
     
     v_min = MAST::Numerics::Utility::real_minimum(vec);
 
-    if (comm) MAST::Numerics::Utility::comm_min(comm, v_min);
+    if (comm) MAST::Numerics::Utility::comm_min(*comm, v_min);
 
     for (uint_t i=0; i<vec.size(); i++) {
         
@@ -136,8 +136,8 @@ aggregate_minimum_sensitivity(libMesh::Parallel::Communicator *comm,
         v  += exp(-p * (vec[i] - v_min));
     }
     
-    if (comm) MAST::Numerics::Utility::comm_sum(comm, dv);
-    if (comm) MAST::Numerics::Utility::comm_sum(comm, v);
+    if (comm) MAST::Numerics::Utility::comm_sum(*comm, dv);
+    if (comm) MAST::Numerics::Utility::comm_sum(*comm, v);
 
     v = dv / v;
     
@@ -156,24 +156,24 @@ aggregate_minimum_sensitivity(libMesh::Parallel::Communicator *comm,
  */
 template <typename ScalarType>
 void
-aggregate_minimum_denominator(libMesh::Parallel::Communicator *comm,
-                              const std::vector<ScalarType>   &vec,
-                              const real_t                     p,
-                              ScalarType                      &denom,
-                              ScalarType                      &v_min) {
+aggregate_minimum_denominator(const libMesh::Parallel::Communicator *comm,
+                              const std::vector<ScalarType>         &vec,
+                              const real_t                           p,
+                              ScalarType                            &denom,
+                              ScalarType                            &v_min) {
     
     denom  = 0.;
     
     v_min = MAST::Numerics::Utility::real_minimum(vec);
 
-    if (comm) MAST::Numerics::Utility::comm_min(comm, v_min);
+    if (comm) MAST::Numerics::Utility::comm_min(*comm, v_min);
 
     for (uint_t i=0; i<vec.size(); i++) {
         
         denom  += exp(-p * (vec[i] - v_min));
     }
     
-    if (comm) MAST::Numerics::Utility::comm_sum(comm, denom);
+    if (comm) MAST::Numerics::Utility::comm_sum(*comm, denom);
 }
 
 
@@ -214,12 +214,12 @@ aggregate_minimum_sensitivity(const std::vector<ScalarType>   &vec,
  */
 template <typename ScalarType>
 ScalarType
-aggregate_minimum_sensitivity(libMesh::Parallel::Communicator *comm,
-                              const std::vector<ScalarType>   &vec,
-                              const std::vector<ScalarType>   &dvec,
-                              const real_t                     p,
-                              const ScalarType                &denom,
-                              const ScalarType                &v_min) {
+aggregate_minimum_sensitivity(const libMesh::Parallel::Communicator *comm,
+                              const std::vector<ScalarType>         &vec,
+                              const std::vector<ScalarType>         &dvec,
+                              const real_t                           p,
+                              const ScalarType                      &denom,
+                              const ScalarType                      &v_min) {
     
     ScalarType
     dv     = 0.;
@@ -229,7 +229,7 @@ aggregate_minimum_sensitivity(libMesh::Parallel::Communicator *comm,
         dv += exp(-p * (vec[i] - v_min)) * dvec[i];
     }
     
-    if (comm) MAST::Numerics::Utility::comm_sum(comm, dv);
+    if (comm) MAST::Numerics::Utility::comm_sum(*comm, dv);
 
    return dv / denom;
 }
@@ -245,9 +245,9 @@ aggregate_minimum_sensitivity(libMesh::Parallel::Communicator *comm,
  */
 template <typename ScalarType>
 ScalarType
-aggregate_maximum(libMesh::Parallel::Communicator *comm,
-                  const std::vector<ScalarType>   &vec,
-                  const real_t                     p) {
+aggregate_maximum(const libMesh::Parallel::Communicator *comm,
+                  const std::vector<ScalarType>         &vec,
+                  const real_t                           p) {
     
     ScalarType
     v      = 0.,
@@ -255,14 +255,14 @@ aggregate_maximum(libMesh::Parallel::Communicator *comm,
 
     v_max = MAST::Numerics::Utility::real_maximum(vec);
 
-    if (comm) MAST::Numerics::Utility::comm_max(comm, v_max);
+    if (comm) MAST::Numerics::Utility::comm_max(*comm, v_max);
 
     for (uint_t i=0; i<vec.size(); i++) {
         
         v += exp(p * (vec[i] - v_max));
     }
     
-    if (comm) MAST::Numerics::Utility::comm_sum(comm, v);
+    if (comm) MAST::Numerics::Utility::comm_sum(*comm, v);
 
     v = v_max + log(v) / p;
     
@@ -281,10 +281,10 @@ aggregate_maximum(libMesh::Parallel::Communicator *comm,
  */
 template <typename ScalarType>
 ScalarType
-aggregate_maximum_sensitivity(libMesh::Parallel::Communicator *comm,
-                              const std::vector<ScalarType>   &vec,
-                              const uint_t                     i,
-                              const real_t                     p) {
+aggregate_maximum_sensitivity(const libMesh::Parallel::Communicator *comm,
+                              const std::vector<ScalarType>         &vec,
+                              const uint_t                           i,
+                              const real_t                           p) {
     
     ScalarType
     v      = 0.,
@@ -292,14 +292,14 @@ aggregate_maximum_sensitivity(libMesh::Parallel::Communicator *comm,
     
     v_max = MAST::Numerics::Utility::real_maximum(vec);
 
-    if (comm) MAST::Numerics::Utility::comm_max(comm, v_max);
+    if (comm) MAST::Numerics::Utility::comm_max(*comm, v_max);
     
     for (uint_t i=0; i<vec.size(); i++) {
         
         v += exp(p * (vec[i] - v_max));
     }
     
-    if (comm) MAST::Numerics::Utility::comm_sum(comm, v);
+    if (comm) MAST::Numerics::Utility::comm_sum(*comm, v);
 
     v = exp(p * (vec[i] - v_max)) / v;
     
@@ -320,10 +320,10 @@ aggregate_maximum_sensitivity(libMesh::Parallel::Communicator *comm,
  */
 template <typename ScalarType>
 ScalarType
-aggregate_maximum_sensitivity(libMesh::Parallel::Communicator *comm,
-                              const std::vector<ScalarType>   &vec,
-                              const std::vector<ScalarType>   &dvec,
-                              const real_t                     p) {
+aggregate_maximum_sensitivity(const libMesh::Parallel::Communicator *comm,
+                              const std::vector<ScalarType>         &vec,
+                              const std::vector<ScalarType>         &dvec,
+                              const real_t                           p) {
     
     ScalarType
     dv     = 0.,
@@ -332,7 +332,7 @@ aggregate_maximum_sensitivity(libMesh::Parallel::Communicator *comm,
     
     v_max = MAST::Numerics::Utility::real_maximum(vec);
 
-    if (comm) MAST::Numerics::Utility::comm_max(comm, v_max);
+    if (comm) MAST::Numerics::Utility::comm_max(*comm, v_max);
 
     for (uint_t i=0; i<vec.size(); i++) {
         
@@ -340,8 +340,8 @@ aggregate_maximum_sensitivity(libMesh::Parallel::Communicator *comm,
         v  += exp(p * (vec[i] - v_max));
     }
     
-    if (comm) MAST::Numerics::Utility::comm_sum(comm, dv);
-    if (comm) MAST::Numerics::Utility::comm_sum(comm, v);
+    if (comm) MAST::Numerics::Utility::comm_sum(*comm, dv);
+    if (comm) MAST::Numerics::Utility::comm_sum(*comm, v);
 
     v = dv / v;
     
@@ -359,24 +359,24 @@ aggregate_maximum_sensitivity(libMesh::Parallel::Communicator *comm,
  */
 template <typename ScalarType>
 void
-aggregate_maximum_denominator(libMesh::Parallel::Communicator *comm,
-                              const std::vector<ScalarType>   &vec,
-                              const real_t                     p,
-                              ScalarType                      &denom,
-                              ScalarType                      &v_max) {
+aggregate_maximum_denominator(const libMesh::Parallel::Communicator *comm,
+                              const std::vector<ScalarType>         &vec,
+                              const real_t                           p,
+                              ScalarType                            &denom,
+                              ScalarType                            &v_max) {
     
     denom  = 0.;
     
     v_max = MAST::Numerics::Utility::real_maximum(vec);
 
-    if (comm) MAST::Numerics::Utility::comm_max(comm, v_max);
+    if (comm) MAST::Numerics::Utility::comm_max(*comm, v_max);
     
     for (uint_t i=0; i<vec.size(); i++) {
         
         denom  += exp(p * (vec[i] - v_max));
     }
 
-    if (comm) MAST::Numerics::Utility::comm_sum(comm, denom);
+    if (comm) MAST::Numerics::Utility::comm_sum(*comm, denom);
 }
 
 
@@ -417,12 +417,12 @@ aggregate_maximum_sensitivity(const std::vector<ScalarType>   &vec,
  */
 template <typename ScalarType>
 ScalarType
-aggregate_maximum_sensitivity(libMesh::Parallel::Communicator *comm,
-                              const std::vector<ScalarType>   &vec,
-                              const std::vector<ScalarType>   &dvec,
-                              const real_t                     p,
-                              const ScalarType                &denom,
-                              const ScalarType                &v_max) {
+aggregate_maximum_sensitivity(const libMesh::Parallel::Communicator *comm,
+                              const std::vector<ScalarType>         &vec,
+                              const std::vector<ScalarType>         &dvec,
+                              const real_t                           p,
+                              const ScalarType                      &denom,
+                              const ScalarType                      &v_max) {
     
     ScalarType
     dv     = 0.;
@@ -432,7 +432,7 @@ aggregate_maximum_sensitivity(libMesh::Parallel::Communicator *comm,
         dv += exp(p * (vec[i] - v_max)) * dvec[i];
     }
 
-    if (comm) MAST::Numerics::Utility::comm_sum(comm, dv);
+    if (comm) MAST::Numerics::Utility::comm_sum(*comm, dv);
 
     return dv / denom;
 }
