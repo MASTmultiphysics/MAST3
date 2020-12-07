@@ -377,6 +377,74 @@ comm_sum(const libMesh::Parallel::Communicator& comm,
 }
 
 
+inline real_t
+comm_min(const libMesh::Parallel::Communicator& comm,
+         const std::vector<real_t>& v) {
+    
+    real_t
+    v_min = *std::min_element(v.begin(), v.end());
+    
+    comm.min(v_min);
+    
+    return v_min;
+}
+
+
+inline complex_t
+comm_min(const libMesh::Parallel::Communicator& comm,
+         const std::vector<complex_t>& v) {
+    Error(false, "Not currently implemented for complex_t");
+}
+
+
+inline real_t
+comm_max(const libMesh::Parallel::Communicator& comm,
+         const std::vector<real_t>& v) {
+    
+    real_t
+    v_max = *std::max_element(v.begin(), v.end());
+    
+    comm.max(v_max);
+    
+    return v_max;
+}
+
+inline complex_t
+comm_max(const libMesh::Parallel::Communicator& comm,
+         const std::vector<complex_t>& v) {
+    Error(false, "Not currently implemented for complex_t");
+}
+
+
+#if MAST_ENABLE_ADOLC == 1
+inline void
+comm_sum(const libMesh::Parallel::Communicator& comm,
+         adouble_tl_t& v) {
+    Error(false, "Not currently implemented for adouble_tl_t");
+}
+
+inline void
+comm_sum(const libMesh::Parallel::Communicator& comm,
+         std::vector<adouble_tl_t>& v) {
+    comm.sum(v);
+}
+
+inline adouble_tl_t
+comm_min(const libMesh::Parallel::Communicator& comm,
+         const std::vector<adouble_tl_t>& v) {
+    
+    Error(false, "Not currently implemented for adouble_tl_t");
+}
+
+inline adouble_tl_t
+comm_max(const libMesh::Parallel::Communicator& comm,
+         const std::vector<adouble_tl_t>& v) {
+    
+    Error(false, "Not currently implemented for adouble_tl_t");
+}
+#endif
+
+
 } // namespace Utility
 } // namespace Numerics
 } // namespace MAST
