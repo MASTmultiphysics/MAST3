@@ -26,6 +26,7 @@
 
 // MAST includes
 #include <mast/base/mast_data_types.h>
+#include <mast/base/exceptions.hpp>
 
 // libMesh includes
 #include <libmesh/numeric_vector.h>
@@ -489,7 +490,7 @@ comm_max(const libMesh::Parallel::Communicator& comm,
 
 inline adouble_tl_t
 comm_max(const libMesh::Parallel::Communicator &comm,
-         std::vector<adouble_tl_t>              v) {
+         adouble_tl_t                           v) {
     
     Error(false, "Not currently implemented for adouble_tl_t");
 }
