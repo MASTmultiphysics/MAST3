@@ -468,6 +468,8 @@ public:
             MAST::Optimization::Aggregation::aggregate_maximum_sensitivity
             (*vm_stress_vec, id, c.agg_rho, denom, s_max) ;
         }
+        
+        return dq;
     }
 
 
