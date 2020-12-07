@@ -79,11 +79,11 @@ vonMises_stress(const VecType& stress) {
 
 
 
-template <typename ScalarType, uint_t Dim, typename VecType>
+template <typename ScalarType, uint_t Dim, typename Vec1Type, typename Vec2Type>
 inline
 typename std::enable_if<Dim==2, ScalarType>::type
-vonMises_stress_derivative(const VecType& stress,
-                           const VecType& dstress_dp) {
+vonMises_stress_derivative(const Vec1Type& stress,
+                           const Vec2Type& dstress_dp) {
     
     Assert1(stress.size() == MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<Dim>::value,
             stress.size(),
@@ -115,11 +115,11 @@ vonMises_stress_derivative(const VecType& stress,
 
 
 
-template <typename ScalarType, uint_t Dim, typename VecType>
+template <typename ScalarType, uint_t Dim, typename Vec1Type, typename Vec2Type>
 inline
 typename std::enable_if<Dim==3, ScalarType>::type
-vonMises_stress_derivative(const VecType& stress,
-                           const VecType& dstress_dp) {
+vonMises_stress_derivative(const Vec1Type& stress,
+                           const Vec2Type& dstress_dp) {
     
     Assert1(stress.size() == MAST::Physics::Elasticity::LinearContinuum::NStrainComponents<Dim>::value,
             stress.size(),
