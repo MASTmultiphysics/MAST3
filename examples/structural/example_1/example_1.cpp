@@ -1045,16 +1045,17 @@ inline void write_solution(ContextType               &c,
                            IndexType                 &index,
                            StressStorageType         &stress,
                            vonMisesStressStorageType &vm_stress,
-                           uint_t                     time) {
+                           uint_t                     time,
+                           libMesh::ExodusII_IO      &writer) {
  
     // copy the solution to system for plotting
     MAST::Examples::Structural::Example1::copy_stress_to_system
     (*c.stress_sys, *c.index, stress, vm_stress, TraitsType::stress_t::n_strain, c.n_qpoints_per_elem());
     
     // write solution as first time-step
-    libMesh::ExodusII_IO writer(*c.mesh);
     {
         for (uint_t i=0; i<sol.size(); i++) c.sys->solution->set(i, sol(i));
+        c.sys->solution->close();
         writer.write_timestep("solution.exo", *c.eq_sys, time, 1.*time);
     }
 }
@@ -1187,13 +1188,14 @@ int main(int argc, const char** argv) {
     std::vector<real_t>
     vm_stress_vec(vm_stress.data(), vm_stress.data()+vm_stress.size());
     e_ops.vm_stress_vec = &vm_stress_vec;
+    libMesh::ExodusII_IO writer(*c.mesh);
     
-    MAST::Examples::Structural::Example1::write_solution<traits_t>
-    (c, sol, *c.index, stress, vm_stress, 1);
-
     // compute the adjoint solution
     MAST::Examples::Structural::Example1::compute_adjoint_sol<traits_t>
     (c, e_ops, sol, *c.index, stress, adj);
+
+    MAST::Examples::Structural::Example1::write_solution<traits_t>
+    (c, adj, *c.index, stress, vm_stress, 1, writer);
 
     // print the header for the table
     std::cout
@@ -1227,7 +1229,7 @@ int main(int argc, const char** argv) {
          vm_stress, dvm_stress, dvm_agg, dvm_agg_adj);
         
         MAST::Examples::Structural::Example1::write_solution<traits_t>
-        (c, dsol, *c.index, dstress, dvm_stress, 2);
+        (c, dsol, *c.index, dstress, dvm_stress, 2, writer);
 
         MAST::Examples::Structural::Example1::print_difference
         (dsol, sol_c,
@@ -1256,7 +1258,7 @@ int main(int argc, const char** argv) {
          vm_stress, dvm_stress, dvm_agg, dvm_agg_adj);
         
         MAST::Examples::Structural::Example1::write_solution<traits_t>
-        (c, dsol, *c.index, dstress, dvm_stress, 3);
+        (c, dsol, *c.index, dstress, dvm_stress, 3, writer);
 
         MAST::Examples::Structural::Example1::print_difference
         (dsol, sol_c,
@@ -1285,7 +1287,7 @@ int main(int argc, const char** argv) {
          vm_stress, dvm_stress, dvm_agg, dvm_agg_adj);
         
         MAST::Examples::Structural::Example1::write_solution<traits_t>
-        (c, dsol, *c.index, dstress, dvm_stress, 4);
+        (c, dsol, *c.index, dstress, dvm_stress, 4, writer);
 
         MAST::Examples::Structural::Example1::print_difference
         (dsol, sol_c,
@@ -1315,7 +1317,7 @@ int main(int argc, const char** argv) {
          vm_stress, dvm_stress, dvm_agg, dvm_agg_adj);
         
         MAST::Examples::Structural::Example1::write_solution<traits_t>
-        (c, dsol, *c.index, dstress, dvm_stress, 5);
+        (c, dsol, *c.index, dstress, dvm_stress, 5, writer);
 
         MAST::Examples::Structural::Example1::print_difference
         (dsol, sol_c,
