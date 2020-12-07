@@ -35,6 +35,8 @@
 #include <mast/base/assembly/libmesh/residual_and_jacobian.hpp>
 #include <mast/base/assembly/libmesh/residual_sensitivity.hpp>
 #include <mast/base/assembly/libmesh/stress_assembly.hpp>
+#include <mast/base/assembly/libmesh/material_point_output_derivative.hpp>
+#include <mast/base/assembly/libmesh/material_point_output_sensitivity.hpp>
 #include <mast/numerics/libmesh/sparse_matrix_initialization.hpp>
 #include <mast/optimization/aggregation/discrete_aggregation.hpp>
 
@@ -76,7 +78,8 @@ public:
     elem      (nullptr),
     qp        (-1),
     p_side_id (1),
-    index     (nullptr) {
+    index     (nullptr),
+    agg_rho   (50)  {
 
 
         // initialize the mesh on a two-dimensional domanin of size
@@ -151,6 +154,7 @@ public:
     uint_t                            qp;
     uint_t                            p_side_id;
     mp_indexing_t                    *index;
+    real_t                            agg_rho;
 };
 
 
@@ -204,6 +208,8 @@ public:
     nu            (nullptr),
     press         (nullptr),
     area          (nullptr),
+    denom         (0.),
+    s_max         (0.),
     _fe_data      (nullptr),
     _fe_side_data (nullptr),
     _fe_var       (nullptr),
@@ -388,12 +394,159 @@ public:
         }
     }
 
+    
+    // this method computes the derivative of quantity-of-interest (QoI) with respect
+    // to the solution variables. The QoI is the aggregate vonMises stress.
+    template <typename ContextType,
+              typename Accessor1Type,
+              typename Accessor2Type,
+              typename ScalarFieldType,
+              typename IndexingType,
+              typename StorageType>
+    inline scalar_t
+    derivative(ContextType                           &c,
+               const ScalarFieldType                 &f,
+               const Accessor1Type                   &v,
+               const Accessor2Type                   &dv,
+               const IndexingType                    &index,
+               const StorageType                     &storage) {
+        
+        _fe_data->reinit(c);
+        _fe_var->init(c, v);
+        _sens_fe_var->init(c, dv);
+
+        scalar_t
+        dq  = 0.,
+        val = 0.;
+        
+        Eigen::Matrix<scalar_t, TraitsType::stress_t::n_strain, 1>
+        dstress_qp = Eigen::Matrix<scalar_t, TraitsType::stress_t::n_strain, 1>::Zero();
+
+        uint_t
+        id = 0;
+        
+        std::vector<scalar_t>
+        stress_vec(storage.data(), storage.data()+storage.size());
+
+        // we check if \p denom is set to zero, which implies we need to compute
+        // and cache the values for \p denom, which is the
+        // denominator of the discrete aggregate maximum sensitivity, and
+        // \p s_max, which is the maximum vonMises stress out of all material/quadrature
+        // points.
+        if (denom == 0.) {
+            MAST::Optimization::Aggregation::aggregate_maximum_denominator
+            (nullptr, stress_vec, c.agg_rho, denom, s_max);
+        }
+
+        
+        // the quantity-of-interest is the discrete approximation to the maximum
+        // vonMises stress. The derivative of this with respect to the state vector
+        // requires the derivative of vonMises stress with respect to the state
+        // vector, which requires the derivative of stress tensor at the quadrature
+        // point with respect to the states. In this for-loop we compute these
+        // derivatives in sequence.
+        for (uint_t i=0; i<_fe_var->n_q_points(); i++) {
+            
+            c.qp = i;
+            
+            id = index.local_id_for_point_on_elem(c.elem, i);
+            typename StorageType::view_t
+            stress_qp = storage.data(id);
+            
+            // compute derivative of stress tensor with respect to the state vector
+            _stress->derivative(c, f, dstress_qp);
+            
+            // use this to compute the derivative of vonMises stress tensor
+            // with respect to the state vector
+            val = MAST::Physics::Elasticity::LinearContinuum::vonMises_stress_derivative<scalar_t, 2>
+            (stress_qp, dstress_qp);
+            
+            // Finally, this is used to compute the derivative of the discrete maximum
+            // approximation with respect to the state vector.
+            // Note: We use the cached values of denom and s_max here.
+            dq += val *
+            MAST::Optimization::Aggregation::aggregate_maximum_sensitivity
+            (stress_vec, i, c.agg_rho, denom, s_max) ;
+        }
+    }
+
+
+    // this method computes the derivative of quantity-of-interest (QoI) with respect
+    // to the solution variables. The QoI is the aggregate vonMises stress.
+    template <typename ContextType,
+              typename AccessorType,
+              typename IndexingType,
+              typename StorageType>
+    inline void derivativeX(ContextType                           &c,
+                            const AccessorType                    &v,
+                            const IndexingType                    &index,
+                            const StorageType                     &storage,
+                            typename TraitsType::element_vector_t &dqdX) {
+        
+        _fe_data->reinit(c);
+        _fe_var->init(c, v);
+        
+        Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>
+        stress_adj = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>::Zero
+        (TraitsType::stress_t::n_strain, v.size());
+
+        uint_t
+        id = 0;
+        
+        std::vector<scalar_t>
+        stress_vec(storage.data(), storage.data()+storage.size());
+
+        // we check if \p denom is set to zero, which implies we need to compute
+        // and cache the values for \p denom, which is the
+        // denominator of the discrete aggregate maximum sensitivity, and
+        // \p s_max, which is the maximum vonMises stress out of all material/quadrature
+        // points.
+        if (denom == 0.) {
+            MAST::Optimization::Aggregation::aggregate_maximum_denominator
+            (nullptr, stress_vec, c.agg_rho, denom, s_max);
+        }
+
+        
+        // the quantity-of-interest is the discrete approximation to the maximum
+        // vonMises stress. The derivative of this with respect to the state vector
+        // requires the derivative of vonMises stress with respect to the state
+        // vector, which requires the derivative of stress tensor at the quadrature
+        // point with respect to the states. In this for-loop we compute these
+        // derivatives in sequence.
+        for (uint_t i=0; i<_fe_var->n_q_points(); i++) {
+            
+            c.qp = i;
+            
+            id = index.local_id_for_point_on_elem(c.elem, i);
+            typename StorageType::view_t
+            stress_qp = storage.data(id);
+            
+            // compute derivative of stress tensor with respect to the state vector
+            _stress->adjoint_derivative(c, stress_adj);
+
+            // use this to compute the derivative of vonMises stress tensor
+            // with respect to the state vector
+            MAST::Physics::Elasticity::LinearContinuum::vonMises_stress_dX<scalar_t, 2>
+            (stress_qp, stress_adj, dqdX);
+            
+            // Finally, this is used to compute the derivative of the discrete maximum
+            // approximation with respect to the state vector.
+            // Note: We use the cached values of denom and s_max here.
+            dqdX += dqdX *
+            MAST::Optimization::Aggregation::aggregate_maximum_sensitivity
+            (stress_vec, i, c.agg_rho, denom, s_max) ;
+        }
+    }
+
+
     // parameters
     typename TraitsType::modulus_t    *E;
     typename TraitsType::nu_t         *nu;
     typename TraitsType::press_t      *press;
     typename TraitsType::area_t       *area;
-    
+    scalar_t                           denom;
+    scalar_t                           s_max;
+
 private:
 
     // variables for quadrature and shape function
@@ -483,6 +636,46 @@ compute_sol(Context                                  &c,
     
     sol = Eigen::SparseLU<typename TraitsType::assembled_matrix_t>(jac).solve(-res);
 }
+
+
+template <typename TraitsType, typename IndexingType, typename StressStorageType>
+inline void
+compute_adjoint_sol(Context                                        &c,
+                    ElemOps<TraitsType>                            &e_ops,
+                    const typename TraitsType::assembled_vector_t  &sol,
+                    const IndexingType                             &index,
+                    const StressStorageType                        &stress,
+                    typename TraitsType::assembled_vector_t        &adj) {
+    
+    using scalar_t   = typename TraitsType::scalar_t;
+
+    typename TraitsType::assembled_vector_t
+    dqdX  = TraitsType::assembled_vector_t::Zero(c.sys->n_dofs()),
+    *res  = nullptr;
+    typename TraitsType::assembled_matrix_t
+    jac;
+    
+    MAST::Numerics::libMeshWrapper::init_sparse_matrix(c.sys->get_dof_map(), jac);
+
+    // assemble the Jacobian
+    {
+        MAST::Base::Assembly::libMeshWrapper::ResidualAndJacobian<scalar_t, ElemOps<TraitsType>>
+        assembly;
+        assembly.set_elem_ops(e_ops);
+        assembly.assemble(c, sol, res, &jac);
+    }
+    
+    // assembly the dq/dX vector
+    {
+        MAST::Base::Assembly::libMeshWrapper::MaterialPointOutputDerivative<scalar_t, ElemOps<TraitsType>>
+        assembly;
+        assembly.set_elem_ops(e_ops);
+        assembly.assemble(c, sol, index, stress, dqdX);
+    }
+    
+    adj = Eigen::SparseLU<typename TraitsType::assembled_matrix_t>(jac.transpose()).solve(dqdX);
+}
+
 
 
 template <typename TraitsType, typename ScalarFieldType>
@@ -772,7 +965,10 @@ inline void analysis(ContextType                      &c,
     std::vector<scalar_t>
     vals(vm_stress.data(), vm_stress.data()+vm_stress.size());
     
-    vm_max_agg = MAST::Optimization::Aggregation::aggregate_maximum(vals, 50);
+    // since this is a serial example, we pass a \p nullptr for
+    // the communicator (first argument) of the \p aggregate_maximum function.
+    vm_max_agg = MAST::Optimization::Aggregation::aggregate_maximum
+    (nullptr, vals, c.agg_rho);
 }
 
 
@@ -789,12 +985,14 @@ inline void sensitivity(ContextType                      &c,
                         ElemOpsType                      &e_ops,
                         VecType                          &sol,
                         VecType                          &dsol,
+                        VecType                          &adj,
                         IndexType                        &index,
                         StressStorageType                &stress,
                         StressStorageType                &dstress,
                         vonMisesStressStorageType        &vm_stress,
                         vonMisesStressStorageType        &dvm_stress,
-                        typename TraitsType::scalar_t    &dvm_max_agg) {
+                        typename TraitsType::scalar_t    &dvm_max_agg,
+                        typename TraitsType::scalar_t    &dvm_max_agg_adj) {
 
     using scalar_t = typename TraitsType::scalar_t;
 
@@ -818,8 +1016,18 @@ inline void sensitivity(ContextType                      &c,
     vals (vm_stress.data(), vm_stress.data()+vm_stress.size()),
     dvals(dvm_stress.data(), dvm_stress.data()+dvm_stress.size());
     
+    // since this is a serial example, we pass a \p nullptr for
+    // the communicator (first argument) of the \p aggregate_maximum function.
     dvm_max_agg = MAST::Optimization::Aggregation::aggregate_maximum_sensitivity
-    (vals, dvals,  50);
+    (nullptr, vals, dvals, c.agg_rho);
+    
+    // compute the sensitivity using adjoint solution
+    MAST::Base::Assembly::libMeshWrapper::MaterialPointOutputSensitivity
+    <scalar_t, ElemOps<TraitsType>, ElemOps<TraitsType>>
+    adj_sens(c.sys->comm());
+    adj_sens.set_elem_ops(e_ops, e_ops);
+    
+    dvm_max_agg_adj = adj_sens.assemble(c, f, sol, adj, index, stress);
 }
 
 
@@ -863,6 +1071,7 @@ inline void print_difference(VecType                     &dsol,
                              vonMisesStressStorageType   &dvm_stress,
                              vonMisesStressStorageTypeCS &vm_stress_cs,
                              real_t                      &dvm_agg,
+                             real_t                      &dvm_agg_adj,
                              complex_t                   &vm_agg_cs,
                              std::string                  nm) {
  
@@ -890,9 +1099,12 @@ inline void print_difference(VecType                     &dsol,
     
     dvm_stress_vec -= vm_stress_vec_cs.imag()/ComplexStepDelta;
 
-    // difference between the aggregated value sensivitity
+    // difference between the analytical and adjoint sensivitity of aggregated value
+    dvm_agg_adj -= dvm_agg;
+
+    // difference between the analytical and complex-step aggregated value sensivitity
     dvm_agg -= vm_agg_cs.imag()/ComplexStepDelta;
-    
+
     // print out the norm of the difference. The difference should be zero to machine
     // precision. This proceduce is followed for all the other parameters.
     std::cout
@@ -901,6 +1113,7 @@ inline void print_difference(VecType                     &dsol,
     << std::setw(20) << dstress_vec.norm()
     << std::setw(20) << dvm_stress_vec.norm()
     << std::setw(20) << dvm_agg
+    << std::setw(20) << dvm_agg_adj
     << std::endl;
 }
 
@@ -929,7 +1142,8 @@ int main(int argc, const char** argv) {
 
     typename traits_t::assembled_vector_t
     sol,
-    dsol;
+    dsol,
+    adj;
 
     typename traits_t::mp_storage_t
     stress(c.mesh->comm().get()),
@@ -957,8 +1171,9 @@ int main(int argc, const char** argv) {
     sol_c;
 
     real_t
-    vm_agg  = 0.,
-    dvm_agg = 0;
+    vm_agg      = 0.,
+    dvm_agg     = 0,
+    dvm_agg_adj = 0;
     
     complex_t
     vm_agg_cs = 0.;
@@ -968,6 +1183,10 @@ int main(int argc, const char** argv) {
     
     MAST::Examples::Structural::Example1::write_solution<traits_t>
     (c, sol, *c.index, stress, vm_stress, 1);
+
+    // compute the adjoint solution
+    MAST::Examples::Structural::Example1::compute_adjoint_sol<traits_t>
+    (c, e_ops, sol, *c.index, stress, adj);
 
     // print the header for the table
     std::cout
@@ -995,9 +1214,9 @@ int main(int argc, const char** argv) {
         
         // sensitivity of solution and stress
         MAST::Examples::Structural::Example1::sensitivity<traits_t>
-        (c, *e_ops.E, e_ops, sol, dsol, *c.index,
+        (c, *e_ops.E, e_ops, sol, dsol, adj, *c.index,
          stress, dstress,
-         vm_stress, dvm_stress, dvm_agg);
+         vm_stress, dvm_stress, dvm_agg, dvm_agg_adj);
         
         MAST::Examples::Structural::Example1::write_solution<traits_t>
         (c, dsol, *c.index, dstress, dvm_stress, 2);
@@ -1006,7 +1225,7 @@ int main(int argc, const char** argv) {
         (dsol, sol_c,
          dstress, stress_cs,
          dvm_stress, vm_stress_cs,
-         dvm_agg, vm_agg_cs,
+         dvm_agg, dvm_agg_adj, vm_agg_cs,
          "E");
     }
 
@@ -1024,9 +1243,9 @@ int main(int argc, const char** argv) {
         
         // sensitivity of solution and stress
         MAST::Examples::Structural::Example1::sensitivity<traits_t>
-        (c, *e_ops.nu, e_ops, sol, dsol, *c.index,
+        (c, *e_ops.nu, e_ops, sol, dsol, adj, *c.index,
          stress, dstress,
-         vm_stress, dvm_stress, dvm_agg);
+         vm_stress, dvm_stress, dvm_agg, dvm_agg_adj);
         
         MAST::Examples::Structural::Example1::write_solution<traits_t>
         (c, dsol, *c.index, dstress, dvm_stress, 3);
@@ -1035,7 +1254,7 @@ int main(int argc, const char** argv) {
         (dsol, sol_c,
          dstress, stress_cs,
          dvm_stress, vm_stress_cs,
-         dvm_agg, vm_agg_cs,
+         dvm_agg, dvm_agg_adj, vm_agg_cs,
          "nu");
     }
 
@@ -1053,9 +1272,9 @@ int main(int argc, const char** argv) {
         
         // sensitivity of solution and stress
         MAST::Examples::Structural::Example1::sensitivity<traits_t>
-        (c, *e_ops.press, e_ops, sol, dsol, *c.index,
+        (c, *e_ops.press, e_ops, sol, dsol, adj, *c.index,
          stress, dstress,
-         vm_stress, dvm_stress, dvm_agg);
+         vm_stress, dvm_stress, dvm_agg, dvm_agg_adj);
         
         MAST::Examples::Structural::Example1::write_solution<traits_t>
         (c, dsol, *c.index, dstress, dvm_stress, 4);
@@ -1064,7 +1283,7 @@ int main(int argc, const char** argv) {
         (dsol, sol_c,
          dstress, stress_cs,
          dvm_stress, vm_stress_cs,
-         dvm_agg, vm_agg_cs,
+         dvm_agg, dvm_agg_adj, vm_agg_cs,
          "pres");
     }
 
@@ -1083,9 +1302,9 @@ int main(int argc, const char** argv) {
         
         // sensitivity of solution and stress
         MAST::Examples::Structural::Example1::sensitivity<traits_t>
-        (c, *e_ops.area, e_ops, sol, dsol, *c.index,
+        (c, *e_ops.area, e_ops, sol, dsol, adj, *c.index,
          stress, dstress,
-         vm_stress, dvm_stress, dvm_agg);
+         vm_stress, dvm_stress, dvm_agg, dvm_agg_adj);
         
         MAST::Examples::Structural::Example1::write_solution<traits_t>
         (c, dsol, *c.index, dstress, dvm_stress, 5);
@@ -1094,7 +1313,7 @@ int main(int argc, const char** argv) {
         (dsol, sol_c,
          dstress, stress_cs,
          dvm_stress, vm_stress_cs,
-         dvm_agg, vm_agg_cs,
+         dvm_agg, dvm_agg_adj, vm_agg_cs,
          "area");
     }
     
