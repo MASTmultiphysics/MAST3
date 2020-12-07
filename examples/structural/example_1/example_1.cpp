@@ -1195,7 +1195,7 @@ int main(int argc, const char** argv) {
     (c, e_ops, sol, *c.index, stress, adj);
 
     MAST::Examples::Structural::Example1::write_solution<traits_t>
-    (c, adj, *c.index, stress, vm_stress, 1, writer);
+    (c, sol, *c.index, stress, vm_stress, 1, writer);
 
     // print the header for the table
     std::cout
