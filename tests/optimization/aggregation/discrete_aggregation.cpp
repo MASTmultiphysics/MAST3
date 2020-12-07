@@ -50,11 +50,11 @@ void run_checks(const real_t p, bool check_agg_min) {
 
     real_t
     min_val  = *std::min_element(vec.begin(), vec.end()),
-    min_agg  = MAST::Optimization::Aggregation::aggregate_minimum(vec, p),
-    dmin_val = MAST::Optimization::Aggregation::aggregate_minimum_sensitivity(vec, dvec, p),
+    min_agg  = MAST::Optimization::Aggregation::aggregate_minimum(nullptr, vec, p),
+    dmin_val = MAST::Optimization::Aggregation::aggregate_minimum_sensitivity(nullptr, vec, dvec, p),
     max_val  = *std::max_element(vec.begin(), vec.end()),
-    max_agg  = MAST::Optimization::Aggregation::aggregate_maximum(vec, p),
-    dmax_val = MAST::Optimization::Aggregation::aggregate_maximum_sensitivity(vec, dvec, p);
+    max_agg  = MAST::Optimization::Aggregation::aggregate_maximum(nullptr, vec, p),
+    dmax_val = MAST::Optimization::Aggregation::aggregate_maximum_sensitivity(nullptr, vec, dvec, p);
 
     // check aggregated minimum if asked
     if (check_agg_min) {
@@ -87,10 +87,10 @@ void run_checks(const real_t p, bool check_agg_min) {
         // sensitivity of minimum aggregate
         //////////////////////////////////////////////////////////
         // analytical sensitivity wrt ith var
-        dval = MAST::Optimization::Aggregation::aggregate_minimum_sensitivity(vec, i, p);
+        dval = MAST::Optimization::Aggregation::aggregate_minimum_sensitivity(nullptr, vec, i, p);
         
         // complex-step sensitivity wrt ith var
-        val     = MAST::Optimization::Aggregation::aggregate_minimum(vec_cs, p);
+        val     = MAST::Optimization::Aggregation::aggregate_minimum(nullptr, vec_cs, p);
         dval_cs = val.imag()/1.e-12;
         
         dval_agg_min += dval_cs * dvec[i];
@@ -101,10 +101,10 @@ void run_checks(const real_t p, bool check_agg_min) {
         // sensitivity of maximum aggregate
         //////////////////////////////////////////////////////////
         // analytical sensitivity wrt ith var
-        dval = MAST::Optimization::Aggregation::aggregate_maximum_sensitivity(vec, i, p);
+        dval = MAST::Optimization::Aggregation::aggregate_maximum_sensitivity(nullptr, vec, i, p);
         
         // complex-step sensitivity wrt ith var
-        val     = MAST::Optimization::Aggregation::aggregate_maximum(vec_cs, p);
+        val     = MAST::Optimization::Aggregation::aggregate_maximum(nullptr, vec_cs, p);
         dval_cs = val.imag()/1.e-12;
 
         dval_agg_max += dval_cs * dvec[i];
@@ -136,7 +136,7 @@ void run_checks(const real_t p, bool check_agg_min) {
     // analytical sensitivity wrt ith var
     {
         adouble_tl_t
-        val_ad = MAST::Optimization::Aggregation::aggregate_minimum(vec_ad, p);
+        val_ad = MAST::Optimization::Aggregation::aggregate_minimum(nullptr, vec_ad, p);
         
         CHECK(val_ad.getValue() == Catch::Detail::Approx(min_agg));
         CHECK(*val_ad.getADValue() == Catch::Detail::Approx(dmin_val));
@@ -148,7 +148,7 @@ void run_checks(const real_t p, bool check_agg_min) {
     // analytical sensitivity wrt ith var
     {
         adouble_tl_t
-        val_ad = MAST::Optimization::Aggregation::aggregate_maximum(vec_ad, p);
+        val_ad = MAST::Optimization::Aggregation::aggregate_maximum(nullptr, vec_ad, p);
         
         CHECK(val_ad.getValue() == Catch::Detail::Approx(max_agg));
         CHECK(*val_ad.getADValue() == Catch::Detail::Approx(dmax_val));
