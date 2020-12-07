@@ -59,7 +59,7 @@ public:
                   "Scalar type of assembly and element operations must be same");
 
     
-    MaterialPointOutputSensitivity(libMesh::Communicator &comm):
+    MaterialPointOutputSensitivity(const libMesh::Parallel::Communicator &comm):
     _comm         (comm),
     _e_ops        (nullptr),
     _output_e_ops (nullptr)
@@ -88,7 +88,7 @@ public:
     assemble(ContextType               &c,
              ScalarFieldType           &f,
              const Vec1Type            &X,
-             const Vec1Type            &X_adj,
+             const Vec2Type            &X_adj,
              const IndexingType        &index,
              const StorageType         &stress) {
                 
@@ -101,13 +101,13 @@ public:
         // analysis quantities
         typename MAST::Base::Assembly::libMeshWrapper::Accessor<ScalarType, Vec1Type>
         sol_accessor     (*c.sys, X),
-        dsol_accessor    (*c.sys, X),
         adj_accessor     (*c.sys, X_adj);
         
         using elem_vector_t = typename ResidualElemOpsType::vector_t;
         using elem_matrix_t = typename ResidualElemOpsType::matrix_t;
         
         elem_vector_t
+        dsol_e,
         dres_e;
 
         uint_t
@@ -126,9 +126,9 @@ public:
             c.elem = *el;
             
             sol_accessor.init  (*c.elem);
-            dsol_accessor.init (*c.elem);
             adj_accessor.init  (*c.elem);
             
+            dsol_e.setZero(sol_accessor.n_dofs());
             dres_e.setZero(sol_accessor.n_dofs());
             
             // first we compute the partial derivative of the
@@ -140,13 +140,15 @@ public:
                                nullptr);
             
             
-            val +=
-            _output_e_ops->derivative(c, f,
-                                      sol_accessor,
-                                      dsol_accessor,
-                                      index,
-                                      stress) // partial derivative of output
-            + adj_accessor.dot(dres_e)); // the adjoint vector combined w/ res sens
+            // partial derivative of output
+            val += _output_e_ops->derivative(c, f,
+                                             sol_accessor,
+                                             dsol_e,
+                                             index,
+                                             stress);
+            
+            // the adjoint vector combined w/ res sens
+            val += adj_accessor.dot(dres_e);
         }
         
         MAST::Numerics::Utility::comm_sum(_comm, val);
@@ -156,9 +158,9 @@ public:
 
 private:
   
-    libMesh::Comm        &_comm;
-    ResidualElemOpsType  *_e_ops;
-    OutputElemOpsType    *_output_e_ops;
+    const libMesh::Parallel::Communicator  &_comm;
+    ResidualElemOpsType                    *_e_ops;
+    OutputElemOpsType                      *_output_e_ops;
 };
 
 } // namespace libMeshWrapper
