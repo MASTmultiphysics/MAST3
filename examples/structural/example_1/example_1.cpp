@@ -210,6 +210,7 @@ public:
     area          (nullptr),
     denom         (0.),
     s_max         (0.),
+    vm_stress_vec (nullptr),
     _fe_data      (nullptr),
     _fe_side_data (nullptr),
     _fe_var       (nullptr),
@@ -411,6 +412,8 @@ public:
                const IndexingType                    &index,
                const StorageType                     &storage) {
         
+        Assert0(vm_stress_vec, "vonMises stress vector must be provided");
+
         _fe_data->reinit(c);
         _fe_var->init(c, v);
         _sens_fe_var->init(c, dv);
@@ -425,9 +428,6 @@ public:
         uint_t
         id = 0;
         
-        std::vector<scalar_t>
-        stress_vec(storage.data(), storage.data()+storage.size());
-
         // we check if \p denom is set to zero, which implies we need to compute
         // and cache the values for \p denom, which is the
         // denominator of the discrete aggregate maximum sensitivity, and
@@ -435,7 +435,7 @@ public:
         // points.
         if (denom == 0.) {
             MAST::Optimization::Aggregation::aggregate_maximum_denominator
-            (nullptr, stress_vec, c.agg_rho, denom, s_max);
+            (nullptr, *vm_stress_vec, c.agg_rho, denom, s_max);
         }
 
         
@@ -466,7 +466,7 @@ public:
             // Note: We use the cached values of denom and s_max here.
             dq += val *
             MAST::Optimization::Aggregation::aggregate_maximum_sensitivity
-            (stress_vec, i, c.agg_rho, denom, s_max) ;
+            (*vm_stress_vec, id, c.agg_rho, denom, s_max) ;
         }
     }
 
@@ -483,6 +483,8 @@ public:
                             const StorageType                     &storage,
                             typename TraitsType::element_vector_t &dqdX) {
         
+        Assert0(vm_stress_vec, "vonMises stress vector must be provided");
+        
         _fe_data->reinit(c);
         _fe_var->init(c, v);
         
@@ -490,12 +492,12 @@ public:
         stress_adj = Eigen::Matrix<scalar_t, Eigen::Dynamic, Eigen::Dynamic>::Zero
         (TraitsType::stress_t::n_strain, v.size());
 
+        Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>
+        dvm_dX_qp = Eigen::Matrix<scalar_t, Eigen::Dynamic, 1>::Zero(dqdX.size());
+        
         uint_t
         id = 0;
         
-        std::vector<scalar_t>
-        stress_vec(storage.data(), storage.data()+storage.size());
-
         // we check if \p denom is set to zero, which implies we need to compute
         // and cache the values for \p denom, which is the
         // denominator of the discrete aggregate maximum sensitivity, and
@@ -503,10 +505,9 @@ public:
         // points.
         if (denom == 0.) {
             MAST::Optimization::Aggregation::aggregate_maximum_denominator
-            (nullptr, stress_vec, c.agg_rho, denom, s_max);
+            (nullptr, *vm_stress_vec, c.agg_rho, denom, s_max);
         }
 
-        
         // the quantity-of-interest is the discrete approximation to the maximum
         // vonMises stress. The derivative of this with respect to the state vector
         // requires the derivative of vonMises stress with respect to the state
@@ -526,15 +527,16 @@ public:
 
             // use this to compute the derivative of vonMises stress tensor
             // with respect to the state vector
+            dvm_dX_qp.setZero();
             MAST::Physics::Elasticity::LinearContinuum::vonMises_stress_dX<scalar_t, 2>
-            (stress_qp, stress_adj, dqdX);
+            (stress_qp, stress_adj, dvm_dX_qp);
             
             // Finally, this is used to compute the derivative of the discrete maximum
             // approximation with respect to the state vector.
             // Note: We use the cached values of denom and s_max here.
-            dqdX += dqdX *
+            dqdX += dvm_dX_qp *
             MAST::Optimization::Aggregation::aggregate_maximum_sensitivity
-            (stress_vec, i, c.agg_rho, denom, s_max) ;
+            (*vm_stress_vec, id, c.agg_rho, denom, s_max);
         }
     }
 
@@ -546,6 +548,7 @@ public:
     typename TraitsType::area_t       *area;
     scalar_t                           denom;
     scalar_t                           s_max;
+    std::vector<scalar_t>             *vm_stress_vec;
 
 private:
 
@@ -673,7 +676,7 @@ compute_adjoint_sol(Context                                        &c,
         assembly.assemble(c, sol, index, stress, dqdX);
     }
     
-    adj = Eigen::SparseLU<typename TraitsType::assembled_matrix_t>(jac.transpose()).solve(dqdX);
+    adj = Eigen::SparseLU<typename TraitsType::assembled_matrix_t>(jac.transpose()).solve(-dqdX);
 }
 
 
@@ -1181,6 +1184,10 @@ int main(int argc, const char** argv) {
     MAST::Examples::Structural::Example1::analysis<traits_t>
     (c, e_ops, sol, *c.index, stress, vm_stress, vm_agg);
     
+    std::vector<real_t>
+    vm_stress_vec(vm_stress.data(), vm_stress.data()+vm_stress.size());
+    e_ops.vm_stress_vec = &vm_stress_vec;
+    
     MAST::Examples::Structural::Example1::write_solution<traits_t>
     (c, sol, *c.index, stress, vm_stress, 1);
 
@@ -1196,7 +1203,8 @@ int main(int argc, const char** argv) {
     << std::setw(20) << "Solution"
     << std::setw(20) << "Stress"
     << std::setw(20) << "vonMises Stress"
-    << std::setw(20) << "vonMises Agg"
+    << std::setw(20) << "vonMises Agg (Dir)"
+    << std::setw(20) << "vonMises Agg (Adj)"
     << std::endl;
 
     ///////////////////////////////////////////////////////////////////////////////////////
