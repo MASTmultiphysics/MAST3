@@ -137,6 +137,7 @@ public:
         if (q_order == libMesh::SECOND) return 4;
         else if (q_order == libMesh::FOURTH) return 9;
         else Error(false, "Quadrature order not implemented");
+        return -1;
     }
     inline bool if_compute_pressure_load_on_side(const uint_t s)
     { return mesh->boundary_info->has_boundary_id(elem, s, p_side_id);}

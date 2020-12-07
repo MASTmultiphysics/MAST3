@@ -52,6 +52,7 @@ inline uint_t n_linear_basis_nodes_on_elem(const libMesh::Elem& e) {
         default:
             Error(false, "Elem type must be QUAD4/QUAD9 for 2D or HEX8/HEX27 for 3D");
     }
+    return -1;
 }
 
 

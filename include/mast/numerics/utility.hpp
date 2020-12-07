@@ -405,6 +405,7 @@ inline complex_t
 comm_min(const libMesh::Parallel::Communicator& comm,
          const std::vector<complex_t>& v) {
     Error(false, "Not currently implemented for complex_t");
+    return 0.;
 }
 
 
@@ -413,6 +414,7 @@ comm_min(const libMesh::Parallel::Communicator &comm,
          complex_t                                 v) {
     
     Error(false, "Not currently implemented for complex_t");
+    return 0.;
 }
 
 
@@ -442,6 +444,7 @@ inline complex_t
 comm_max(const libMesh::Parallel::Communicator& comm,
          const std::vector<complex_t>& v) {
     Error(false, "Not currently implemented for complex_t");
+    return 0.;
 }
 
 
@@ -449,6 +452,7 @@ inline complex_t
 comm_max(const libMesh::Parallel::Communicator &comm,
          complex_t                              v) {
     Error(false, "Not currently implemented for complex_t");
+    return 0.;
 }
 
 
@@ -471,6 +475,7 @@ comm_min(const libMesh::Parallel::Communicator& comm,
          const std::vector<adouble_tl_t>& v) {
     
     Error(false, "Not currently implemented for adouble_tl_t");
+    return 0.;
 }
 
 inline adouble_tl_t
@@ -478,6 +483,7 @@ comm_min(const libMesh::Parallel::Communicator  &comm,
          adouble_tl_t                            v) {
     
     Error(false, "Not currently implemented for adouble_tl_t");
+    return 0.;
 }
 
 
@@ -486,6 +492,7 @@ comm_max(const libMesh::Parallel::Communicator& comm,
          const std::vector<adouble_tl_t>& v) {
     
     Error(false, "Not currently implemented for adouble_tl_t");
+    return 0.;
 }
 
 inline adouble_tl_t
@@ -493,6 +500,7 @@ comm_max(const libMesh::Parallel::Communicator &comm,
          adouble_tl_t                           v) {
     
     Error(false, "Not currently implemented for adouble_tl_t");
+    return 0.;
 }
 #endif
 
