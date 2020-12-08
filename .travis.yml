@@ -3,9 +3,9 @@ language: cpp
 matrix:
   include:
     # macOS/Linux builds - libMesh version 1.5.1
-    - os: osx
-      osx_image: xcode10.2
-      env: LIBMESH_VERSION=1.5.1
+    #- os: osx
+    #  osx_image: xcode10.2
+    #  env: LIBMESH_VERSION=1.5.1
     - os: linux
       dist: bionic
       env: LIBMESH_VERSION=1.5.1
