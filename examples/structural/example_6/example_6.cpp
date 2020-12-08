@@ -774,24 +774,30 @@ public:
                        real_t                     &o,
                        std::vector<real_t>        &fvals) {
 
-        // pass all desntity values through the heaviside filter for plotting.
-        for (uint_t i=_c.rho_sys->solution->first_local_index();
-             i<_c.rho_sys->solution->last_local_index(); i++) {
+        uint_t
+        write_freq = _c.ex_init.input("write_freq","frequency of writing output files", 20);
 
-            real_t v = _c.rho_sys->solution->el(i);
-            _c.rho_sys->solution->set(i, _e_ops.heaviside->filter(v));
+        if (iter%write_freq == 0) {
+            
+            // pass all desntity values through the heaviside filter for plotting.
+            for (uint_t i=_c.rho_sys->solution->first_local_index();
+                 i<_c.rho_sys->solution->last_local_index(); i++) {
+                
+                real_t v = _c.rho_sys->solution->el(i);
+                _c.rho_sys->solution->set(i, _e_ops.heaviside->filter(v));
+            }
+            _c.rho_sys->solution->close();
+            _c.rho_sys->update();
+            
+            std::ostringstream oss;
+            oss << "output_optim.e-s." << std::setfill('0') << std::setw(5) << iter ;
+            
+            _c.sys->time = iter;
+            libMesh::Nemesis_IO writer(*_c.mesh);
+            // "1" is the number of time-steps in the file,
+            // as opposed to the time-step number.
+            writer.write_timestep(oss.str(), *_c.eq_sys, 1, (real_t)iter);
         }
-        _c.rho_sys->solution->close();
-        _c.rho_sys->update();
-        
-        std::ostringstream oss;
-        oss << "output_optim.e-s." << std::setfill('0') << std::setw(5) << iter ;
-        
-        _c.sys->time = iter;
-        libMesh::Nemesis_IO writer(*_c.mesh);
-        // "1" is the number of time-steps in the file,
-        // as opposed to the time-step number.
-        writer.write_timestep(oss.str(), *_c.eq_sys, 1, (real_t)iter);
         
         // also, save the design iteration to a text file
         MAST::Optimization::Utility::write_obj_constr_history_to_file(*this,
