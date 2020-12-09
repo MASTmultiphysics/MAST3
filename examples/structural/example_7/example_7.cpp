@@ -876,26 +876,34 @@ public:
             
             // compute the average element density value
             real_t
-            rho = 0.;
+            rho     = 0.,
+            rho_avg = 0.,
+            min_rho = 1.,
+            max_rho = 0.;
             
             n_nodes = MAST::Mesh::libMeshWrapper::Utility::n_linear_basis_nodes_on_elem(**it);
             
             for (uint_t i=0; i<n_nodes; i++) {
                 
                 const libMesh::Node& n = *elem->node_ptr(i);
-                
-                rho +=
-                MAST::Numerics::Utility::get(sol,//*_c.rho_sys->current_local_solution,
-                                             n.dof_number(sys_num, 0, 0));
+
+                rho =
+                MAST::Numerics::Utility::get(sol, n.dof_number(sys_num, 0, 0));
+
+                rho_avg += rho;
+                if (min_rho > rho) min_rho = rho;
+                if (max_rho < rho) max_rho = rho;
             }
             
-            rho /= (1. * n_nodes);
+            rho_avg /= (1. * n_nodes);
 
-            if (rho >= 0.3 &&
-                rho <= 0.9 &&
+            if (rho_avg >= 0.3 &&
+                rho_avg <= 0.9 &&
                 elem->level() < _max_h)
                 elem->set_refinement_flag(libMesh::Elem::REFINE);
-            else if (rho < 0.2)
+            else if (rho_avg < 0.2)
+                elem->set_refinement_flag(libMesh::Elem::COARSEN);
+            else if ((max_rho-min_rho) < 1.e-2)
                 elem->set_refinement_flag(libMesh::Elem::COARSEN);
         }
     }
