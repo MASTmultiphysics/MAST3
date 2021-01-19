@@ -1,0 +1,56 @@
+name: build-and-test-mast
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install APT dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get -qq install -y \
+            gfortran wget m4 \
+            openmpi-bin libopenmpi-dev \
+            petsc-dev libpetsc3.7.7-dbg \
+            slepc-dev libparpack2-dev \
+            metis libmetis-dev \
+            libparpack2-dev \
+            libnetcdf13 libnetcdf-dev \
+            libboost-all-dev \
+            libeigen3-dev \
+            libadolc-dev \
+            doxygen graphviz rsync \
+            texlive-latex-base dvi2ps ghostscript \
+            python3.7 python3.7-dev libpython3.7
+
+      - name: Setup pip w/ external Python 3.7 & install Python dependencies
+        run: |
+          cd ${HOME}/work
+          wget https://bootstrap.pypa.io/get-pip.py
+          sudo python3.7 get-pip.py
+          sudo python3.7 -m pip install numpy scipy docopt colorama pandas h5py matplotlib cpylog pyNastran
+          sudo python3.7 -m pip install Cython --install-option="--no-cython-compile"
+
+      - name: Update to later CMake release
+        run: |
+          cd ${HOME}/work
+          wget https://github.com/Kitware/CMake/releases/download/v3.15.5/cmake-3.15.5-Linux-x86_64.sh
+          sudo mkdir /opt/cmake
+          sudo sh cmake-3.15.5-Linux-x86_64.sh --prefix=/opt/cmake --skip-license
+
+      - name: Get/install libMesh dependency
+        run: |
+          cd ${HOME}/work
+          wget -nv "https://github.com/MASTmultiphysics/mast-ci-packages/releases/download/libmesh_ubuntu18.04/libmesh-1.5.1-1.deb"
+          sudo apt install "./libmesh-1.5.1-1.deb"
+
+      - name: Say Hello
+        shell: bash
+        run: |
+          cd ${HOME}/work
+          echo "$(which cmake)"
+          echo "$(/opt/cmake/bin/cmake --version)"
+          echo ${HOME}
+          echo ${GITHUB_WORKSPACE}
+          echo $(pwd)
