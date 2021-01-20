@@ -78,6 +78,12 @@ jobs:
           cd ${GITHUB_WORKSPACE}/build_dbg
           make -j 2
 
+      - name: Test MAST (Debug Version)
+        shell: bash
+        run: |
+          cd ${GITHUB_WORKSPACE}/build_dbg/tests
+          ctest --force-new-ctest-process --output-on-failure --timeout 30
+
       - name: Configure MAST (Release Version)
         shell: bash
         run: |
@@ -110,3 +116,9 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}/build_rel
           make -j 2
+
+      - name: Test MAST (Release Version)
+        shell: bash
+        run: |
+          cd ${GITHUB_WORKSPACE}/build_rel/tests
+          ctest --force-new-ctest-process --output-on-failure --timeout 30
