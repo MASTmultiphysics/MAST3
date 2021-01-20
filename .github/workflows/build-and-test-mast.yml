@@ -45,12 +45,68 @@ jobs:
           wget -nv "https://github.com/MASTmultiphysics/mast-ci-packages/releases/download/libmesh_ubuntu18.04/libmesh-1.5.1-1.deb"
           sudo apt install "./libmesh-1.5.1-1.deb"
 
-      - name: Say Hello
+      - name: Configure MAST (Debug Version)
         shell: bash
         run: |
-          cd ${HOME}/work
-          echo "$(which cmake)"
-          echo "$(/opt/cmake/bin/cmake --version)"
-          echo ${HOME}
-          echo ${GITHUB_WORKSPACE}
-          echo $(pwd)
+          cd ${GITHUB_WORKSPACE}
+          mkdir build_dbg
+          cd build_dbg
+          /opt/cmake/bin/cmake .. \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_INSTALL_PREFIX="${MAST_INSTALL_DIR}" \
+            -DCMAKE_C_COMPILER=mpicc \
+            -DCMAKE_CXX_COMPILER=mpic++ \
+            -DCMAKE_Fortran_COMPILER=mpifort \
+            -DlibMesh_DIR=/usr/local \
+            -DPETSc_DIR=/usr/lib/petsc \
+            -DSLEPc_DIR=/usr/lib/slepc \
+            -DEIGEN3_ROOT=/usr/include/eigen3 \
+            -DADOLC_DIR=/usr \
+            -DPython3_DIR=/usr \
+            -DBOOST_ROOT=/usr \
+            -DBUILD_DOC=ON \
+            -DENABLE_DOT=OFF \
+            -DENABLE_GCMMA=OFF \
+            -DENABLE_SNOPT=OFF\
+            -DENABLE_ADOLC=ON \
+            -DENABLE_NASTRANIO=OFF \
+            -DENABLE_CYTHON=OFF
+
+      - name: Build MAST (Debug Version)
+        shell: bash
+        run: |
+          cd ${GITHUB_WORKSPACE}/build_dbg
+          make -j 2
+
+      - name: Configure MAST (Release Version)
+        shell: bash
+        run: |
+          cd ${GITHUB_WORKSPACE}
+          mkdir build_rel
+          cd build_rel
+          /opt/cmake/bin/cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="${MAST_INSTALL_DIR}" \
+            -DCMAKE_C_COMPILER=mpicc \
+            -DCMAKE_CXX_COMPILER=mpic++ \
+            -DCMAKE_Fortran_COMPILER=mpifort \
+            -DlibMesh_DIR=/usr/local \
+            -DPETSc_DIR=/usr/lib/petsc \
+            -DSLEPc_DIR=/usr/lib/slepc \
+            -DEIGEN3_ROOT=/usr/include/eigen3 \
+            -DADOLC_DIR=/usr/lib/adolc \
+            -DPython3_DIR=/usr \
+            -DBOOST_ROOT=/usr \
+            -DBUILD_DOC=ON \
+            -DENABLE_DOT=OFF \
+            -DENABLE_GCMMA=OFF \
+            -DENABLE_SNOPT=OFF \
+            -DENABLE_ADOLC=ON \
+            -DENABLE_NASTRANIO=OFF \
+            -DENABLE_CYTHON=OFF
+
+      - name: Build MAST (Release Version)
+        shell: bash
+        run: |
+          cd ${GITHUB_WORKSPACE}/build_rel
+          make -j 2
