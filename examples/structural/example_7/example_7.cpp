@@ -148,7 +148,7 @@ public:
 
         // create and attach the null space to the matrix
         MAST::Physics::Elasticity::libMeshWrapper::NullSpace
-        null_sp(*sys, ModelType::dim, false);
+        null_sp(*sys, ModelType::dim, true);
         
         Mat m = dynamic_cast<libMesh::PetscMatrix<real_t>*>(sys->matrix)->mat();
         null_sp.attach_to_matrix(m);
